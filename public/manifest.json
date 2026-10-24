@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "MediaManagarr",
+  "version": "0.0.1",
+  "description": "Your self-hosted media ecosystem, all in one place.",
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "MediaManagarr"
+  }
+}
