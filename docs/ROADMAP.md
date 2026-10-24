@@ -1,6 +1,6 @@
 # MediaManagarr Development Roadmap
 
-> **Status:** Early development. Everything described here is planned unless explicitly identified as implemented. Milestones describe intended outcomes, not fixed delivery dates.
+> **Status:** Early development. Milestones 0 and 1 are complete. Milestone 2 is next. Remaining milestones describe planned outcomes, not fixed delivery dates.
 
 ## Vision
 
@@ -91,35 +91,42 @@ Use Vitest for calculations, transformations, status mapping, API handling, and 
 
 Evaluate Playwright or Cypress for browser automation, recognizing that testing a popup page is not the same as testing a packaged extension with permissions, storage, and background messaging. Prioritize meaningful test coverage, especially for destructive actions.
 
-Storybook should document each reusable component's purpose, props, events, variants, interaction states, accessibility requirements, and examples. Publish only mock data—never credentials or private server addresses. Deploy its static build to GitHub Pages using GitHub Actions after the relevant checks pass on `master`.
+Storybook is configured for Vue 3 and Vite, with accessibility checks powered by axe-core. The initial `Button` atom has colocated stories and component tests. Future reusable components should document their purpose, props, events, variants, interaction states, accessibility requirements, and examples.
 
-## Milestone 0 — Repository and development infrastructure
+The component library is automatically built and deployed to [GitHub Pages](https://yansudeansu.github.io/mediamanagarr/) through GitHub Actions when changes are pushed to `master`. Publish only mock data—never credentials or private server addresses.
+
+## Milestone 0 — Repository and development infrastructure ✅ Complete
 
 **Goal:** A clean checkout can install dependencies, pass automated checks, and build successfully.
 
-- Create the GitHub repository and configure `master`.
-- Initialize Vue 3, TypeScript, Vite, and npm.
-- Add README, MIT license, `.gitignore`, `.editorconfig`, and contributing guidance.
-- Configure strict TypeScript, ESLint, Prettier, and Vitest.
-- Add lint, format, test, and build scripts.
-- Configure GitHub Actions with `npm ci`, dependency caching, and quality checks.
-- Verify CI on a clean checkout.
-- Establish branch and pull-request conventions.
-- Evaluate WXT versus a custom Vite extension setup (may continue into the application-shell milestone).
+- [x] Create the GitHub repository and configure `master`.
+- [x] Initialize Vue 3, TypeScript, Vite, and npm.
+- [x] Add README, MIT license, `.gitignore`, `.editorconfig`, and contributing guidance.
+- [x] Configure strict TypeScript, ESLint, Prettier, and Vitest.
+- [x] Add lint, format, test, and build scripts.
+- [x] Configure GitHub Actions with `npm ci`, dependency caching, and quality checks.
+- [x] Verify CI on a clean checkout.
+- [x] Establish branch and pull-request conventions.
 
-## Milestone 1 — Storybook and documentation infrastructure
+**Deferred to Milestone 2:** Evaluate WXT versus a custom Vite extension setup before implementing the application shell.
+
+## Milestone 1 — Storybook and documentation infrastructure ✅ Complete
 
 **Goal:** A tested component is documented in Storybook and automatically published.
 
-- Install Storybook for Vue 3 and Vite.
-- Introduce initial design tokens and a reusable component.
-- Add component stories, interaction states, and a component test.
-- Enable Storybook accessibility tooling.
-- Add production Storybook builds.
-- Configure GitHub Pages and a GitHub Actions deployment workflow from `master`.
-- Verify the published site and document local Storybook commands.
+- [x] Install Storybook for Vue 3 and Vite.
+- [x] Introduce initial design tokens and a reusable `Button` atom.
+- [x] Add component stories, interaction states, and component tests.
+- [x] Enable Storybook accessibility tooling with axe-core.
+- [x] Verify initial component stories pass automated accessibility checks.
+- [x] Add production Storybook builds.
+- [x] Configure GitHub Pages and a GitHub Actions deployment workflow from `master`.
+- [x] Verify the published component library.
+- [x] Document local Storybook commands and component conventions in the README.
 
-## Milestone 2 — Design system and application shell
+**Published component library:** [MediaManagarr Storybook](https://yansudeansu.github.io/mediamanagarr/)
+
+## Milestone 2 — Design system and application shell 🚧 Next
 
 **Goal:** A working, accessible application shell with documented shared components.
 
