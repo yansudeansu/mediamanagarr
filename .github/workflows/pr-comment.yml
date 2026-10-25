@@ -9,15 +9,17 @@ permissions:
   actions: read
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   publish:
-    name: Publish PR Overview
+    name: Update PR Overview
+    runs-on: ubuntu-latest
+
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository
-    runs-on: ubuntu-latest
 
     steps:
       - name: Download PR report
@@ -29,16 +31,18 @@ jobs:
         run: |
           set -euo pipefail
 
+          mkdir -p report
+
           gh run download "$RUN_ID" \
             --repo "$REPOSITORY" \
             --name pr-overview \
             --dir report
 
-      - name: Verify report and update comment
+      - name: Verify report and update PR description
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -46,26 +50,13 @@ jobs:
           number=$(jq -r '.pr' report/pr-report-metadata.json)
           report_sha=$(jq -r '.sha' report/pr-report-metadata.json)
 
-          if ! [[ "$number" =~ ^[0-9]+$ ]]; then
+          if ! [[ "$number" =~ ^[1-9][0-9]*$ ]]; then
             echo "Invalid PR number."
             exit 1
           fi
 
           if ! [[ "$report_sha" =~ ^[a-fA-F0-9]{40}$ ]]; then
             echo "Invalid report SHA."
-            exit 1
-          fi
-
-          associated_prs=$(gh api \
-            "repos/$REPOSITORY/actions/runs/$RUN_ID/pulls")
-
-          associated=$(jq -r \
-            --argjson number "$number" \
-            'any(.[]; .number == $number)' \
-            <<< "$associated_prs")
-
-          if [[ "$associated" != "true" ]]; then
-            echo "Report does not belong to this PR."
             exit 1
           fi
 
@@ -76,61 +67,90 @@ jobs:
           head_repo=$(jq -r '.head.repo.full_name' <<< "$pr")
 
           if [[ "$state" != "open" ||
-                "$current_sha" != "$report_sha" ||
-                "$head_repo" != "$REPOSITORY" ]]; then
-            echo "PR is closed, external, or has changed."
+                "$head_repo" != "$REPOSITORY" ||
+                "$current_sha" != "$report_sha" ]]; then
+            echo "Skipping closed, external, or outdated PR."
             exit 0
           fi
 
-          deployed_sha=""
+          # GitHub pull_request workflows may run against a temporary
+          # merge commit, so RUN_SHA is not compared with report_sha.
 
           metadata=$(gh api \
             "repos/$REPOSITORY/contents/pr-preview/pr-$number/deployment.json?ref=gh-pages" \
             2>/dev/null) || metadata=""
 
+          deployed_sha=""
+
           if [[ -n "$metadata" ]]; then
-            deployed_sha=$(jq -r '.content' <<< "$metadata" \
-              | base64 --decode \
-              | jq -r '.sha // empty')
+            deployed_sha=$(
+              jq -r '.content' <<< "$metadata" |
+                base64 --decode |
+                jq -r '.sha // empty'
+            )
           fi
 
-          if [[ "$deployed_sha" == "$current_sha" ]]; then
-            status="Status: Deployed."
-          else
-            status="Status: Pending deployment."
+          if [[ "$deployed_sha" == "$report_sha" ]]; then
+            sed -i \
+              's/Status: Pending deployment\./Status: Deployed./' \
+              report/pr-overview.md
           fi
-
-          sed -i \
-            "s/Status: Pending deployment\\./$status/" \
-            report/pr-overview.md
 
           marker="<!-- mediamanagarr-pr-overview -->"
 
           if ! grep -Fq "$marker" report/pr-overview.md; then
-            echo "Invalid PR report marker."
+            echo "Missing PR overview marker."
             exit 1
           fi
 
-          comment_id=$(
+          existing_body=$(jq -r '.body // ""' <<< "$pr")
+
+          # Remove a previously generated overview section while
+          # preserving any manually written PR description.
+          manual_body=$(
+            printf '%s\n' "$existing_body" |
+              sed '/<!-- mediamanagarr-pr-overview -->/,/<!-- mediamanagarr-pr-overview-end -->/d'
+          )
+
+          {
+            if [[ -n "$manual_body" ]]; then
+              printf '%s\n\n' "$manual_body"
+            fi
+
+            cat report/pr-overview.md
+            printf '\n<!-- mediamanagarr-pr-overview-end -->\n'
+          } > updated-body.md
+
+          # Recheck the head SHA before updating the description.
+          latest_sha=$(gh api \
+            "repos/$REPOSITORY/pulls/$number" \
+            --jq '.head.sha')
+
+          if [[ "$latest_sha" != "$report_sha" ]]; then
+            echo "PR changed during processing."
+            exit 0
+          fi
+
+          gh api \
+            --method PATCH \
+            "repos/$REPOSITORY/pulls/$number" \
+            -F body=@updated-body.md
+
+          echo "Updated PR #$number description."
+
+          # Remove an old bot-generated overview comment, if present.
+          comment_ids=$(
             gh api \
               "repos/$REPOSITORY/issues/$number/comments" \
               --paginate \
-              --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | contains("<!-- mediamanagarr-pr-overview -->")) | .id' \
-              | head -n 1
+              --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | contains("<!-- mediamanagarr-pr-overview -->")) | .id'
           )
 
-          if [[ -n "$comment_id" ]]; then
-            gh api \
-              --method PATCH \
-              "repos/$REPOSITORY/issues/comments/$comment_id" \
-              -F body=@report/pr-overview.md
+          while IFS= read -r comment_id; do
+            [[ -z "$comment_id" ]] && continue
 
-            echo "Updated PR #$number overview."
-          else
             gh api \
-              --method POST \
-              "repos/$REPOSITORY/issues/$number/comments" \
-              -F body=@report/pr-overview.md
+              --method DELETE \
+              "repos/$REPOSITORY/issues/comments/$comment_id"
 
-            echo "Created PR #$number overview."
-          fi
+          done <<< "$comment_ids"
