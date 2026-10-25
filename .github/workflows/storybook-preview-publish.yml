@@ -82,7 +82,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           ACTION: ${{ steps.pr.outputs.action }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -106,11 +106,34 @@ jobs:
               exit 0
             fi
 
-            if [[ "$current_sha" != "$HEAD_SHA" ]]; then
-              echo "A newer commit exists. Skipping outdated preview."
+            # Read the original PR event that triggered the build.
+            event_url=$(gh api \
+              "repos/$REPOSITORY/actions/runs/$RUN_ID" \
+              --jq '.event')
+
+            if [[ "$event_url" != "pull_request" ]]; then
+              echo "Unexpected workflow event."
+              exit 1
+            fi
+
+            # The build workflow uses GitHub's PR merge ref.
+            # Verify that its associated PR still points to the
+            # same head commit recorded when the build started.
+            run=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID")
+
+            run_head_sha=$(echo "$run" | jq -r '.head_sha')
+
+            merge_sha=$(gh api \
+              "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+              --jq '.merge_commit_sha')
+
+            if [[ "$run_head_sha" != "$merge_sha" ]]; then
+              echo "Build does not match the current PR merge commit."
               echo "proceed=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
+
+            echo "head_sha=$current_sha" >> "$GITHUB_OUTPUT"
           fi
 
           echo "proceed=true" >> "$GITHUB_OUTPUT"
@@ -147,6 +170,7 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           ACTION: ${{ steps.pr.outputs.action }}
+          HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -158,6 +182,13 @@ jobs:
           if [[ "$ACTION" == "publish" ]]; then
             mkdir -p "$destination"
             cp -a preview/. "$destination/"
+
+            jq -n \
+              --arg sha "$HEAD_SHA" \
+              --arg pr "$PR_NUMBER" \
+              '{pr: ($pr | tonumber), sha: $sha}' \
+              > "$destination/deployment.json"
+
             echo "Published preview for PR #$PR_NUMBER"
           else
             echo "Removed preview for PR #$PR_NUMBER"
@@ -213,9 +244,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
+
+          # Recheck the PR head before updating the comment.
+          current_sha=$(gh api \
+            "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '.head.sha')
+
+          if [[ "$current_sha" != "$HEAD_SHA" ]]; then
+            echo "PR has changed. Skipping comment update."
+            exit 0
+          fi
 
           comment_id=$(
             gh api \
@@ -230,11 +272,9 @@ jobs:
             exit 0
           fi
 
-          body=$(
-            gh api \
-              "repos/$REPOSITORY/issues/comments/$comment_id" \
-              --jq '.body'
-          )
+          body=$(gh api \
+            "repos/$REPOSITORY/issues/comments/$comment_id" \
+            --jq '.body')
 
           updated_body="${body/Status: Pending deployment./Status: Deployed.}"
 
