@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "npm run build:firefox && npm run build:chrome",
+    "build:firefox": "vue-tsc -b && vite build --mode firefox",
+    "build:chrome": "vue-tsc -b && vite build --mode chrome",
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
