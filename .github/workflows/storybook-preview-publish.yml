@@ -31,7 +31,7 @@ jobs:
     permissions:
       contents: write
       actions: read
-      pull-requests: read
+      pull-requests: write
       pages: write
       id-token: write
 
@@ -204,3 +204,43 @@ jobs:
         if: steps.verify.outputs.proceed == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Update PR overview deployment status
+        if: >-
+          steps.verify.outputs.proceed == 'true' &&
+          steps.pr.outputs.action == 'publish'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          comment_id=$(
+            gh api \
+              "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
+              --paginate \
+              --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | contains("<!-- mediamanagarr-pr-overview -->")) | .id' \
+              | head -n 1
+          )
+
+          if [[ -z "$comment_id" ]]; then
+            echo "PR overview comment not found."
+            exit 0
+          fi
+
+          body=$(
+            gh api \
+              "repos/$REPOSITORY/issues/comments/$comment_id" \
+              --jq '.body'
+          )
+
+          updated_body="${body/Status: Pending deployment./Status: Deployed.}"
+
+          gh api \
+            --method PATCH \
+            "repos/$REPOSITORY/issues/comments/$comment_id" \
+            -f body="$updated_body"
+
+          echo "Updated PR #$PR_NUMBER preview status."
