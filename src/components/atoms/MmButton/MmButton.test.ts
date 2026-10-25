@@ -29,6 +29,62 @@ describe('MmButton', () => {
     expect(wrapper.classes()).toContain('button--primary')
   })
 
+  it('supports the pagination variant', () => {
+    const wrapper = mount(MmButton, {
+      props: {
+        variant: 'pagination',
+        size: 'small',
+      },
+      slots: {
+        default: '3',
+      },
+    })
+
+    expect(wrapper.classes()).toContain('button--pagination')
+    expect(wrapper.classes()).toContain('button--small')
+    expect(wrapper.text()).toBe('3')
+  })
+
+  it('supports an active pagination button', () => {
+    const wrapper = mount(MmButton, {
+      props: {
+        variant: 'pagination',
+        disabled: true,
+      },
+      attrs: {
+        'aria-current': 'page',
+        'aria-label': 'Page 3',
+      },
+      slots: {
+        default: '3',
+      },
+    })
+
+    expect(wrapper.classes()).toContain('button--pagination')
+    expect(wrapper.attributes('aria-current')).toBe('page')
+    expect(wrapper.attributes('aria-label')).toBe('Page 3')
+    expect(wrapper.attributes('disabled')).toBeDefined()
+  })
+
+  it('does not emit clicks from an active pagination button', async () => {
+    const wrapper = mount(MmButton, {
+      props: {
+        variant: 'pagination',
+        disabled: true,
+      },
+      attrs: {
+        'aria-current': 'page',
+      },
+      slots: {
+        default: '3',
+      },
+    })
+
+    await wrapper.trigger('click')
+
+    expect(wrapper.emitted('click')).toBeUndefined()
+  })
+
   it('applies the selected size', () => {
     const wrapper = mount(MmButton, {
       props: {

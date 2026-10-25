@@ -9,7 +9,7 @@ const meta = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['primary', 'secondary', 'danger', 'ghost'],
+      options: ['primary', 'secondary', 'danger', 'ghost', 'pagination'],
       description: 'Visual appearance of the button.',
     },
     size: {
@@ -128,6 +128,43 @@ export const Ghost: Story = {
     variant: 'ghost',
     default: 'Dismiss',
   },
+}
+
+/**
+ * Pagination page button.
+ */
+export const Pagination: Story = {
+  args: {
+    variant: 'pagination',
+    size: 'small',
+    default: '3',
+  },
+}
+
+/**
+ * Active pagination page.
+ */
+export const PaginationActive: Story = {
+  args: {
+    variant: 'pagination',
+    size: 'small',
+    disabled: true,
+    default: '3',
+  },
+  render: (args) => ({
+    components: { MmButton },
+    setup() {
+      return { args }
+    },
+    template: `
+      <mm-button
+        v-bind="args"
+        aria-current="page"
+      >
+        {{ args.default }}
+      </mm-button>
+    `,
+  }),
 }
 
 /**

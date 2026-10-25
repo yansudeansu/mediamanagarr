@@ -1,4 +1,5 @@
 import type { JellyfinUser } from './jellyfin'
+import type { SeerrRequestsPage, SeerrRequestsQuery } from './seerr'
 import type { SafeServiceConfigs, ServiceConnectionInput, ServiceId } from './service'
 
 export interface GetServiceConfigsMessage {
@@ -25,12 +26,17 @@ export interface SetJellyfinUserMessage {
   userId: string
 }
 
+export interface GetSeerrRequestsMessage extends SeerrRequestsQuery {
+  type: 'GET_SEERR_REQUESTS'
+}
+
 export type BackgroundMessage =
   | GetServiceConfigsMessage
   | ConnectServiceMessage
   | RemoveServiceMessage
   | GetJellyfinUsersMessage
   | SetJellyfinUserMessage
+  | GetSeerrRequestsMessage
 
 export interface GetServiceConfigsSuccess {
   success: true
@@ -58,6 +64,11 @@ export interface SetJellyfinUserSuccess {
   userId: string
 }
 
+export interface GetSeerrRequestsSuccess {
+  success: true
+  requests: SeerrRequestsPage
+}
+
 export interface BackgroundMessageFailure {
   success: false
   error: string
@@ -73,6 +84,8 @@ export type GetJellyfinUsersResponse = GetJellyfinUsersSuccess | BackgroundMessa
 
 export type SetJellyfinUserResponse = SetJellyfinUserSuccess | BackgroundMessageFailure
 
+export type GetSeerrRequestsResponse = GetSeerrRequestsSuccess | BackgroundMessageFailure
+
 export type BackgroundResponse<T extends BackgroundMessage> = T extends GetServiceConfigsMessage
   ? GetServiceConfigsResponse
   : T extends ConnectServiceMessage
@@ -83,4 +96,6 @@ export type BackgroundResponse<T extends BackgroundMessage> = T extends GetServi
         ? GetJellyfinUsersResponse
         : T extends SetJellyfinUserMessage
           ? SetJellyfinUserResponse
-          : never
+          : T extends GetSeerrRequestsMessage
+            ? GetSeerrRequestsResponse
+            : never

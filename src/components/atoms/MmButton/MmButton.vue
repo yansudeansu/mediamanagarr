@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import MmIcon from '../MmIcon/MmIcon.vue'
 import type { IconName } from '../MmIcon/MmIcon.vue'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'pagination'
 export type ButtonSize = 'small' | 'medium'
 
 interface Props {
@@ -155,6 +155,51 @@ function handleClick(event: MouseEvent) {
   color: var(--text);
 }
 
+/* Pagination */
+
+.button--pagination {
+  min-width: 30px;
+  min-height: 30px;
+  height: 30px;
+  padding: 0 7px;
+
+  border-color: #343942;
+  border-radius: 8px;
+
+  background: #20242b;
+  color: #dce0e6;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.button--pagination:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.button--pagination[aria-current='page'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #101712;
+  font-weight: 700;
+  cursor: default;
+}
+
+.button--pagination[aria-current='page']:disabled {
+  opacity: 1;
+}
+
+.button--pagination:disabled:not([aria-current='page']) {
+  opacity: 0.3;
+  cursor: default;
+}
+
 /* Sizes */
 
 .button--small {
@@ -166,6 +211,16 @@ function handleClick(event: MouseEvent) {
 .button--medium {
   min-height: 34px;
   padding: 8px 12px;
+  font-size: 12px;
+}
+
+/* Pagination sizing overrides the generic sizes */
+
+.button--pagination.button--small,
+.button--pagination.button--medium {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 7px;
   font-size: 12px;
 }
 

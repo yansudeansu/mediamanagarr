@@ -8,11 +8,14 @@ import {
 } from '../utils/service-storage'
 import { testServiceConnection } from './services/connection'
 import { fetchJellyfinUsers } from './services/jellyfin-users'
+import { fetchSeerrRequests } from './services/seerr-requests'
 import {
   clearJellyfinUserSelection,
   getJellyfinUserSelection,
   saveJellyfinUserSelection,
 } from '../utils/jellyfin-storage'
+import type { ServiceConfig } from '../types/service'
+import type { SeerrRequestsPage } from '../types/seerr'
 
 vi.mock('../utils/service-storage', () => ({
   getSafeServiceConfigs: vi.fn(),
@@ -29,13 +32,17 @@ vi.mock('./services/jellyfin-users', () => ({
   fetchJellyfinUsers: vi.fn(),
 }))
 
+vi.mock('./services/seerr-requests', () => ({
+  fetchSeerrRequests: vi.fn(),
+}))
+
 vi.mock('../utils/jellyfin-storage', () => ({
   clearJellyfinUserSelection: vi.fn(),
   getJellyfinUserSelection: vi.fn(),
   saveJellyfinUserSelection: vi.fn(),
 }))
 
-const jellyfinConfig = {
+const jellyfinConfig: ServiceConfig = {
   url: 'https://jellyfin.example.com',
   apiKey: 'saved-key',
 }
@@ -44,6 +51,27 @@ const jellyfinUsers = [
   { id: 'user-1', name: 'Alice' },
   { id: 'user-2', name: 'Bob' },
 ]
+
+const seerrConfig: ServiceConfig = {
+  url: 'https://seerr.example.com/seerr',
+  apiKey: 'seerr-test-key',
+}
+
+const seerrRequestsPage: SeerrRequestsPage = {
+  items: [
+    {
+      id: 42,
+      type: 'movie',
+      title: 'Example Movie',
+      status: 'Approved',
+      mediaStatus: 'Available',
+      requestedBy: 'Alice',
+      createdAt: '2026-10-20T12:00:00.000Z',
+      posterPath: '/poster.jpg',
+    },
+  ],
+  total: 1,
+}
 
 describe('handleBackgroundMessage', () => {
   beforeEach(() => {
@@ -443,6 +471,162 @@ describe('handleBackgroundMessage', () => {
       })
 
       expect(saveJellyfinUserSelection).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('GET_SEERR_REQUESTS', () => {
+    beforeEach(() => {
+      vi.mocked(getServiceConfig).mockResolvedValue(seerrConfig)
+      vi.mocked(fetchSeerrRequests).mockResolvedValue(seerrRequestsPage)
+    })
+
+    it('fetches Seerr requests with default query values', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'GET_SEERR_REQUESTS',
+      })
+
+      expect(result).toEqual({
+        success: true,
+        requests: seerrRequestsPage,
+      })
+
+      expect(getServiceConfig).toHaveBeenCalledWith('seerr')
+
+      expect(chrome.permissions.contains).toHaveBeenCalledWith({
+        origins: ['https://seerr.example.com/*'],
+      })
+
+      expect(fetchSeerrRequests).toHaveBeenCalledWith(seerrConfig, {
+        page: undefined,
+        pageSize: undefined,
+        filter: undefined,
+      })
+    })
+
+    it('forwards pagination and filters to the Seerr API client', async () => {
+      await handleBackgroundMessage({
+        type: 'GET_SEERR_REQUESTS',
+        page: 3,
+        pageSize: 5,
+        filter: 'pending',
+      })
+
+      expect(fetchSeerrRequests).toHaveBeenCalledWith(seerrConfig, {
+        page: 3,
+        pageSize: 5,
+        filter: 'pending',
+      })
+    })
+
+    it('accepts the Approved filter', async () => {
+      await handleBackgroundMessage({
+        type: 'GET_SEERR_REQUESTS',
+        filter: 'approved',
+      })
+
+      expect(fetchSeerrRequests).toHaveBeenCalledWith(
+        seerrConfig,
+        expect.objectContaining({
+          filter: 'approved',
+        }),
+      )
+    })
+
+    it('returns an error when Seerr is not configured', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(undefined)
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_SEERR_REQUESTS',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Configure Seerr before viewing requests.',
+      })
+
+      expect(chrome.permissions.contains).not.toHaveBeenCalled()
+      expect(fetchSeerrRequests).not.toHaveBeenCalled()
+    })
+
+    it('requires Seerr host permission', async () => {
+      vi.stubGlobal('chrome', {
+        permissions: {
+          contains: vi.fn().mockResolvedValue(false),
+        },
+      })
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_SEERR_REQUESTS',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Seerr server access has not been granted.',
+      })
+
+      expect(fetchSeerrRequests).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      { page: 0 },
+      { page: -1 },
+      { page: 1.5 },
+      { page: '2' },
+      { pageSize: 0 },
+      { pageSize: 101 },
+      { pageSize: 2.5 },
+      { filter: 'declined' },
+      { filter: 123 },
+      { page: Number.MAX_SAFE_INTEGER, pageSize: 100 },
+    ])('rejects invalid query input: %j', async (query) => {
+      const result = await handleBackgroundMessage({
+        type: 'GET_SEERR_REQUESTS',
+        ...query,
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid background message.',
+      })
+
+      expect(getServiceConfig).not.toHaveBeenCalled()
+      expect(fetchSeerrRequests).not.toHaveBeenCalled()
+    })
+
+    it('returns Seerr API errors as structured failures', async () => {
+      vi.mocked(fetchSeerrRequests).mockRejectedValue(
+        new Error('Seerr authentication failed. Check your API key.'),
+      )
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_SEERR_REQUESTS',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Seerr authentication failed. Check your API key.',
+      })
+    })
+
+    it('handles unexpected non-Error failures', async () => {
+      vi.mocked(fetchSeerrRequests).mockRejectedValue('unexpected failure')
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_SEERR_REQUESTS',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'An unexpected error occurred.',
+      })
+    })
+
+    it('does not expose the Seerr API key in responses', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'GET_SEERR_REQUESTS',
+      })
+
+      expect(JSON.stringify(result)).not.toContain(seerrConfig.apiKey)
     })
   })
 })

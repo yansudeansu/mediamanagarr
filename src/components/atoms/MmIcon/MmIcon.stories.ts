@@ -9,7 +9,7 @@ const meta = {
   argTypes: {
     name: {
       control: 'select',
-      options: ['settings', 'arrow-left', 'refresh'],
+      options: ['settings', 'arrow-left', 'arrow-right', 'refresh'],
       description: 'Name of the icon to display.',
     },
     size: {
@@ -57,6 +57,15 @@ export const ArrowLeft: Story = {
 }
 
 /**
+ * Forward navigation icon.
+ */
+export const ArrowRight: Story = {
+  args: {
+    name: 'arrow-right',
+  },
+}
+
+/**
  * Refresh icon, used for reloading service data.
  */
 export const Refresh: Story = {
@@ -72,7 +81,8 @@ export const Gallery: Story = {
   render: () => ({
     components: { MmIcon },
     setup() {
-      const icons = ['settings', 'arrow-left', 'refresh'] as const
+      const icons = ['settings', 'arrow-left', 'arrow-right', 'refresh'] as const
+
       return { icons }
     },
     template: `

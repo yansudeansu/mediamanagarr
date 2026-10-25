@@ -89,6 +89,33 @@ describe('MmIcon', () => {
     expect(settings.get('svg').html()).not.toBe(refresh.get('svg').html())
   })
 
+  it('renders the right-arrow icon', () => {
+    const wrapper = mount(MmIcon, {
+      props: {
+        name: 'arrow-right',
+      },
+    })
+
+    expect(wrapper.find('svg').exists()).toBe(true)
+    expect(wrapper.get('svg').attributes('stroke')).toBe('currentColor')
+  })
+
+  it('renders different paths for left and right arrows', () => {
+    const left = mount(MmIcon, {
+      props: {
+        name: 'arrow-left',
+      },
+    })
+
+    const right = mount(MmIcon, {
+      props: {
+        name: 'arrow-right',
+      },
+    })
+
+    expect(left.get('svg').html()).not.toBe(right.get('svg').html())
+  })
+
   it('updates the icon when its name changes', async () => {
     const wrapper = mount(MmIcon, {
       props: {
@@ -100,6 +127,22 @@ describe('MmIcon', () => {
 
     await wrapper.setProps({
       name: 'arrow-left',
+    })
+
+    expect(wrapper.get('svg').html()).not.toBe(initialMarkup)
+  })
+
+  it('updates from left arrow to right arrow', async () => {
+    const wrapper = mount(MmIcon, {
+      props: {
+        name: 'arrow-left',
+      },
+    })
+
+    const initialMarkup = wrapper.get('svg').html()
+
+    await wrapper.setProps({
+      name: 'arrow-right',
     })
 
     expect(wrapper.get('svg').html()).not.toBe(initialMarkup)
