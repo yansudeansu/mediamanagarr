@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
 jobs:
   publish:
     name: Publish Browser Extension Release
@@ -21,52 +25,42 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Detect release
-        id: release
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          version=$(node -p "require('./package.json').version")
-          subject=$(git log -1 --format=%s)
-
-          if [[ "$subject" != "chore(release): v$version" ]]; then
-            echo "Not a release commit."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if git rev-parse "refs/tags/v$version" >/dev/null 2>&1; then
-            echo "Release tag already exists."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          previous_version=$(git show HEAD^:package.json | node -p \
-            "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
-
-          if [[ "$previous_version" == "$version" ]]; then
-            echo "Version was not changed."
-            exit 1
-          fi
-
-          echo "publish=true" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
       - name: Set up Node.js
-        if: steps.release.outputs.publish == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
 
+      - name: Verify release
+        id: release
+        run: npm run release:check
+
       - name: Install dependencies
         if: steps.release.outputs.publish == 'true'
         run: npm ci
 
-      - name: Run checks
+      - name: Run checks and build
         if: steps.release.outputs.publish == 'true'
         run: npm run check
+
+      - name: Verify built manifest
+        if: steps.release.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f dist/manifest.json
+
+          actual=$(node -p "require('./dist/manifest.json').version")
+
+          if [[ "$actual" != "$VERSION" ]]; then
+            echo "Manifest version mismatch: $actual != $VERSION"
+            exit 1
+          fi
+
+          echo "Verified manifest version $actual."
 
       - name: Package extensions
         if: steps.release.outputs.publish == 'true'
@@ -80,13 +74,53 @@ jobs:
 
           (
             cd dist
-            zip -r "../release/mediamanagarr-v${VERSION}-chrome.zip" .
+
+            zip -qr \
+              "../release/mediamanagarr-v${VERSION}-chrome.zip" \
+              .
           )
 
           (
             cd dist
-            zip -r "../release/mediamanagarr-v${VERSION}-firefox.zip" .
+
+            zip -qr \
+              "../release/mediamanagarr-v${VERSION}-firefox.zip" \
+              .
           )
+
+          unzip -t \
+            "release/mediamanagarr-v${VERSION}-chrome.zip"
+
+          unzip -t \
+            "release/mediamanagarr-v${VERSION}-firefox.zip"
+
+          unzip -p \
+            "release/mediamanagarr-v${VERSION}-chrome.zip" \
+            manifest.json |
+            node -e "
+              let input = '';
+              process.stdin.on('data', chunk => input += chunk);
+              process.stdin.on('end', () => {
+                const manifest = JSON.parse(input);
+                if (manifest.version !== process.env.VERSION) {
+                  process.exit(1);
+                }
+              });
+            "
+
+          unzip -p \
+            "release/mediamanagarr-v${VERSION}-firefox.zip" \
+            manifest.json |
+            node -e "
+              let input = '';
+              process.stdin.on('data', chunk => input += chunk);
+              process.stdin.on('end', () => {
+                const manifest = JSON.parse(input);
+                if (manifest.version !== process.env.VERSION) {
+                  process.exit(1);
+                }
+              });
+            "
 
       - name: Publish GitHub Release
         if: steps.release.outputs.publish == 'true'

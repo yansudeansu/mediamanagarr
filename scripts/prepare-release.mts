@@ -1,8 +1,5 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { conventionalChangelog } from 'conventional-changelog'
-import { pipeline } from 'node:stream/promises'
-import { Writable } from 'node:stream'
 
 type ReleaseType = 'major' | 'minor' | 'patch'
 
@@ -11,8 +8,18 @@ interface PackageJson {
 }
 
 interface Commit {
+  sha: string
   subject: string
   body: string
+  type: string
+  description: string
+  breaking: boolean
+}
+
+const releaseRank: Record<ReleaseType, number> = {
+  patch: 1,
+  minor: 2,
+  major: 3,
 }
 
 function git(...args: string[]): string {
@@ -29,10 +36,6 @@ function run(command: string, ...args: string[]): void {
 
 function latestTag(): string | null {
   const tags = git('tag', '--list', 'v[0-9]*')
-
-  if (!tags) {
-    return null
-  }
 
   const versions = tags
     .split('\n')
@@ -57,31 +60,51 @@ function latestTag(): string | null {
 
 function getCommits(tag: string | null): Commit[] {
   const range = tag ? `${tag}..HEAD` : 'HEAD'
-  const output = git('log', range, '--format=%s%x1f%b%x1e')
 
-  return output
-    .split('\x1e')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const [subject = '', body = ''] = entry.split('\x1f')
+  const hashes = git('rev-list', '--reverse', '--no-merges', range).split('\n').filter(Boolean)
 
-      return { subject, body }
-    })
+  return hashes.flatMap((sha) => {
+    const message = git('show', '-s', '--format=%B', sha)
+    const [subject = '', ...bodyLines] = message.split('\n')
+    const body = bodyLines.join('\n').trim()
+
+    const match = subject.match(/^([a-z]+)(?:\([^)]+\))?(!)?:\s+(.+)$/)
+
+    if (!match) {
+      return []
+    }
+
+    const [, type, breakingMarker, description] = match
+
+    return [
+      {
+        sha,
+        subject,
+        body,
+        type,
+        description,
+        breaking: Boolean(breakingMarker) || /^BREAKING[ -]CHANGE:/m.test(body),
+      },
+    ]
+  })
 }
 
 function releaseImpact(commits: Commit[]): ReleaseType | null {
   let impact: ReleaseType | null = null
 
-  for (const { subject, body } of commits) {
-    if (/^[a-z]+(?:\([^)]+\))?!:/.test(subject) || /^BREAKING(?: CHANGE|-CHANGE):/m.test(body)) {
-      return 'major'
+  for (const commit of commits) {
+    let next: ReleaseType | null = null
+
+    if (commit.breaking) {
+      next = 'major'
+    } else if (commit.type === 'feat') {
+      next = 'minor'
+    } else if (commit.type === 'fix' || commit.type === 'perf') {
+      next = 'patch'
     }
 
-    if (/^feat(?:\([^)]+\))?:/.test(subject)) {
-      impact = 'minor'
-    } else if (/^fix(?:\([^)]+\))?:/.test(subject) && impact === null) {
-      impact = 'patch'
+    if (next && (!impact || releaseRank[next] > releaseRank[impact])) {
+      impact = next
     }
   }
 
@@ -109,48 +132,55 @@ function bumpVersion(version: string, impact: ReleaseType): string {
   }
 }
 
-async function generateChangelog(version: string, previousTag: string | null): Promise<void> {
-  const chunks: Buffer[] = []
+function changelogSection(version: string, commits: Commit[]): string {
+  const groups: Array<[string, string[]]> = [
+    ['Breaking Changes', []],
+    ['Features', []],
+    ['Bug Fixes', []],
+    ['Performance Improvements', []],
+  ]
 
-  const destination = new Writable({
-    write(chunk: Buffer, _encoding, callback) {
-      chunks.push(Buffer.from(chunk))
-      callback()
-    },
-  })
+  for (const commit of commits) {
+    const line = `- ${commit.description} (${commit.sha.slice(0, 7)})`
 
-  const stream = conventionalChangelog(
-    {
-      releaseCount: 1,
-      outputUnreleased: false,
-    },
-    {
-      preset: {
-        name: 'conventionalcommits',
-      },
-    },
-  )
-
-  await pipeline(stream, destination)
-
-  const generated = Buffer.concat(chunks).toString('utf8').trim()
-
-  if (!generated) {
-    throw new Error('Changelog generation returned no content.')
+    if (commit.breaking) {
+      groups[0]![1].push(line)
+    } else if (commit.type === 'feat') {
+      groups[1]![1].push(line)
+    } else if (commit.type === 'fix') {
+      groups[2]![1].push(line)
+    } else if (commit.type === 'perf') {
+      groups[3]![1].push(line)
+    }
   }
 
-  const existing = existsSync('CHANGELOG.md') ? readFileSync('CHANGELOG.md', 'utf8') : ''
+  const sections = groups
+    .filter(([, lines]) => lines.length > 0)
+    .map(([heading, lines]) => `### ${heading}\n\n${lines.join('\n')}`)
 
-  const header = '# Changelog\n\n'
-
-  const previous = existing.startsWith(header) ? existing.slice(header.length) : existing
-
-  writeFileSync('CHANGELOG.md', `${header}${generated}\n\n${previous.trimStart()}`)
-
-  console.log(`Generated changelog for v${version} since ${previousTag ?? 'project start'}.`)
+  return [`## v${version}`, '', ...sections].join('\n\n')
 }
 
-async function main(): Promise<void> {
+function updateChangelog(version: string, commits: Commit[]): void {
+  const existing = existsSync('CHANGELOG.md') ? readFileSync('CHANGELOG.md', 'utf8') : ''
+
+  if (new RegExp(`^## v${version.replaceAll('.', '\\.')}\\s*$`, 'm').test(existing)) {
+    throw new Error(`CHANGELOG.md already contains v${version}.`)
+  }
+
+  const header = '# Changelog'
+  const previous = existing.startsWith(header)
+    ? existing.slice(header.length).trim()
+    : existing.trim()
+
+  const section = changelogSection(version, commits)
+
+  const updated = [header, '', section, ...(previous ? ['', previous] : []), ''].join('\n')
+
+  writeFileSync('CHANGELOG.md', updated)
+}
+
+function main(): void {
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as PackageJson
 
   const previousTag = latestTag()
@@ -174,15 +204,20 @@ async function main(): Promise<void> {
     return
   }
 
+  if (git('tag', '--list', `v${version}`) === `v${version}`) {
+    throw new Error(`Release tag v${version} already exists.`)
+  }
+
   console.log(`Preparing v${version}`)
 
-  run('npm', 'version', version, '--no-git-tag-version')
+  // Generate the changelog before changing package files.
+  updateChangelog(version, commits)
 
-  await generateChangelog(version, previousTag)
+  run('npm', 'version', version, '--no-git-tag-version', '--ignore-scripts')
 
   writeFileSync('release-version.txt', `${version}\n`)
 
   console.log(`Prepared release v${version}`)
 }
 
-await main()
+main()
