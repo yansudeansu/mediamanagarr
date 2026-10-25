@@ -34,10 +34,34 @@ jobs:
       - name: Build Storybook
         run: npm run build-storybook
 
+      - name: Save PR build metadata
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p preview-metadata
+
+          jq -n \
+            --argjson pr "$PR_NUMBER" \
+            --arg sha "$HEAD_SHA" \
+            '{pr: $pr, sha: $sha}' \
+            > preview-metadata/build.json
+
       - name: Upload Storybook preview
         uses: actions/upload-artifact@v4
         with:
           name: storybook-pr-preview
           path: storybook-static/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload PR build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-pr-metadata
+          path: preview-metadata/build.json
           if-no-files-found: error
           retention-days: 7
