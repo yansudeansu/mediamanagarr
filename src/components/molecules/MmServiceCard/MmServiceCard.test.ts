@@ -175,50 +175,55 @@ describe('MmServiceCard', () => {
   })
 
   describe('accessibility', () => {
-    it('has an accessible label containing the service name', () => {
-      const wrapper = createWrapper()
-
-      expect(wrapper.attributes('aria-label')).toContain('Jellyfin')
-    })
-
-    it('includes the connection state in its accessible label', () => {
+    it('uses visible content rather than overriding the accessible name', () => {
       const wrapper = createWrapper({
         status: 'connected',
       })
 
-      expect(wrapper.attributes('aria-label')).toBe('Jellyfin: connected')
+      expect(wrapper.attributes('aria-label')).toBeUndefined()
+      expect(wrapper.attributes('aria-labelledby')).toBeUndefined()
     })
 
-    it('updates its accessible label when the status changes', async () => {
+    it('includes the service name and visible status in its button content', () => {
+      const wrapper = createWrapper({
+        status: 'connected',
+      })
+
+      expect(wrapper.text()).toContain('Jellyfin')
+      expect(wrapper.text()).toContain('Connected')
+    })
+
+    it('includes the visible not-configured label in its button content', () => {
+      const wrapper = createWrapper({
+        status: 'not-configured',
+      })
+
+      expect(wrapper.text()).toContain('Jellyfin')
+      expect(wrapper.text()).toContain('Not set')
+    })
+
+    it('updates its visible status when the connection changes', async () => {
       const wrapper = createWrapper({
         status: 'configured',
       })
 
-      expect(wrapper.attributes('aria-label')).toBe('Jellyfin: configured')
+      expect(wrapper.text()).toContain('Configured')
 
       await wrapper.setProps({
         status: 'failed',
       })
 
-      expect(wrapper.attributes('aria-label')).toBe('Jellyfin: failed')
+      expect(wrapper.text()).toContain('Failed')
     })
 
-    it('updates its accessible label when the service changes', async () => {
+    it('updates its visible service name when the service changes', async () => {
       const wrapper = createWrapper()
 
       await wrapper.setProps({
         service: SERVICE_INFO.radarr,
       })
 
-      expect(wrapper.attributes('aria-label')).toContain('Radarr')
-    })
-
-    it('exposes the status badge text', () => {
-      const wrapper = createWrapper({
-        status: 'connected',
-      })
-
-      expect(wrapper.text()).toContain('Connected')
+      expect(wrapper.text()).toContain('Radarr')
     })
 
     it('does not add a custom keyboard role to the native button', () => {

@@ -57,26 +57,26 @@ const label = computed(() => statusLabels[props.status])
 }
 
 .status-badge--not-configured {
-  color: var(--muted);
-  background: rgb(148 163 184 / 10%);
-  border-color: rgb(148 163 184 / 15%);
+  color: #aeb9c9;
+  background: #252a33;
+  border-color: #353d49;
 }
 
 .status-badge--configured {
   color: #93c5fd;
-  background: rgb(59 130 246 / 12%);
-  border-color: rgb(59 130 246 / 20%);
+  background: #17283e;
+  border-color: #28476b;
 }
 
 .status-badge--connected {
   color: #86efac;
-  background: rgb(34 197 94 / 12%);
-  border-color: rgb(34 197 94 / 20%);
+  background: #153326;
+  border-color: #28563c;
 }
 
 .status-badge--failed {
   color: #fca5a5;
-  background: rgb(239 68 68 / 12%);
-  border-color: rgb(239 68 68 / 20%);
+  background: #382225;
+  border-color: #68383e;
 }
 </style>

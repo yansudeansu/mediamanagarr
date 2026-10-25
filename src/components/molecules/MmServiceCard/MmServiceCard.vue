@@ -32,7 +32,6 @@ function handleSelect() {
     :class="{ 'service-card--selected': selected }"
     :disabled="disabled"
     :aria-current="selected ? 'true' : undefined"
-    :aria-label="`${service.name}: ${status.replace('-', ' ')}`"
     @click="handleSelect"
   >
     <span class="service-card__name">
@@ -86,19 +85,7 @@ function handleSelect() {
 
 .service-card--selected {
   background: rgb(34 197 94 / 9%);
-}
-
-.service-card--selected::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-
-  width: 3px;
-
-  background: var(--accent);
-
-  content: '';
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .service-card--selected:hover:not(:disabled) {

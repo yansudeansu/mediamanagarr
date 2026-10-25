@@ -27,13 +27,20 @@ describe('MmSelect', () => {
       expect(wrapper.get('.select-field__label').text()).toBe('Jellyfin user')
     })
 
-    it('associates its label with the trigger', () => {
-      const wrapper = createWrapper()
+    it('associates its label and visible value with the trigger', () => {
+      const wrapper = createWrapper({
+        modelValue: 'user-1',
+      })
 
       const label = wrapper.get('.select-field__label')
+      const value = wrapper.get('.select-field__value')
       const trigger = wrapper.get('.select-field__trigger')
 
-      expect(trigger.attributes('aria-labelledby')).toBe(label.attributes('id'))
+      expect(trigger.attributes('aria-labelledby')).toBe(
+        `${label.attributes('id')} ${value.attributes('id')}`,
+      )
+
+      expect(value.text()).toBe('Alice')
     })
 
     it('renders the placeholder when nothing is selected', () => {
@@ -361,7 +368,17 @@ describe('MmSelect', () => {
       )
     })
 
-    it('exposes the listbox relationship', async () => {
+    it('does not reference a missing listbox while closed', () => {
+      const wrapper = createWrapper()
+
+      const trigger = wrapper.get('.select-field__trigger')
+
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      expect(trigger.attributes('aria-controls')).toBeUndefined()
+      expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
+    })
+
+    it('exposes the listbox relationship while open', async () => {
       const wrapper = createWrapper()
 
       await wrapper.get('.select-field__trigger').trigger('click')
@@ -371,6 +388,19 @@ describe('MmSelect', () => {
 
       expect(trigger.attributes('aria-haspopup')).toBe('listbox')
       expect(trigger.attributes('aria-controls')).toBe(listbox.attributes('id'))
+    })
+
+    it('removes the listbox reference after closing', async () => {
+      const wrapper = createWrapper()
+
+      await wrapper.get('.select-field__trigger').trigger('click')
+
+      expect(wrapper.get('.select-field__trigger').attributes('aria-controls')).toBeDefined()
+
+      await wrapper.get('.select-field__trigger').trigger('click')
+
+      expect(wrapper.get('.select-field__trigger').attributes('aria-controls')).toBeUndefined()
+      expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
     })
   })
 

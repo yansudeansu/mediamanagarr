@@ -45,6 +45,7 @@ const generatedId = useId()
 
 const selectId = `mm-select-${generatedId}`
 const labelId = `${selectId}-label`
+const valueId = `${selectId}-value`
 const hintId = `${selectId}-hint`
 const errorId = `${selectId}-error`
 const listboxId = `${selectId}-listbox`
@@ -275,17 +276,17 @@ onBeforeUnmount(() => {
           'select-field__trigger--placeholder': !selectedOption,
         }"
         :disabled="isDisabled"
-        :aria-labelledby="labelId"
+        :aria-labelledby="`${labelId} ${valueId}`"
         :aria-describedby="describedBy"
         :aria-invalid="error ? 'true' : undefined"
         :aria-expanded="isOpen"
-        :aria-controls="listboxId"
+        :aria-controls="isOpen ? listboxId : undefined"
         :aria-busy="loading ? 'true' : undefined"
         aria-haspopup="listbox"
         @click="toggleDropdown"
         @keydown="handleTriggerKeydown"
       >
-        <span class="select-field__value">
+        <span :id="valueId" class="select-field__value">
           {{ loading ? 'Loading...' : selectedLabel || 'Select an option' }}
         </span>
 
