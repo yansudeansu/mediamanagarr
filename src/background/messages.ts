@@ -2,13 +2,16 @@ import type {
   BackgroundMessage,
   ConnectServiceResponse,
   GetJellyfinUsersResponse,
+  GetSeerrRequestsResponse,
   GetServiceConfigsResponse,
   RemoveServiceResponse,
   SetJellyfinUserResponse,
 } from '../types/messages'
+import { SEERR_REQUEST_FILTERS, type SeerrRequestsQuery } from '../types/seerr'
 import { SERVICES, type ServiceConfig, type ServiceId } from '../types/service'
 import { testServiceConnection } from './services/connection'
 import { fetchJellyfinUsers } from './services/jellyfin-users'
+import { fetchSeerrRequests } from './services/seerr-requests'
 import { getHostPermission, resolveServiceConfig } from '../utils/service-config'
 import {
   getSafeServiceConfigs,
@@ -28,6 +31,11 @@ type MessageResponse =
   | RemoveServiceResponse
   | GetJellyfinUsersResponse
   | SetJellyfinUserResponse
+  | GetSeerrRequestsResponse
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
 
 function isServiceId(value: unknown): value is ServiceId {
   return typeof value === 'string' && SERVICES.some((service) => service === value)
@@ -36,81 +44,118 @@ function isServiceId(value: unknown): value is ServiceId {
 function isConnectMessage(
   value: unknown,
 ): value is Extract<BackgroundMessage, { type: 'CONNECT_SERVICE' }> {
-  if (value === null || typeof value !== 'object') {
+  if (!isRecord(value) || !isRecord(value.config)) {
     return false
   }
-
-  const message = value as Record<string, unknown>
-  const config = message.config
-
-  if (config === null || typeof config !== 'object') {
-    return false
-  }
-
-  const input = config as Record<string, unknown>
 
   return (
-    message.type === 'CONNECT_SERVICE' &&
-    isServiceId(message.serviceId) &&
-    typeof input.url === 'string' &&
-    typeof input.apiKey === 'string'
+    value.type === 'CONNECT_SERVICE' &&
+    isServiceId(value.serviceId) &&
+    typeof value.config.url === 'string' &&
+    typeof value.config.apiKey === 'string'
   )
 }
 
 function isRemoveMessage(
   value: unknown,
 ): value is Extract<BackgroundMessage, { type: 'REMOVE_SERVICE' }> {
-  if (value === null || typeof value !== 'object') {
-    return false
-  }
-
-  const message = value as Record<string, unknown>
-
-  return message.type === 'REMOVE_SERVICE' && isServiceId(message.serviceId)
+  return isRecord(value) && value.type === 'REMOVE_SERVICE' && isServiceId(value.serviceId)
 }
 
 function isSetJellyfinUserMessage(
   value: unknown,
 ): value is Extract<BackgroundMessage, { type: 'SET_JELLYFIN_USER' }> {
-  if (value === null || typeof value !== 'object') {
+  return (
+    isRecord(value) &&
+    value.type === 'SET_JELLYFIN_USER' &&
+    typeof value.userId === 'string' &&
+    value.userId.trim().length > 0
+  )
+}
+
+function isSeerrRequestsMessage(
+  value: unknown,
+): value is Extract<BackgroundMessage, { type: 'GET_SEERR_REQUESTS' }> {
+  if (!isRecord(value) || value.type !== 'GET_SEERR_REQUESTS') {
     return false
   }
 
-  const message = value as Record<string, unknown>
+  const { page, pageSize, filter } = value
 
-  return (
-    message.type === 'SET_JELLYFIN_USER' &&
-    typeof message.userId === 'string' &&
-    message.userId.trim().length > 0
-  )
+  if (page !== undefined && (typeof page !== 'number' || !Number.isSafeInteger(page) || page < 1)) {
+    return false
+  }
+
+  if (
+    pageSize !== undefined &&
+    (typeof pageSize !== 'number' ||
+      !Number.isSafeInteger(pageSize) ||
+      pageSize < 1 ||
+      pageSize > 100)
+  ) {
+    return false
+  }
+
+  if (
+    filter !== undefined &&
+    (typeof filter !== 'string' || !SEERR_REQUEST_FILTERS.some((candidate) => candidate === filter))
+  ) {
+    return false
+  }
+
+  const normalizedPage = page ?? 1
+  const normalizedPageSize = pageSize ?? 10
+
+  return Number.isSafeInteger((normalizedPage - 1) * normalizedPageSize)
 }
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'An unexpected error occurred.'
 }
 
-async function getConfiguredJellyfin(): Promise<ServiceConfig> {
-  const config = await getServiceConfig('jellyfin')
+async function getConfiguredService(
+  serviceId: ServiceId,
+  missingConfigMessage: string,
+  missingPermissionMessage: string,
+): Promise<ServiceConfig> {
+  const config = await getServiceConfig(serviceId)
 
   if (!config) {
-    throw new Error('Configure Jellyfin before selecting a user.')
+    throw new Error(missingConfigMessage)
   }
 
   const permission = getHostPermission(config.url)
+
   const allowed = await chrome.permissions.contains({
     origins: [permission],
   })
 
   if (!allowed) {
-    throw new Error('Jellyfin server access has not been granted.')
+    throw new Error(missingPermissionMessage)
   }
 
   return config
 }
 
+async function getConfiguredJellyfin(): Promise<ServiceConfig> {
+  return getConfiguredService(
+    'jellyfin',
+    'Configure Jellyfin before selecting a user.',
+    'Jellyfin server access has not been granted.',
+  )
+}
+
+async function getConfiguredSeerr(): Promise<ServiceConfig> {
+  return getConfiguredService(
+    'seerr',
+    'Configure Seerr before viewing requests.',
+    'Seerr server access has not been granted.',
+  )
+}
+
 export async function handleBackgroundMessage(message: unknown): Promise<MessageResponse> {
   try {
-    if (message !== null && typeof message === 'object' && 'type' in message) {
+    if (isRecord(message)) {
       if (message.type === 'GET_SERVICE_CONFIGS') {
         return {
           success: true,
@@ -171,6 +216,30 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
         return {
           success: true,
           userId,
+        }
+      }
+
+      if (message.type === 'GET_SEERR_REQUESTS') {
+        if (!isSeerrRequestsMessage(message)) {
+          return {
+            success: false,
+            error: 'Invalid background message.',
+          }
+        }
+
+        const config = await getConfiguredSeerr()
+
+        const query: SeerrRequestsQuery = {
+          page: message.page,
+          pageSize: message.pageSize,
+          filter: message.filter,
+        }
+
+        const requests = await fetchSeerrRequests(config, query)
+
+        return {
+          success: true,
+          requests,
         }
       }
     }

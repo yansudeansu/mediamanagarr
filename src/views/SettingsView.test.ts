@@ -61,6 +61,9 @@ function mockConfigLoad(configs: SafeServiceConfigs = savedConfigs()) {
           success: true,
           userId: message.userId,
         }
+
+      default:
+        throw new Error(`Unexpected background message: ${message.type}`)
     }
   })
 }
@@ -236,6 +239,9 @@ describe('SettingsView', () => {
 
         case 'SET_JELLYFIN_USER':
           return { success: true, userId: message.userId }
+
+        default:
+          throw new Error(`Unexpected background message: ${message.type}`)
       }
     })
 
@@ -279,6 +285,9 @@ describe('SettingsView', () => {
 
         case 'SET_JELLYFIN_USER':
           return { success: true, userId: message.userId }
+
+        default:
+          throw new Error(`Unexpected background message: ${message.type}`)
       }
     })
 
@@ -354,6 +363,9 @@ describe('SettingsView', () => {
             success: false,
             error: 'Unable to save Jellyfin user.',
           }
+
+        default:
+          throw new Error(`Unexpected background message: ${message.type}`)
       }
     })
 
@@ -389,6 +401,9 @@ describe('SettingsView', () => {
 
         case 'SET_JELLYFIN_USER':
           return { success: true, userId: message.userId }
+
+        default:
+          throw new Error(`Unexpected background message: ${message.type}`)
       }
     })
 
@@ -501,6 +516,9 @@ describe('SettingsView', () => {
 
         case 'SET_JELLYFIN_USER':
           return { success: true, userId: message.userId }
+
+        default:
+          throw new Error(`Unexpected background message: ${message.type}`)
       }
     })
 
@@ -585,6 +603,9 @@ describe('SettingsView', () => {
 
         case 'SET_JELLYFIN_USER':
           return { success: true, userId: message.userId }
+
+        default:
+          throw new Error(`Unexpected background message: ${message.type}`)
       }
     })
 

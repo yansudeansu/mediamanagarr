@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ArrowLeft, RefreshCw, Settings } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, RefreshCw, Settings } from 'lucide-vue-next'
 
-export type IconName = 'settings' | 'arrow-left' | 'refresh'
+export type IconName = 'settings' | 'arrow-left' | 'arrow-right' | 'refresh'
 
 withDefaults(
   defineProps<{
@@ -25,6 +25,14 @@ withDefaults(
 
   <arrow-left
     v-else-if="name === 'arrow-left'"
+    :size="size"
+    :stroke-width="2"
+    aria-hidden="true"
+    focusable="false"
+  />
+
+  <arrow-right
+    v-else-if="name === 'arrow-right'"
     :size="size"
     :stroke-width="2"
     aria-hidden="true"
