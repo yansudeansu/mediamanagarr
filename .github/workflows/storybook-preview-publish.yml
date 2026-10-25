@@ -1,0 +1,206 @@
+name: Publish Storybook PR Preview
+
+on:
+  workflow_run:
+    workflows: ['Storybook PR Preview']
+    types: [completed]
+
+  pull_request_target:
+    types: [closed]
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storybook-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish or Remove PR Preview
+    runs-on: ubuntu-latest
+
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'pull_request') ||
+      (github.event_name == 'pull_request_target' &&
+       github.event.action == 'closed')
+
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Identify pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            prs=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/pulls")
+
+            number=$(echo "$prs" | jq -r '.[0].number // empty')
+
+            if [[ -z "$number" ]]; then
+              echo "No associated pull request found."
+              exit 1
+            fi
+
+            echo "action=publish" >> "$GITHUB_OUTPUT"
+          else
+            number="$PR_NUMBER"
+            echo "action=remove" >> "$GITHUB_OUTPUT"
+          fi
+
+          if ! [[ "$number" =~ ^[0-9]+$ ]]; then
+            echo "Invalid pull request number."
+            exit 1
+          fi
+
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Verify pull request
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          ACTION: ${{ steps.pr.outputs.action }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
+
+          if [[ "$ACTION" == "publish" ]]; then
+            state=$(echo "$pr" | jq -r '.state')
+            head_repo=$(echo "$pr" | jq -r '.head.repo.full_name')
+            current_sha=$(echo "$pr" | jq -r '.head.sha')
+
+            if [[ "$state" != "open" ]]; then
+              echo "PR is no longer open. Skipping publication."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if [[ "$head_repo" != "$REPOSITORY" ]]; then
+              echo "Skipping preview from forked repository."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if [[ "$current_sha" != "$HEAD_SHA" ]]; then
+              echo "A newer commit exists. Skipping outdated preview."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout publishing branch
+        if: steps.verify.outputs.proceed == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+          persist-credentials: false
+
+      - name: Download Storybook preview
+        if: >-
+          steps.verify.outputs.proceed == 'true' &&
+          steps.pr.outputs.action == 'publish'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p preview
+
+          gh run download "$RUN_ID" \
+            --repo "$REPOSITORY" \
+            --name storybook-pr-preview \
+            --dir preview
+
+      - name: Update preview directory
+        if: steps.verify.outputs.proceed == 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          ACTION: ${{ steps.pr.outputs.action }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          destination="site/pr-preview/pr-$PR_NUMBER"
+
+          rm -rf "$destination"
+
+          if [[ "$ACTION" == "publish" ]]; then
+            mkdir -p "$destination"
+            cp -a preview/. "$destination/"
+            echo "Published preview for PR #$PR_NUMBER"
+          else
+            echo "Removed preview for PR #$PR_NUMBER"
+          fi
+
+          touch site/.nojekyll
+
+      - name: Commit generated website
+        if: steps.verify.outputs.proceed == 'true'
+        working-directory: site
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          ACTION: ${{ steps.pr.outputs.action }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No website changes to commit."
+          else
+            git commit -m "ci: $ACTION Storybook preview for PR #$PR_NUMBER"
+
+            git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
+              push origin HEAD:gh-pages
+          fi
+
+      - name: Configure GitHub Pages
+        if: steps.verify.outputs.proceed == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload complete website
+        if: steps.verify.outputs.proceed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        if: steps.verify.outputs.proceed == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
