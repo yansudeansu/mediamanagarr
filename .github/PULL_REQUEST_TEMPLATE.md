@@ -12,7 +12,9 @@
 
 ## Screenshots / Storybook
 
-<!-- For UI changes, add screenshots or a Storybook link. Otherwise, write "N/A". -->
+<!-- For UI changes, add screenshots or relevant Storybook stories.
+     Automated preview links will be provided separately when available.
+     Otherwise, write "N/A". -->
 
 ## Checklist
 
