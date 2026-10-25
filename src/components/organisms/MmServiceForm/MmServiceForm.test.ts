@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmServiceForm from './MmServiceForm.vue'
 import MmInput from '../../atoms/MmInput/MmInput.vue'
+import MmSelect from '../../atoms/MmSelect/MmSelect.vue'
 import type { ServiceId } from '../../../types/service'
 
 describe('MmServiceForm', () => {
@@ -151,5 +152,65 @@ describe('MmServiceForm', () => {
     })
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Could not reach the server.')
+  })
+
+  it('shows the Jellyfin user dropdown when Jellyfin is configured', () => {
+    const wrapper = mount(MmServiceForm, {
+      props: {
+        serviceId: 'jellyfin',
+        url: 'https://jellyfin.example.com',
+        configured: true,
+        jellyfinUsers: [
+          { id: 'user-1', name: 'Alice' },
+          { id: 'user-2', name: 'Bob' },
+        ],
+        jellyfinUserId: 'user-2',
+      },
+    })
+
+    expect(wrapper.text()).toContain('Jellyfin User')
+    expect(wrapper.text()).toContain('Bob')
+  })
+
+  it('hides the Jellyfin user dropdown when Jellyfin is not configured', () => {
+    const wrapper = mount(MmServiceForm, {
+      props: {
+        serviceId: 'jellyfin',
+        configured: false,
+      },
+    })
+
+    expect(wrapper.text()).not.toContain('Jellyfin User')
+  })
+
+  it('hides the Jellyfin user dropdown for other services', () => {
+    const wrapper = mount(MmServiceForm, {
+      props: {
+        serviceId: 'sonarr',
+        configured: true,
+        jellyfinUsers: [{ id: 'user-1', name: 'Alice' }],
+      },
+    })
+
+    expect(wrapper.text()).not.toContain('Jellyfin User')
+  })
+
+  it('emits the selected Jellyfin user ID', async () => {
+    const wrapper = mount(MmServiceForm, {
+      props: {
+        serviceId: 'jellyfin',
+        configured: true,
+        jellyfinUsers: [
+          { id: 'user-1', name: 'Alice' },
+          { id: 'user-2', name: 'Bob' },
+        ],
+      },
+    })
+
+    const select = wrapper.findComponent(MmSelect)
+
+    await select.vm.$emit('update:modelValue', 'user-2')
+
+    expect(wrapper.emitted('selectJellyfinUser')?.[0]).toEqual(['user-2'])
   })
 })

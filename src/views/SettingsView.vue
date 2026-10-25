@@ -9,6 +9,7 @@ import {
   type ServiceId,
   type ServiceState,
 } from '../types/service'
+import type { JellyfinUser } from '../types/jellyfin'
 import { sendBackgroundMessage } from '../utils/background-messaging'
 import { getHostPermission, normalizeServerUrl } from '../utils/service-config'
 
@@ -22,22 +23,76 @@ const selectedService = ref<ServiceId>('jellyfin')
 
 const configs = ref<SafeServiceConfigs>({})
 const statuses = ref<Partial<Record<ServiceId, ServiceState>>>({})
-
 const loadingServices = ref<Partial<Record<ServiceId, boolean>>>({})
 const serviceErrors = ref<Partial<Record<ServiceId, string>>>({})
 
-const selectedStatus = computed(() => statuses.value[selectedService.value] ?? 'not-configured')
+const jellyfinUsers = ref<JellyfinUser[]>([])
+const jellyfinUserId = ref('')
+const jellyfinUsersLoading = ref(false)
+const jellyfinUserSaving = ref(false)
+const jellyfinUsersError = ref('')
 
 const selectedUrl = computed(() => configs.value[selectedService.value]?.url ?? '')
-
-const configured = computed(() => selectedStatus.value !== 'not-configured')
-
+const configured = computed(() => configs.value[selectedService.value]?.configured ?? false)
 const loading = computed(() => loadingServices.value[selectedService.value] ?? false)
-
 const error = computed(() => serviceErrors.value[selectedService.value] ?? '')
 
 function getErrorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : 'An unexpected error occurred.'
+}
+
+async function loadJellyfinUsers(): Promise<void> {
+  if (!configs.value.jellyfin?.configured) {
+    jellyfinUsers.value = []
+    jellyfinUserId.value = ''
+    return
+  }
+
+  jellyfinUsersLoading.value = true
+  jellyfinUsersError.value = ''
+
+  try {
+    const response = await sendBackgroundMessage({
+      type: 'GET_JELLYFIN_USERS',
+    })
+
+    if (!response.success) {
+      throw new Error(response.error)
+    }
+
+    jellyfinUsers.value = response.users
+    jellyfinUserId.value = response.selectedUserId
+  } catch (caught) {
+    jellyfinUsers.value = []
+    jellyfinUserId.value = ''
+    jellyfinUsersError.value = getErrorMessage(caught)
+  } finally {
+    jellyfinUsersLoading.value = false
+  }
+}
+
+async function selectJellyfinUser(userId: string): Promise<void> {
+  if (jellyfinUserSaving.value || jellyfinUsersLoading.value) return
+
+  jellyfinUserSaving.value = true
+  jellyfinUsersError.value = ''
+
+  try {
+    const response = await sendBackgroundMessage({
+      type: 'SET_JELLYFIN_USER',
+      userId,
+    })
+
+    if (!response.success) {
+      throw new Error(response.error)
+    }
+
+    jellyfinUserId.value = response.userId
+  } catch (caught) {
+    jellyfinUsersError.value = getErrorMessage(caught)
+  } finally {
+    jellyfinUserSaving.value = false
+  }
 }
 
 async function loadConfigs(): Promise<void> {
@@ -57,6 +112,10 @@ async function loadConfigs(): Promise<void> {
         ? 'configured'
         : 'not-configured'
     }
+
+    if (response.configs.jellyfin?.configured) {
+      await loadJellyfinUsers()
+    }
   } catch (caught) {
     serviceErrors.value[selectedService.value] = getErrorMessage(caught)
   }
@@ -65,9 +124,7 @@ async function loadConfigs(): Promise<void> {
 async function connectService(payload: ConnectPayload): Promise<void> {
   const { serviceId } = payload
 
-  if (loadingServices.value[serviceId]) {
-    return
-  }
+  if (loadingServices.value[serviceId]) return
 
   loadingServices.value[serviceId] = true
   serviceErrors.value[serviceId] = ''
@@ -76,8 +133,7 @@ async function connectService(payload: ConnectPayload): Promise<void> {
     const normalizedUrl = normalizeServerUrl(payload.url)
     const permission = getHostPermission(normalizedUrl)
 
-    // Request permission directly from the user's Connect & Test action.
-    // Firefox requires this call to retain the user gesture.
+    // Keep the permission request in the direct user gesture.
     const granted = await chrome.permissions.request({
       origins: [permission],
     })
@@ -105,6 +161,10 @@ async function connectService(payload: ConnectPayload): Promise<void> {
     }
 
     statuses.value[serviceId] = 'connected'
+
+    if (serviceId === 'jellyfin') {
+      await loadJellyfinUsers()
+    }
   } catch (caught) {
     statuses.value[serviceId] = 'failed'
     serviceErrors.value[serviceId] = getErrorMessage(caught)
@@ -131,7 +191,13 @@ onMounted(() => {
         :configured="configured"
         :loading="loading"
         :error="error"
+        :jellyfin-users="jellyfinUsers"
+        :jellyfin-user-id="jellyfinUserId"
+        :jellyfin-users-loading="jellyfinUsersLoading"
+        :jellyfin-user-saving="jellyfinUserSaving"
+        :jellyfin-users-error="jellyfinUsersError"
         @connect="connectService"
+        @select-jellyfin-user="selectJellyfinUser"
       />
     </template>
   </mm-settings-template>

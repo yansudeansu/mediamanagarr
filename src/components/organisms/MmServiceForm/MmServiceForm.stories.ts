@@ -12,6 +12,11 @@ const meta = {
     configured: false,
     loading: false,
     error: '',
+    jellyfinUsers: [],
+    jellyfinUserId: '',
+    jellyfinUsersLoading: false,
+    jellyfinUserSaving: false,
+    jellyfinUsersError: '',
   },
 
   argTypes: {
@@ -29,6 +34,18 @@ const meta = {
       control: 'boolean',
     },
     error: {
+      control: 'text',
+    },
+    jellyfinUserId: {
+      control: 'text',
+    },
+    jellyfinUsersLoading: {
+      control: 'boolean',
+    },
+    jellyfinUserSaving: {
+      control: 'boolean',
+    },
+    jellyfinUsersError: {
       control: 'text',
     },
   },
@@ -52,6 +69,12 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
+const exampleUsers = [
+  { id: 'user-1', name: 'Alice' },
+  { id: 'user-2', name: 'Bob' },
+  { id: 'user-3', name: 'Charlie' },
+]
+
 export const Playground: Story = {}
 
 export const FreshInstall: Story = {
@@ -66,6 +89,36 @@ export const Configured: Story = {
     serviceId: 'jellyfin',
     url: 'https://jellyfin.example.com',
     configured: true,
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-1',
+  },
+}
+
+export const JellyfinUserSelected: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-2',
+  },
+}
+
+export const JellyfinUsersLoading: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    jellyfinUsersLoading: true,
+  },
+}
+
+export const JellyfinUsersError: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    jellyfinUsersError: 'Unable to load Jellyfin users: HTTP 403.',
   },
 }
 
@@ -83,6 +136,8 @@ export const Loading: Story = {
     url: 'https://jellyfin.example.com',
     configured: true,
     loading: true,
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-1',
   },
 }
 

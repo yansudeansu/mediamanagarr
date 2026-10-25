@@ -31,6 +31,12 @@ const connectedStatuses: Partial<Record<ServiceId, ServiceState>> = {
   qbittorrent: 'connected',
 }
 
+const exampleJellyfinUsers = [
+  { id: 'user-1', name: 'Alice' },
+  { id: 'user-2', name: 'Bob' },
+  { id: 'user-3', name: 'Charlie' },
+]
+
 function createStory(
   statuses: Partial<Record<ServiceId, ServiceState>>,
   initialService: ServiceId = 'jellyfin',
@@ -44,6 +50,7 @@ function createStory(
 
     setup() {
       const selectedService = ref<ServiceId>(initialService)
+      const jellyfinUserId = ref('user-1')
 
       const urls: Partial<Record<ServiceId, string>> = {
         jellyfin: 'https://jellyfin.example.com',
@@ -64,6 +71,8 @@ function createStory(
         statuses,
         selectedUrl,
         configured,
+        jellyfinUsers: exampleJellyfinUsers,
+        jellyfinUserId,
       }
     },
 
@@ -82,6 +91,9 @@ function createStory(
               :service-id="selectedService"
               :url="selectedUrl"
               :configured="configured"
+              :jellyfin-users="jellyfinUsers"
+              :jellyfin-user-id="jellyfinUserId"
+              @select-jellyfin-user="jellyfinUserId = $event"
             />
           </template>
         </mm-settings-template>
@@ -91,7 +103,7 @@ function createStory(
 }
 
 /**
- * Original MediaManagarr Settings layout.
+ * Original MediaManagarr Settings layout with configured services.
  */
 export const Playground: Story = {
   render: createStory(configuredStatuses),

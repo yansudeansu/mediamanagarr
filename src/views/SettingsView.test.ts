@@ -20,10 +20,39 @@ const savedConfigs = {
   },
 }
 
+const jellyfinUsers = [
+  { id: 'user-1', name: 'Alice' },
+  { id: 'user-2', name: 'Bob' },
+]
+
 function mockConfigLoad() {
-  vi.mocked(sendBackgroundMessage).mockResolvedValue({
-    success: true,
-    configs: savedConfigs,
+  vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+    switch (message.type) {
+      case 'GET_SERVICE_CONFIGS':
+        return {
+          success: true,
+          configs: savedConfigs,
+        }
+
+      case 'GET_JELLYFIN_USERS':
+        return {
+          success: true,
+          users: jellyfinUsers,
+          selectedUserId: 'user-1',
+        }
+
+      case 'CONNECT_SERVICE':
+        return {
+          success: true,
+          serviceId: message.serviceId,
+        }
+
+      case 'SET_JELLYFIN_USER':
+        return {
+          success: true,
+          userId: message.userId,
+        }
+    }
   })
 }
 
@@ -89,15 +118,31 @@ describe('SettingsView', () => {
   })
 
   it('requests host permission before connecting', async () => {
-    vi.mocked(sendBackgroundMessage)
-      .mockResolvedValueOnce({
-        success: true,
-        configs: {},
-      })
-      .mockResolvedValueOnce({
-        success: true,
-        serviceId: 'jellyfin',
-      })
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      switch (message.type) {
+        case 'GET_SERVICE_CONFIGS':
+          return { success: true, configs: {} }
+
+        case 'GET_JELLYFIN_USERS':
+          return {
+            success: true,
+            users: jellyfinUsers,
+            selectedUserId: '',
+          }
+
+        case 'CONNECT_SERVICE':
+          return {
+            success: true,
+            serviceId: message.serviceId,
+          }
+
+        case 'SET_JELLYFIN_USER':
+          return {
+            success: true,
+            userId: message.userId,
+          }
+      }
+    })
 
     const wrapper = mount(SettingsView)
     await flushPromises()
@@ -125,15 +170,31 @@ describe('SettingsView', () => {
   })
 
   it('updates the service after a successful connection', async () => {
-    vi.mocked(sendBackgroundMessage)
-      .mockResolvedValueOnce({
-        success: true,
-        configs: {},
-      })
-      .mockResolvedValueOnce({
-        success: true,
-        serviceId: 'jellyfin',
-      })
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      switch (message.type) {
+        case 'GET_SERVICE_CONFIGS':
+          return { success: true, configs: {} }
+
+        case 'GET_JELLYFIN_USERS':
+          return {
+            success: true,
+            users: jellyfinUsers,
+            selectedUserId: '',
+          }
+
+        case 'CONNECT_SERVICE':
+          return {
+            success: true,
+            serviceId: message.serviceId,
+          }
+
+        case 'SET_JELLYFIN_USER':
+          return {
+            success: true,
+            userId: message.userId,
+          }
+      }
+    })
 
     const wrapper = mount(SettingsView)
     await flushPromises()
@@ -180,15 +241,34 @@ describe('SettingsView', () => {
   })
 
   it('does not overwrite saved configuration after a failed connection', async () => {
-    vi.mocked(sendBackgroundMessage)
-      .mockResolvedValueOnce({
-        success: true,
-        configs: savedConfigs,
-      })
-      .mockResolvedValueOnce({
-        success: false,
-        error: 'Authentication failed.',
-      })
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      switch (message.type) {
+        case 'GET_SERVICE_CONFIGS':
+          return {
+            success: true,
+            configs: savedConfigs,
+          }
+
+        case 'GET_JELLYFIN_USERS':
+          return {
+            success: true,
+            users: jellyfinUsers,
+            selectedUserId: 'user-1',
+          }
+
+        case 'CONNECT_SERVICE':
+          return {
+            success: false,
+            error: 'Authentication failed.',
+          }
+
+        case 'SET_JELLYFIN_USER':
+          return {
+            success: true,
+            userId: message.userId,
+          }
+      }
+    })
 
     const wrapper = mount(SettingsView)
     await flushPromises()
@@ -207,15 +287,31 @@ describe('SettingsView', () => {
   })
 
   it('keeps errors scoped to their service', async () => {
-    vi.mocked(sendBackgroundMessage)
-      .mockResolvedValueOnce({
-        success: true,
-        configs: {},
-      })
-      .mockResolvedValueOnce({
-        success: false,
-        error: 'Connection failed.',
-      })
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      switch (message.type) {
+        case 'GET_SERVICE_CONFIGS':
+          return { success: true, configs: {} }
+
+        case 'GET_JELLYFIN_USERS':
+          return {
+            success: true,
+            users: jellyfinUsers,
+            selectedUserId: '',
+          }
+
+        case 'CONNECT_SERVICE':
+          return {
+            success: false,
+            error: 'Connection failed.',
+          }
+
+        case 'SET_JELLYFIN_USER':
+          return {
+            success: true,
+            userId: message.userId,
+          }
+      }
+    })
 
     const wrapper = mount(SettingsView)
     await flushPromises()
@@ -234,5 +330,176 @@ describe('SettingsView', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.getComponent(MmServiceForm).props('error')).toBe('')
+  })
+
+  it('loads Jellyfin users when a saved configuration exists', async () => {
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    expect(sendBackgroundMessage).toHaveBeenCalledWith({
+      type: 'GET_JELLYFIN_USERS',
+    })
+
+    const form = wrapper.getComponent(MmServiceForm)
+
+    expect(form.props('jellyfinUsers')).toEqual(jellyfinUsers)
+    expect(form.props('jellyfinUserId')).toBe('user-1')
+  })
+
+  it('saves a selected Jellyfin user', async () => {
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    wrapper.getComponent(MmServiceForm).vm.$emit('selectJellyfinUser', 'user-2')
+    await flushPromises()
+
+    expect(sendBackgroundMessage).toHaveBeenCalledWith({
+      type: 'SET_JELLYFIN_USER',
+      userId: 'user-2',
+    })
+
+    expect(wrapper.getComponent(MmServiceForm).props('jellyfinUserId')).toBe('user-2')
+  })
+
+  it('keeps the previous selection when saving fails', async () => {
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      switch (message.type) {
+        case 'GET_SERVICE_CONFIGS':
+          return {
+            success: true,
+            configs: savedConfigs,
+          }
+
+        case 'GET_JELLYFIN_USERS':
+          return {
+            success: true,
+            users: jellyfinUsers,
+            selectedUserId: 'user-1',
+          }
+
+        case 'CONNECT_SERVICE':
+          return {
+            success: true,
+            serviceId: message.serviceId,
+          }
+
+        case 'SET_JELLYFIN_USER':
+          return {
+            success: false,
+            error: 'Unable to save Jellyfin user.',
+          }
+      }
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    wrapper.getComponent(MmServiceForm).vm.$emit('selectJellyfinUser', 'user-2')
+    await flushPromises()
+
+    const form = wrapper.getComponent(MmServiceForm)
+
+    expect(form.props('jellyfinUserId')).toBe('user-1')
+    expect(form.props('jellyfinUsersError')).toBe('Unable to save Jellyfin user.')
+  })
+
+  it('shows a Jellyfin user-loading error without failing the service connection', async () => {
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      switch (message.type) {
+        case 'GET_SERVICE_CONFIGS':
+          return {
+            success: true,
+            configs: savedConfigs,
+          }
+
+        case 'GET_JELLYFIN_USERS':
+          return {
+            success: false,
+            error: 'Unable to reach Jellyfin.',
+          }
+
+        case 'CONNECT_SERVICE':
+          return {
+            success: true,
+            serviceId: message.serviceId,
+          }
+
+        case 'SET_JELLYFIN_USER':
+          return {
+            success: true,
+            userId: message.userId,
+          }
+      }
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const form = wrapper.getComponent(MmServiceForm)
+
+    expect(form.props('configured')).toBe(true)
+    expect(form.props('error')).toBe('')
+    expect(form.props('jellyfinUsersError')).toBe('Unable to reach Jellyfin.')
+  })
+
+  it('refreshes Jellyfin users after a successful connection', async () => {
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const initialRequests = vi
+      .mocked(sendBackgroundMessage)
+      .mock.calls.filter(([message]) => message.type === 'GET_JELLYFIN_USERS').length
+
+    wrapper.getComponent(MmServiceForm).vm.$emit('connect', {
+      serviceId: 'jellyfin',
+      url: 'https://jellyfin.example.com',
+      apiKey: '',
+    })
+
+    await flushPromises()
+
+    const finalRequests = vi
+      .mocked(sendBackgroundMessage)
+      .mock.calls.filter(([message]) => message.type === 'GET_JELLYFIN_USERS').length
+
+    expect(finalRequests).toBe(initialRequests + 1)
+  })
+
+  it('does not request Jellyfin users when Jellyfin is not configured', async () => {
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      switch (message.type) {
+        case 'GET_SERVICE_CONFIGS':
+          return {
+            success: true,
+            configs: {},
+          }
+
+        case 'GET_JELLYFIN_USERS':
+          return {
+            success: true,
+            users: jellyfinUsers,
+            selectedUserId: '',
+          }
+
+        case 'CONNECT_SERVICE':
+          return {
+            success: true,
+            serviceId: message.serviceId,
+          }
+
+        case 'SET_JELLYFIN_USER':
+          return {
+            success: true,
+            userId: message.userId,
+          }
+      }
+    })
+
+    mount(SettingsView)
+    await flushPromises()
+
+    expect(sendBackgroundMessage).not.toHaveBeenCalledWith({
+      type: 'GET_JELLYFIN_USERS',
+    })
   })
 })
