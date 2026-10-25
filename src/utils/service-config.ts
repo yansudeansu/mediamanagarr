@@ -33,9 +33,7 @@ export function getHostPermission(url: string): string {
   const normalizedUrl = normalizeServerUrl(url)
   const parsedUrl = new URL(normalizedUrl)
 
-  // Extension host permissions are origin-based.
-  // Reverse-proxy paths belong in API requests, not permission patterns.
-  return `${parsedUrl.origin}/*`
+  return `${parsedUrl.protocol}//${parsedUrl.hostname}/*`
 }
 
 export function resolveServiceConfig(

@@ -106,8 +106,8 @@ describe('getHostPermission', () => {
     expect(getHostPermission('https://media.example.com')).toBe('https://media.example.com/*')
   })
 
-  it('creates an HTTP host permission', () => {
-    expect(getHostPermission('http://localhost:8096')).toBe('http://localhost:8096/*')
+  it('creates an HTTP host permission without the port', () => {
+    expect(getHostPermission('http://localhost:8096')).toBe('http://localhost/*')
   })
 
   it('excludes reverse-proxy paths', () => {
