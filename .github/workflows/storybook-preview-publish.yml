@@ -40,31 +40,41 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Identify pull request
-        id: pr
+      - name: Download PR build metadata
+        if: github.event_name == 'workflow_run'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          EVENT_NAME: ${{ github.event_name }}
           RUN_ID: ${{ github.event.workflow_run.id }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p metadata
+
+          gh run download "$RUN_ID" \
+            --repo "$REPOSITORY" \
+            --name storybook-pr-metadata \
+            --dir metadata
+
+      - name: Identify pull request
+        id: pr
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CLOSED_PR_NUMBER: ${{ github.event.pull_request.number }}
         shell: bash
         run: |
           set -euo pipefail
 
           if [[ "$EVENT_NAME" == "workflow_run" ]]; then
-            prs=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/pulls")
-
-            number=$(echo "$prs" | jq -r '.[0].number // empty')
-
-            if [[ -z "$number" ]]; then
-              echo "No associated pull request found."
-              exit 1
-            fi
+            number=$(jq -r '.pr' metadata/build.json)
+            sha=$(jq -r '.sha' metadata/build.json)
 
             echo "action=publish" >> "$GITHUB_OUTPUT"
+            echo "sha=$sha" >> "$GITHUB_OUTPUT"
           else
-            number="$PR_NUMBER"
+            number="$CLOSED_PR_NUMBER"
+
             echo "action=remove" >> "$GITHUB_OUTPUT"
           fi
 
@@ -82,6 +92,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           ACTION: ${{ steps.pr.outputs.action }}
+          BUILD_SHA: ${{ steps.pr.outputs.sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         shell: bash
         run: |
@@ -90,9 +101,9 @@ jobs:
           pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
 
           if [[ "$ACTION" == "publish" ]]; then
-            state=$(echo "$pr" | jq -r '.state')
-            head_repo=$(echo "$pr" | jq -r '.head.repo.full_name')
-            current_sha=$(echo "$pr" | jq -r '.head.sha')
+            state=$(jq -r '.state' <<< "$pr")
+            head_repo=$(jq -r '.head.repo.full_name' <<< "$pr")
+            current_sha=$(jq -r '.head.sha' <<< "$pr")
 
             if [[ "$state" != "open" ]]; then
               echo "PR is no longer open. Skipping publication."
@@ -106,34 +117,30 @@ jobs:
               exit 0
             fi
 
-            # Read the original PR event that triggered the build.
-            event_url=$(gh api \
-              "repos/$REPOSITORY/actions/runs/$RUN_ID" \
-              --jq '.event')
-
-            if [[ "$event_url" != "pull_request" ]]; then
-              echo "Unexpected workflow event."
+            if ! [[ "$BUILD_SHA" =~ ^[a-fA-F0-9]{40}$ ]]; then
+              echo "Invalid build commit SHA."
               exit 1
             fi
 
-            # The build workflow uses GitHub's PR merge ref.
-            # Verify that its associated PR still points to the
-            # same head commit recorded when the build started.
-            run=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID")
-
-            run_head_sha=$(echo "$run" | jq -r '.head_sha')
-
-            merge_sha=$(gh api \
-              "repos/$REPOSITORY/pulls/$PR_NUMBER" \
-              --jq '.merge_commit_sha')
-
-            if [[ "$run_head_sha" != "$merge_sha" ]]; then
-              echo "Build does not match the current PR merge commit."
+            if [[ "$current_sha" != "$BUILD_SHA" ]]; then
+              echo "A newer PR commit exists. Skipping outdated preview."
               echo "proceed=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
-            echo "head_sha=$current_sha" >> "$GITHUB_OUTPUT"
+            # Verify that the completed run belongs to this PR.
+            associated_prs=$(gh api \
+              "repos/$REPOSITORY/actions/runs/$RUN_ID/pulls")
+
+            associated=$(jq -r \
+              --argjson number "$PR_NUMBER" \
+              'any(.[]; .number == $number)' \
+              <<< "$associated_prs")
+
+            if [[ "$associated" != "true" ]]; then
+              echo "Workflow run is not associated with this PR."
+              exit 1
+            fi
           fi
 
           echo "proceed=true" >> "$GITHUB_OUTPUT"
@@ -170,7 +177,7 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           ACTION: ${{ steps.pr.outputs.action }}
-          HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
+          BUILD_SHA: ${{ steps.pr.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -184,12 +191,12 @@ jobs:
             cp -a preview/. "$destination/"
 
             jq -n \
-              --arg sha "$HEAD_SHA" \
-              --arg pr "$PR_NUMBER" \
-              '{pr: ($pr | tonumber), sha: $sha}' \
+              --argjson pr "$PR_NUMBER" \
+              --arg sha "$BUILD_SHA" \
+              '{pr: $pr, sha: $sha}' \
               > "$destination/deployment.json"
 
-            echo "Published preview for PR #$PR_NUMBER"
+            echo "Prepared preview for PR #$PR_NUMBER"
           else
             echo "Removed preview for PR #$PR_NUMBER"
           fi
@@ -217,7 +224,13 @@ jobs:
           else
             git commit -m "ci: $ACTION Storybook preview for PR #$PR_NUMBER"
 
-            git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
+            authorization=$(
+              printf 'x-access-token:%s' "$GH_TOKEN" |
+                base64 -w0
+            )
+
+            git \
+              -c "http.extraheader=AUTHORIZATION: basic $authorization" \
               push origin HEAD:gh-pages
           fi
 
@@ -244,18 +257,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
-          HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
+          BUILD_SHA: ${{ steps.pr.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
 
-          # Recheck the PR head before updating the comment.
           current_sha=$(gh api \
             "repos/$REPOSITORY/pulls/$PR_NUMBER" \
             --jq '.head.sha')
 
-          if [[ "$current_sha" != "$HEAD_SHA" ]]; then
-            echo "PR has changed. Skipping comment update."
+          if [[ "$current_sha" != "$BUILD_SHA" ]]; then
+            echo "PR changed during deployment. Skipping comment update."
             exit 0
           fi
 
