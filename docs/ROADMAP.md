@@ -1,6 +1,6 @@
 # MediaManagarr Development Roadmap
 
-> **Status:** Early development. Milestones 0 and 1 are complete. Milestone 2 is in its final verification stage. Remaining milestones describe planned outcomes, not fixed delivery dates.
+> **Status:** Early development. Milestones 0 and 1 are complete. Milestone 2 is in progress. Milestone 2.5 will establish Git workflow safeguards and release automation before service integrations begin. Remaining milestones describe planned outcomes, not fixed delivery dates.
 
 ## Vision
 
@@ -17,6 +17,8 @@ The original Media Monitor project remains separate and serves as a reference fo
 5. Support Firefox, Zen Browser, and Chromium browsers without assuming their extension APIs behave identically.
 6. Protect credentials and require confirmation for destructive operations.
 7. Add dependencies only when they provide meaningful value.
+8. Keep the default branch stable through automated checks and reviewed changes.
+9. Use consistent versioning, commit conventions, and release documentation.
 
 ## Technology and workflow
 
@@ -32,9 +34,72 @@ The original Media Monitor project remains separate and serves as a reference fo
 | Documentation            | Storybook and GitHub Pages                  |
 | Code quality             | ESLint, Prettier, strict TypeScript         |
 | CI                       | GitHub Actions, default branch `master`     |
+| Commit conventions       | Conventional Commits                        |
+| Commit validation        | Commitlint (planned)                        |
+| Local Git hooks          | Husky (planned)                             |
+| Release automation       | Release Please (proposed)                   |
+| Versioning               | Semantic Versioning                         |
+| Changelog                | Automated `CHANGELOG.md` (planned)          |
 | License                  | MIT                                         |
 
 The build handles TypeScript validation; a separate `typecheck` command is not initially required. Use npm exclusively.
+
+### Development workflow
+
+The intended contribution workflow is:
+
+1. Create a feature or fix branch from `master`.
+2. Make small, focused changes.
+3. Write tests and update documentation alongside the implementation.
+4. Use Conventional Commits for commit messages.
+5. Run local checks before pushing.
+6. Open a pull request targeting `master`.
+7. Require successful CI checks before merging.
+8. Merge using a consistent strategy that preserves meaningful release history.
+
+Local Git hooks provide early feedback but are not a security boundary. GitHub branch protection or repository rulesets, together with required CI checks, provide server-side enforcement.
+
+### Commit conventions
+
+Use Conventional Commits:
+
+```text
+feat: add service connection form
+fix: correct popup scrolling
+docs: update development roadmap
+refactor: simplify navigation state
+test: cover connection failures
+chore: update extension icons
+ci: improve GitHub Actions workflow
+```
+
+Breaking changes use `!` or a `BREAKING CHANGE:` footer.
+
+The release workflow must document how merge strategies affect commit parsing and version calculation.
+
+### Versioning and releases
+
+Use Semantic Versioning:
+
+- **Patch:** Backward-compatible bug fixes.
+- **Minor:** Backward-compatible features.
+- **Major:** Breaking changes.
+
+During early development, follow a documented `0.x.y` versioning policy rather than assuming that every breaking change must immediately produce `1.0.0`.
+
+`package.json` is the source of truth for the application version. The Vite build synchronizes the generated extension manifest with that version.
+
+Release automation should:
+
+- Analyze merged changes using Conventional Commits.
+- Propose version updates.
+- Generate or update `CHANGELOG.md`.
+- Create version tags.
+- Publish GitHub Releases.
+- Avoid unnecessary releases for documentation-only or maintenance changes.
+- Prevent duplicate releases and accidental version changes.
+
+The initial release process may publish source releases without browser-store packages. Signed extension packages and store distribution are addressed in Milestone 12.
 
 ## Proposed architecture
 
@@ -87,6 +152,25 @@ src/
 ├── App.vue
 └── main.ts
 ```
+
+Additional repository infrastructure may include:
+
+```text
+.github/
+└── workflows/
+    ├── ci.yml
+    ├── storybook.yml
+    └── release.yml
+
+.husky/
+├── commit-msg
+└── pre-push
+
+commitlint.config.js
+CHANGELOG.md
+```
+
+These filenames are illustrative. Preserve existing workflow filenames and avoid creating duplicate workflows.
 
 **Atoms** are basic controls such as buttons, badges, and inputs. **Molecules** combine atoms, such as form fields and filters. **Organisms** are larger sections such as media cards, calendar grids, and service panels. **Templates** define reusable layouts. **Views** compose these elements into complete screens and coordinate application state.
 
@@ -214,7 +298,6 @@ Publish only mock data—never credentials or private server addresses.
 - [x] Create the `MmFooter` molecule with branding and version information.
 - [x] Add component tests and Storybook stories.
 - [x] Add branded Introduction and Design Tokens documentation pages.
-- [ ] Introduce additional controls such as inputs, badges, dialogs, and empty/error states when needed by future features.
 
 ### Application shell
 
@@ -237,19 +320,72 @@ Publish only mock data—never credentials or private server addresses.
 - [x] Load the temporary extension in Zen Browser.
 - [x] Synchronize the generated manifest version with `package.json`.
 - [x] Display the application version in the popup footer.
-- [ ] Introduce platform adapters when storage, permissions, or background messaging are first required.
+- [x] Introduce platform adapters when storage, permissions, or background messaging are first required.
 
 ### Final verification
 
-- [ ] Run ESLint successfully.
-- [ ] Pass Prettier formatting checks.
-- [ ] Pass all Vitest tests.
-- [ ] Complete a production Vite build.
-- [ ] Complete a production Storybook build.
-- [ ] Perform final keyboard and accessibility checks.
-- [ ] Commit the completed milestone.
+- [x] Run ESLint successfully.
+- [x] Pass Prettier formatting checks.
+- [x] Pass all Vitest tests.
+- [x] Complete a production Vite build.
+- [x] Complete a production Storybook build.
+- [x] Perform final keyboard and accessibility checks.
 
-**Remaining work:** Final verification. Additional controls and platform adapters are intentionally deferred until features require them.
+## Milestone 2.5 — Git workflow and release automation
+
+**Goal:** Protect the default branch, standardize commits, and automate versioning and release documentation.
+
+### Commit conventions
+
+- [ ] Adopt Conventional Commits across the repository.
+- [ ] Install and configure Commitlint.
+- [ ] Define allowed commit types and message conventions.
+- [ ] Configure a local `commit-msg` hook to validate commit messages.
+- [ ] Document commit conventions in the contributing guide.
+- [ ] Ensure the chosen merge strategy preserves meaningful release information.
+
+### Local quality safeguards
+
+- [ ] Install and configure Husky.
+- [ ] Add a pre-push hook that runs lint, formatting checks, tests, and the production build.
+- [ ] Ensure hooks work after a clean `npm ci`.
+- [ ] Keep local checks reasonably fast and avoid unnecessary duplicate work.
+- [ ] Document how to run checks manually.
+- [ ] Confirm that failing checks prevent a normal push.
+
+### GitHub branch protection
+
+- [ ] Configure a repository ruleset for `master`.
+- [ ] Block force pushes to `master`.
+- [ ] Prevent deletion of `master`.
+- [ ] Require pull requests before merging into `master`.
+- [ ] Require successful CI checks before merging.
+- [ ] Validate Conventional Commit messages.
+- [ ] Verify that failing checks block merges.
+- [ ] Document any repository-plan limitations affecting enforcement.
+
+### Versioning and changelog
+
+- [ ] Use `master` as the single long-lived branch.
+- [ ] Adopt Semantic Versioning with a documented pre-1.0 policy.
+- [ ] Track releases using Git tags.
+- [ ] Determine the next version from commits since the previous release.
+- [ ] Support manually triggered releases through GitHub Actions.
+- [ ] Evaluate release automation tools for this workflow.
+- [ ] Generate and maintain `CHANGELOG.md`.
+- [ ] Keep `package.json` and `package-lock.json` synchronized.
+- [ ] Preserve automatic manifest-version synchronization.
+- [ ] Avoid version bumps when no qualifying changes exist.
+
+### Tags and GitHub Releases
+
+- [ ] Create Git tags from validated releases on `master`.
+- [ ] Publish GitHub Releases with generated release notes.
+- [ ] Ensure release automation only publishes commits from `master`.
+- [ ] Prevent duplicate tags and releases.
+- [ ] Ensure all required checks pass before publishing.
+- [ ] Document required GitHub Actions permissions.
+- [ ] Test release automation without publishing an unintended release.
 
 ## Milestone 3 — Settings and service configuration
 
@@ -355,15 +491,18 @@ These are candidates, not commitments for the initial release.
 
 ## Milestone 12 — Release engineering and distribution
 
-**Goal:** Reproducible, tested browser packages and a documented release process.
+**Goal:** Reproducible, tested browser packages and a documented distribution process.
 
 - Build and validate browser-specific packages and manifests.
 - Test Firefox, Zen Browser, and Chrome compatibility.
-- Exclude development files; establish versioning and changelog conventions.
+- Exclude development files and validate packaged contents.
 - Investigate Firefox Add-ons and Chrome Web Store requirements.
 - Document signing, manual installation, and updates.
-- Automate release artifacts and publish GitHub releases.
+- Automate extension release artifacts and attach them to GitHub Releases.
+- Establish store submission and update procedures.
 - Add issue/PR templates, a security policy, dependency updates, and support guidance.
+
+Git tags, source-code versioning, and changelog generation are established in Milestone 2.5. This milestone focuses on distributable browser-extension packages.
 
 ## Media Monitor reference project
 
@@ -398,3 +537,5 @@ A standalone web application, more integrations, flexible dashboards, richer not
 ## Completion standard
 
 A feature is complete when its relevant behavior works, tests pass, keyboard/accessibility requirements are checked, documentation is updated, and supported-browser differences have been considered.
+
+For infrastructure changes, completion also requires verifying that safeguards behave correctly when checks fail and that release automation cannot accidentally publish an unintended release.
