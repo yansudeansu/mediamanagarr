@@ -1,3 +1,4 @@
+import type { JellyfinUser } from './jellyfin'
 import type { SafeServiceConfigs, ServiceConnectionInput, ServiceId } from './service'
 
 export interface GetServiceConfigsMessage {
@@ -10,7 +11,20 @@ export interface ConnectServiceMessage {
   config: ServiceConnectionInput
 }
 
-export type BackgroundMessage = GetServiceConfigsMessage | ConnectServiceMessage
+export interface GetJellyfinUsersMessage {
+  type: 'GET_JELLYFIN_USERS'
+}
+
+export interface SetJellyfinUserMessage {
+  type: 'SET_JELLYFIN_USER'
+  userId: string
+}
+
+export type BackgroundMessage =
+  | GetServiceConfigsMessage
+  | ConnectServiceMessage
+  | GetJellyfinUsersMessage
+  | SetJellyfinUserMessage
 
 export interface GetServiceConfigsSuccess {
   success: true
@@ -22,6 +36,17 @@ export interface ConnectServiceSuccess {
   serviceId: ServiceId
 }
 
+export interface GetJellyfinUsersSuccess {
+  success: true
+  users: JellyfinUser[]
+  selectedUserId: string
+}
+
+export interface SetJellyfinUserSuccess {
+  success: true
+  userId: string
+}
+
 export interface BackgroundMessageFailure {
   success: false
   error: string
@@ -31,8 +56,16 @@ export type GetServiceConfigsResponse = GetServiceConfigsSuccess | BackgroundMes
 
 export type ConnectServiceResponse = ConnectServiceSuccess | BackgroundMessageFailure
 
+export type GetJellyfinUsersResponse = GetJellyfinUsersSuccess | BackgroundMessageFailure
+
+export type SetJellyfinUserResponse = SetJellyfinUserSuccess | BackgroundMessageFailure
+
 export type BackgroundResponse<T extends BackgroundMessage> = T extends GetServiceConfigsMessage
   ? GetServiceConfigsResponse
   : T extends ConnectServiceMessage
     ? ConnectServiceResponse
-    : never
+    : T extends GetJellyfinUsersMessage
+      ? GetJellyfinUsersResponse
+      : T extends SetJellyfinUserMessage
+        ? SetJellyfinUserResponse
+        : never
