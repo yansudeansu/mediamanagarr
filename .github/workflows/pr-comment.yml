@@ -13,7 +13,7 @@ permissions:
 jobs:
   publish:
     name: Publish PR Overview
-    if: >
+    if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository
@@ -25,7 +25,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           REPOSITORY: ${{ github.repository }}
+        shell: bash
         run: |
+          set -euo pipefail
+
           gh run download "$RUN_ID" \
             --repo "$REPOSITORY" \
             --name pr-overview \
@@ -35,6 +38,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
+        shell: bash
         run: |
           node --input-type=module <<'EOF'
           import { readFileSync } from 'node:fs';
@@ -51,9 +55,9 @@ jobs:
 
           const prNumber = prs[0].number;
           const [owner, repo] = process.env.REPOSITORY.split('/');
-          const body = readFileSync('report/pr-overview.md', 'utf8');
-
           const marker = '<!-- mediamanagarr-pr-overview -->';
+
+          let body = readFileSync('report/pr-overview.md', 'utf8');
 
           if (!body.startsWith(marker)) {
             throw new Error('Downloaded report has an invalid marker.');
@@ -80,6 +84,59 @@ jobs:
 
             return response.json();
           }
+
+          // Confirm that this report belongs to the current PR commit.
+          const pr = await api(
+            `/repos/${owner}/${repo}/pulls/${prNumber}`,
+          );
+
+          if (pr.state !== 'open') {
+            console.log(`PR #${prNumber} is closed. Skipping.`);
+            process.exit(0);
+          }
+
+          const run = await api(
+            `/repos/${owner}/${repo}/actions/runs/${event.workflow_run.id}`,
+          );
+
+          // GitHub may use a temporary merge commit for PR workflows.
+          // Compare against the current PR merge commit.
+          if (run.head_sha !== pr.merge_commit_sha) {
+            console.log(
+              `PR #${prNumber} has changed. Skipping outdated report.`,
+            );
+            process.exit(0);
+          }
+
+          // Read the deployed preview metadata from gh-pages.
+          let deployedSha = null;
+
+          const metadataResponse = await fetch(
+            `https://raw.githubusercontent.com/${owner}/${repo}/gh-pages/pr-preview/pr-${prNumber}/deployment.json`,
+            {
+              headers: {
+                Accept: 'application/json',
+              },
+            },
+          );
+
+          if (metadataResponse.ok) {
+            const metadata = await metadataResponse.json();
+            deployedSha = metadata.sha ?? null;
+          } else if (metadataResponse.status !== 404) {
+            throw new Error(
+              `Failed to read preview metadata: ${metadataResponse.status}`,
+            );
+          }
+
+          const deployed = deployedSha === pr.head.sha;
+
+          body = body.replace(
+            'Status: Pending deployment.',
+            deployed
+              ? 'Status: Deployed.'
+              : 'Status: Pending deployment.',
+          );
 
           const comments = [];
 
@@ -110,7 +167,9 @@ jobs:
               },
             );
 
-            console.log(`Updated PR #${prNumber} overview.`);
+            console.log(
+              `Updated PR #${prNumber} overview. Preview deployed: ${deployed}`,
+            );
           } else {
             await api(
               `/repos/${owner}/${repo}/issues/${prNumber}/comments`,
@@ -120,6 +179,8 @@ jobs:
               },
             );
 
-            console.log(`Created PR #${prNumber} overview.`);
+            console.log(
+              `Created PR #${prNumber} overview. Preview deployed: ${deployed}`,
+            );
           }
           EOF
