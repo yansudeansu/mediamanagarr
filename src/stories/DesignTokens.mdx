@@ -1,0 +1,197 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Foundations/Design Tokens" />
+
+# Design Tokens
+
+MediaManagarr uses a small set of shared CSS custom properties to maintain visual consistency across the application.
+
+## Colors
+
+<div
+  style={{
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '16px',
+    margin: '24px 0',
+  }}
+>
+  {[
+    ['Background', '--background', '#15171c'],
+    ['Surface', '--surface', '#1e2229'],
+    ['Surface Hover', '--surface-hover', '#272c35'],
+    ['Border', '--border', '#2f343e'],
+    ['Text', '--text', '#e5e7eb'],
+    ['Muted', '--muted', '#8b919e'],
+    ['Accent', '--accent', '#22c55e'],
+    ['Danger', '--danger', '#ef4444'],
+  ].map(([name, token, value]) => (
+    <div
+      key={token}
+      style={{
+        overflow: 'hidden',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)',
+      }}
+    >
+      <div
+        style={{
+          height: '72px',
+          backgroundColor: `var(${token})`,
+        }}
+      />
+
+      <div style={{ padding: '12px' }}>
+        <strong>{name}</strong>
+
+        <div
+          style={{
+            marginTop: '6px',
+            fontSize: '12px',
+            color: 'var(--muted)',
+          }}
+        >
+          <code>{token}</code>
+        </div>
+
+        <div
+          style={{
+            marginTop: '4px',
+            fontSize: '12px',
+            color: 'var(--muted)',
+          }}
+        >
+          {value}
+        </div>
+      </div>
+    </div>
+
+))}
+
+</div>
+
+The swatches use CSS variables directly. The hexadecimal values document the current palette.
+
+## Typography
+
+MediaManagarr uses the system font stack:
+
+```css
+--font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+```
+
+<div
+  style={{
+    padding: '20px',
+    margin: '20px 0',
+    background: 'var(--background)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-md)',
+    fontFamily: 'var(--font-family)',
+  }}
+>
+  <h2 style={{ margin: '0 0 12px', color: 'var(--text)' }}>
+    Section Heading
+  </h2>
+
+<p style={{ margin: '0 0 12px', color: 'var(--text)' }}>
+  Primary body text for application content.
+</p>
+
+  <p style={{ margin: 0, color: 'var(--muted)' }}>
+    Muted text for supporting information and descriptions.
+  </p>
+</div>
+
+Typography sizes are currently defined by the components that use them. A separate typography scale can be introduced when needed.
+
+## Border Radius
+
+<div
+  style={{
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '20px',
+    margin: '24px 0',
+  }}
+>
+  {[
+    ['Small', '--radius-sm', '6px'],
+    ['Medium', '--radius-md', '8px'],
+    ['Large', '--radius-lg', '10px'],
+  ].map(([name, token, value]) => (
+    <div key={token} style={{ textAlign: 'center' }}>
+      <div
+        style={{
+          width: '100px',
+          height: '72px',
+          background: 'var(--surface)',
+          border: '1px solid var(--accent)',
+          borderRadius: `var(${token})`,
+          marginBottom: '10px',
+        }}
+      />
+
+      <strong>{name}</strong>
+
+      <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+        {value}
+      </div>
+
+      <code style={{ fontSize: '11px' }}>{token}</code>
+    </div>
+
+))}
+
+</div>
+
+## Spacing
+
+The application currently uses component-level spacing values rather than a global spacing scale.
+
+The examples below illustrate commonly used spacing values.
+
+<div
+  style={{
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    margin: '24px 0',
+  }}
+>
+  {[4, 8, 12, 16, 20, 24].map((size) => (
+    <div
+      key={size}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+      }}
+    >
+      <code style={{ width: '40px' }}>{size}px</code>
+
+      <div
+        style={{
+          width: `${size * 4}px`,
+          height: '16px',
+          background: 'var(--accent)',
+          borderRadius: 'var(--radius-sm)',
+        }}
+      />
+    </div>
+
+))}
+
+</div>
+
+These are reference examples, not formal spacing tokens.
+
+## Motion
+
+The shared transition token is:
+
+```css
+--transition-fast: 150ms ease;
+```
+
+It provides a consistent transition for lightweight interface interactions.

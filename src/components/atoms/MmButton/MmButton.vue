@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import MmIcon from '../MmIcon/MmIcon.vue'
+import type { IconName } from '../MmIcon/MmIcon.vue'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 export type ButtonSize = 'small' | 'medium'
@@ -10,6 +12,8 @@ interface Props {
   disabled?: boolean
   loading?: boolean
   block?: boolean
+  iconOnly?: boolean
+  icon?: IconName
   type?: 'button' | 'submit' | 'reset'
 }
 
@@ -19,6 +23,8 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   loading: false,
   block: false,
+  iconOnly: false,
+  icon: undefined,
   type: 'button',
 })
 
@@ -44,6 +50,7 @@ function handleClick(event: MouseEvent) {
       {
         'button--block': block,
         'button--loading': loading,
+        'button--icon-only': iconOnly,
       },
     ]"
     :type="type"
@@ -53,9 +60,12 @@ function handleClick(event: MouseEvent) {
   >
     <span v-if="loading" class="button__spinner" aria-hidden="true" />
 
-    <span class="button__content">
+    <span v-if="!iconOnly" class="button__content">
+      <mm-icon v-if="icon && !loading" :name="icon" :size="size === 'small' ? 14 : 16" />
       <slot />
     </span>
+
+    <mm-icon v-else-if="icon && !loading" :name="icon" :size="size === 'small' ? 16 : 18" />
   </button>
 </template>
 
@@ -166,6 +176,24 @@ function handleClick(event: MouseEvent) {
   width: 100%;
 }
 
+/* Icon-only */
+
+.button--icon-only {
+  padding: 0;
+}
+
+.button--icon-only.button--small {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+}
+
+.button--icon-only.button--medium {
+  width: 34px;
+  height: 34px;
+  font-size: 18px;
+}
+
 /* Loading */
 
 .button--loading {
@@ -182,6 +210,7 @@ function handleClick(event: MouseEvent) {
 .button__spinner {
   width: 13px;
   height: 13px;
+  flex-shrink: 0;
 
   border: 2px solid currentColor;
   border-right-color: transparent;

@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
-import Button from './Button.vue'
+import MmButton from './MmButton.vue'
 
 const meta = {
   title: 'Atoms/Button',
-  component: Button,
+  component: MmButton,
   tags: ['autodocs'],
 
   argTypes: {
@@ -17,6 +17,11 @@ const meta = {
       options: ['small', 'medium'],
       description: 'Size of the button.',
     },
+    icon: {
+      control: 'select',
+      options: [undefined, 'settings', 'arrow-left', 'refresh'],
+      description: 'Optional icon displayed by the button.',
+    },
     disabled: {
       control: 'boolean',
       description: 'Prevents interaction.',
@@ -29,6 +34,10 @@ const meta = {
       control: 'boolean',
       description: 'Makes the button fill its container.',
     },
+    iconOnly: {
+      control: 'boolean',
+      description: 'Displays a square icon button. Requires an accessible name.',
+    },
     type: {
       control: 'select',
       options: ['button', 'submit', 'reset'],
@@ -36,7 +45,7 @@ const meta = {
     },
     default: {
       control: 'text',
-      description: 'Button label.',
+      description: 'Button label or accessible name for icon-only buttons.',
       table: {
         category: 'slots',
       },
@@ -46,25 +55,30 @@ const meta = {
   args: {
     variant: 'secondary',
     size: 'medium',
+    icon: undefined,
     disabled: false,
     loading: false,
     block: false,
+    iconOnly: false,
     type: 'button',
     default: 'Button',
   },
 
   render: (args) => ({
-    components: { Button },
+    components: { MmButton },
     setup() {
       return { args }
     },
     template: `
-      <Button v-bind="args">
+      <mm-button
+        v-bind="args"
+        :aria-label="args.iconOnly ? args.default : undefined"
+      >
         {{ args.default }}
-      </Button>
+      </mm-button>
     `,
   }),
-} satisfies Meta<typeof Button>
+} satisfies Meta<typeof MmButton>
 
 export default meta
 
@@ -162,4 +176,63 @@ export const FullWidth: Story = {
       template: '<div style="width: 320px"><story /></div>',
     }),
   ],
+}
+
+/**
+ * Button with an icon and text label.
+ */
+export const WithIcon: Story = {
+  args: {
+    icon: 'refresh',
+    default: 'Refresh',
+  },
+}
+
+/**
+ * Square icon-only button.
+ *
+ * The icon is decorative. The button receives an accessible name.
+ */
+export const IconOnly: Story = {
+  args: {
+    icon: 'settings',
+    iconOnly: true,
+    default: 'Open settings',
+  },
+}
+
+/**
+ * Compact icon-only button for toolbars.
+ */
+export const SmallIconOnly: Story = {
+  args: {
+    icon: 'refresh',
+    iconOnly: true,
+    size: 'small',
+    default: 'Refresh',
+  },
+}
+
+/**
+ * Loading replaces the icon with a spinner.
+ */
+export const LoadingWithIcon: Story = {
+  args: {
+    variant: 'primary',
+    icon: 'refresh',
+    loading: true,
+    default: 'Refreshing...',
+  },
+}
+
+/**
+ * Icon-only loading state.
+ */
+export const LoadingIconOnly: Story = {
+  args: {
+    icon: 'refresh',
+    iconOnly: true,
+    loading: true,
+    default: 'Refreshing',
+  },
 }
