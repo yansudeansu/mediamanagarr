@@ -13,7 +13,7 @@ permissions:
 jobs:
   publish:
     name: Publish PR Overview
-    if: >
+    if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository
@@ -25,101 +25,112 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           REPOSITORY: ${{ github.repository }}
+        shell: bash
         run: |
+          set -euo pipefail
+
           gh run download "$RUN_ID" \
             --repo "$REPOSITORY" \
             --name pr-overview \
             --dir report
 
-      - name: Publish or update comment
+      - name: Verify report and update comment
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: bash
         run: |
-          node --input-type=module <<'EOF'
-          import { readFileSync } from 'node:fs';
+          set -euo pipefail
 
-          const event = JSON.parse(
-            readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'),
-          );
+          number=$(jq -r '.pr' report/pr-report-metadata.json)
+          report_sha=$(jq -r '.sha' report/pr-report-metadata.json)
 
-          const prs = event.workflow_run.pull_requests;
+          if ! [[ "$number" =~ ^[0-9]+$ ]]; then
+            echo "Invalid PR number."
+            exit 1
+          fi
 
-          if (prs.length !== 1) {
-            throw new Error('Expected exactly one associated pull request.');
-          }
+          if ! [[ "$report_sha" =~ ^[a-fA-F0-9]{40}$ ]]; then
+            echo "Invalid report SHA."
+            exit 1
+          fi
 
-          const prNumber = prs[0].number;
-          const [owner, repo] = process.env.REPOSITORY.split('/');
-          const body = readFileSync('report/pr-overview.md', 'utf8');
+          associated_prs=$(gh api \
+            "repos/$REPOSITORY/actions/runs/$RUN_ID/pulls")
 
-          const marker = '<!-- mediamanagarr-pr-overview -->';
+          associated=$(jq -r \
+            --argjson number "$number" \
+            'any(.[]; .number == $number)' \
+            <<< "$associated_prs")
 
-          if (!body.startsWith(marker)) {
-            throw new Error('Downloaded report has an invalid marker.');
-          }
+          if [[ "$associated" != "true" ]]; then
+            echo "Report does not belong to this PR."
+            exit 1
+          fi
 
-          const headers = {
-            Authorization: `Bearer ${process.env.GH_TOKEN}`,
-            Accept: 'application/vnd.github+json',
-            'Content-Type': 'application/json',
-            'X-GitHub-Api-Version': '2022-11-28',
-          };
+          pr=$(gh api "repos/$REPOSITORY/pulls/$number")
 
-          async function api(path, options = {}) {
-            const response = await fetch(
-              `https://api.github.com${path}`,
-              { ...options, headers },
-            );
+          state=$(jq -r '.state' <<< "$pr")
+          current_sha=$(jq -r '.head.sha' <<< "$pr")
+          head_repo=$(jq -r '.head.repo.full_name' <<< "$pr")
 
-            if (!response.ok) {
-              throw new Error(
-                `GitHub API error: ${response.status} ${await response.text()}`,
-              );
-            }
+          if [[ "$state" != "open" ||
+                "$current_sha" != "$report_sha" ||
+                "$head_repo" != "$REPOSITORY" ]]; then
+            echo "PR is closed, external, or has changed."
+            exit 0
+          fi
 
-            return response.json();
-          }
+          deployed_sha=""
 
-          const comments = [];
+          metadata=$(gh api \
+            "repos/$REPOSITORY/contents/pr-preview/pr-$number/deployment.json?ref=gh-pages" \
+            2>/dev/null) || metadata=""
 
-          for (let page = 1; ; page += 1) {
-            const items = await api(
-              `/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=100&page=${page}`,
-            );
+          if [[ -n "$metadata" ]]; then
+            deployed_sha=$(jq -r '.content' <<< "$metadata" \
+              | base64 --decode \
+              | jq -r '.sha // empty')
+          fi
 
-            comments.push(...items);
+          if [[ "$deployed_sha" == "$current_sha" ]]; then
+            status="Status: Deployed."
+          else
+            status="Status: Pending deployment."
+          fi
 
-            if (items.length < 100) {
-              break;
-            }
-          }
+          sed -i \
+            "s/Status: Pending deployment\\./$status/" \
+            report/pr-overview.md
 
-          const existing = comments.find(
-            (comment) =>
-              comment.user.login === 'github-actions[bot]' &&
-              comment.body?.includes(marker),
-          );
+          marker="<!-- mediamanagarr-pr-overview -->"
 
-          if (existing) {
-            await api(
-              `/repos/${owner}/${repo}/issues/comments/${existing.id}`,
-              {
-                method: 'PATCH',
-                body: JSON.stringify({ body }),
-              },
-            );
+          if ! grep -Fq "$marker" report/pr-overview.md; then
+            echo "Invalid PR report marker."
+            exit 1
+          fi
 
-            console.log(`Updated PR #${prNumber} overview.`);
-          } else {
-            await api(
-              `/repos/${owner}/${repo}/issues/${prNumber}/comments`,
-              {
-                method: 'POST',
-                body: JSON.stringify({ body }),
-              },
-            );
+          comment_id=$(
+            gh api \
+              "repos/$REPOSITORY/issues/$number/comments" \
+              --paginate \
+              --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | contains("<!-- mediamanagarr-pr-overview -->")) | .id' \
+              | head -n 1
+          )
 
-            console.log(`Created PR #${prNumber} overview.`);
-          }
-          EOF
+          if [[ -n "$comment_id" ]]; then
+            gh api \
+              --method PATCH \
+              "repos/$REPOSITORY/issues/comments/$comment_id" \
+              -F body=@report/pr-overview.md
+
+            echo "Updated PR #$number overview."
+          else
+            gh api \
+              --method POST \
+              "repos/$REPOSITORY/issues/$number/comments" \
+              -F body=@report/pr-overview.md
+
+            echo "Created PR #$number overview."
+          fi

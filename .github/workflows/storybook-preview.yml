@@ -1,0 +1,67 @@
+name: Storybook PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Storybook Preview
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Save PR build metadata
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p preview-metadata
+
+          jq -n \
+            --argjson pr "$PR_NUMBER" \
+            --arg sha "$HEAD_SHA" \
+            '{pr: $pr, sha: $sha}' \
+            > preview-metadata/build.json
+
+      - name: Upload Storybook preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-pr-preview
+          path: storybook-static/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload PR build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-pr-metadata
+          path: preview-metadata/build.json
+          if-no-files-found: error
+          retention-days: 7
