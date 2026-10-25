@@ -1,0 +1,353 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { handleBackgroundMessage } from './messages'
+import {
+  getSafeServiceConfigs,
+  getServiceConfig,
+  saveServiceConfig,
+} from '../utils/service-storage'
+import { testServiceConnection } from './services/connection'
+import { fetchJellyfinUsers } from './services/jellyfin-users'
+import { getJellyfinUserSelection, saveJellyfinUserSelection } from '../utils/jellyfin-storage'
+
+vi.mock('../utils/service-storage', () => ({
+  getSafeServiceConfigs: vi.fn(),
+  getServiceConfig: vi.fn(),
+  saveServiceConfig: vi.fn(),
+}))
+
+vi.mock('./services/connection', () => ({
+  testServiceConnection: vi.fn(),
+}))
+
+vi.mock('./services/jellyfin-users', () => ({
+  fetchJellyfinUsers: vi.fn(),
+}))
+
+vi.mock('../utils/jellyfin-storage', () => ({
+  getJellyfinUserSelection: vi.fn(),
+  saveJellyfinUserSelection: vi.fn(),
+}))
+
+const jellyfinConfig = {
+  url: 'https://jellyfin.example.com',
+  apiKey: 'saved-key',
+}
+
+const jellyfinUsers = [
+  { id: 'user-1', name: 'Alice' },
+  { id: 'user-2', name: 'Bob' },
+]
+
+describe('handleBackgroundMessage', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+
+    vi.stubGlobal('chrome', {
+      permissions: {
+        contains: vi.fn().mockResolvedValue(true),
+      },
+    })
+
+    vi.mocked(getServiceConfig).mockResolvedValue(undefined)
+    vi.mocked(fetchJellyfinUsers).mockResolvedValue(jellyfinUsers)
+    vi.mocked(getJellyfinUserSelection).mockResolvedValue('')
+  })
+
+  it('returns safe service configurations', async () => {
+    vi.mocked(getSafeServiceConfigs).mockResolvedValue({
+      jellyfin: {
+        url: 'https://jellyfin.example.com',
+        configured: true,
+      },
+    })
+
+    await expect(handleBackgroundMessage({ type: 'GET_SERVICE_CONFIGS' })).resolves.toEqual({
+      success: true,
+      configs: {
+        jellyfin: {
+          url: 'https://jellyfin.example.com',
+          configured: true,
+        },
+      },
+    })
+  })
+
+  it('rejects malformed messages', async () => {
+    await expect(handleBackgroundMessage(null)).resolves.toEqual({
+      success: false,
+      error: 'Invalid background message.',
+    })
+
+    await expect(
+      handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'unknown',
+        config: {
+          url: 'https://example.com',
+          apiKey: 'secret',
+        },
+      }),
+    ).resolves.toEqual({
+      success: false,
+      error: 'Invalid background message.',
+    })
+  })
+
+  it('tests and saves a valid connection', async () => {
+    const result = await handleBackgroundMessage({
+      type: 'CONNECT_SERVICE',
+      serviceId: 'sonarr',
+      config: {
+        url: 'https://sonarr.example.com/',
+        apiKey: 'test-key',
+      },
+    })
+
+    expect(chrome.permissions.contains).toHaveBeenCalledWith({
+      origins: ['https://sonarr.example.com/*'],
+    })
+
+    expect(testServiceConnection).toHaveBeenCalledWith('sonarr', {
+      url: 'https://sonarr.example.com',
+      apiKey: 'test-key',
+    })
+
+    expect(saveServiceConfig).toHaveBeenCalledWith('sonarr', {
+      url: 'https://sonarr.example.com',
+      apiKey: 'test-key',
+    })
+
+    expect(result).toEqual({
+      success: true,
+      serviceId: 'sonarr',
+    })
+  })
+
+  it('does not test or save when host permission is missing', async () => {
+    vi.stubGlobal('chrome', {
+      permissions: {
+        contains: vi.fn().mockResolvedValue(false),
+      },
+    })
+
+    const result = await handleBackgroundMessage({
+      type: 'CONNECT_SERVICE',
+      serviceId: 'radarr',
+      config: {
+        url: 'https://radarr.example.com',
+        apiKey: 'test-key',
+      },
+    })
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Server access has not been granted. Please allow access and try again.',
+    })
+
+    expect(testServiceConnection).not.toHaveBeenCalled()
+    expect(saveServiceConfig).not.toHaveBeenCalled()
+  })
+
+  it('reuses the saved API key for the same URL', async () => {
+    vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+
+    await handleBackgroundMessage({
+      type: 'CONNECT_SERVICE',
+      serviceId: 'jellyfin',
+      config: {
+        url: 'https://jellyfin.example.com/',
+        apiKey: '',
+      },
+    })
+
+    expect(testServiceConnection).toHaveBeenCalledWith('jellyfin', jellyfinConfig)
+  })
+
+  it('does not save when the connection test fails', async () => {
+    vi.mocked(testServiceConnection).mockRejectedValue(new Error('Authentication failed.'))
+
+    const result = await handleBackgroundMessage({
+      type: 'CONNECT_SERVICE',
+      serviceId: 'seerr',
+      config: {
+        url: 'https://seerr.example.com',
+        apiKey: 'wrong-key',
+      },
+    })
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Authentication failed.',
+    })
+
+    expect(saveServiceConfig).not.toHaveBeenCalled()
+  })
+
+  it('rejects an empty API key when no saved key is available', async () => {
+    const result = await handleBackgroundMessage({
+      type: 'CONNECT_SERVICE',
+      serviceId: 'sonarr',
+      config: {
+        url: 'https://sonarr.example.com',
+        apiKey: '',
+      },
+    })
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Enter an API key.',
+    })
+
+    expect(testServiceConnection).not.toHaveBeenCalled()
+  })
+
+  describe('GET_JELLYFIN_USERS', () => {
+    it('returns available users and the saved selection', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+      vi.mocked(getJellyfinUserSelection).mockResolvedValue('user-2')
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_JELLYFIN_USERS',
+      })
+
+      expect(fetchJellyfinUsers).toHaveBeenCalledWith(jellyfinConfig)
+      expect(getJellyfinUserSelection).toHaveBeenCalledWith(jellyfinConfig.url)
+
+      expect(result).toEqual({
+        success: true,
+        users: jellyfinUsers,
+        selectedUserId: 'user-2',
+      })
+    })
+
+    it('returns an empty selection if the saved user is no longer available', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+      vi.mocked(getJellyfinUserSelection).mockResolvedValue('deleted-user')
+
+      await expect(
+        handleBackgroundMessage({
+          type: 'GET_JELLYFIN_USERS',
+        }),
+      ).resolves.toEqual({
+        success: true,
+        users: jellyfinUsers,
+        selectedUserId: '',
+      })
+    })
+
+    it('requires Jellyfin to be configured', async () => {
+      await expect(
+        handleBackgroundMessage({
+          type: 'GET_JELLYFIN_USERS',
+        }),
+      ).resolves.toEqual({
+        success: false,
+        error: 'Configure Jellyfin before selecting a user.',
+      })
+
+      expect(fetchJellyfinUsers).not.toHaveBeenCalled()
+    })
+
+    it('requires Jellyfin host permission', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+
+      vi.stubGlobal('chrome', {
+        permissions: {
+          contains: vi.fn().mockResolvedValue(false),
+        },
+      })
+
+      await expect(
+        handleBackgroundMessage({
+          type: 'GET_JELLYFIN_USERS',
+        }),
+      ).resolves.toEqual({
+        success: false,
+        error: 'Jellyfin server access has not been granted.',
+      })
+
+      expect(fetchJellyfinUsers).not.toHaveBeenCalled()
+    })
+
+    it('returns an error when Jellyfin user retrieval fails', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+      vi.mocked(fetchJellyfinUsers).mockRejectedValue(
+        new Error('Jellyfin did not allow access to the user list.'),
+      )
+
+      await expect(
+        handleBackgroundMessage({
+          type: 'GET_JELLYFIN_USERS',
+        }),
+      ).resolves.toEqual({
+        success: false,
+        error: 'Jellyfin did not allow access to the user list.',
+      })
+    })
+  })
+
+  describe('SET_JELLYFIN_USER', () => {
+    it('saves a valid selected user', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+
+      const result = await handleBackgroundMessage({
+        type: 'SET_JELLYFIN_USER',
+        userId: 'user-2',
+      })
+
+      expect(saveJellyfinUserSelection).toHaveBeenCalledWith(jellyfinConfig.url, 'user-2')
+
+      expect(result).toEqual({
+        success: true,
+        userId: 'user-2',
+      })
+    })
+
+    it('rejects an unknown user ID', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+
+      await expect(
+        handleBackgroundMessage({
+          type: 'SET_JELLYFIN_USER',
+          userId: 'missing-user',
+        }),
+      ).resolves.toEqual({
+        success: false,
+        error: 'Selected Jellyfin user was not found.',
+      })
+
+      expect(saveJellyfinUserSelection).not.toHaveBeenCalled()
+    })
+
+    it('rejects an empty user ID', async () => {
+      await expect(
+        handleBackgroundMessage({
+          type: 'SET_JELLYFIN_USER',
+          userId: '   ',
+        }),
+      ).resolves.toEqual({
+        success: false,
+        error: 'Invalid background message.',
+      })
+
+      expect(saveJellyfinUserSelection).not.toHaveBeenCalled()
+    })
+
+    it('does not save when retrieving users fails', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+      vi.mocked(fetchJellyfinUsers).mockRejectedValue(new Error('Unable to reach Jellyfin.'))
+
+      await expect(
+        handleBackgroundMessage({
+          type: 'SET_JELLYFIN_USER',
+          userId: 'user-1',
+        }),
+      ).resolves.toEqual({
+        success: false,
+        error: 'Unable to reach Jellyfin.',
+      })
+
+      expect(saveJellyfinUserSelection).not.toHaveBeenCalled()
+    })
+  })
+})

@@ -4,6 +4,7 @@ import MmHeader from './components/molecules/MmHeader/MmHeader.vue'
 import MmNavigation from './components/molecules/MmNavigation/MmNavigation.vue'
 import type { NavigationView } from './components/molecules/MmNavigation/MmNavigation.vue'
 import MmFooter from './components/molecules/MmFooter/MmFooter.vue'
+import SettingsView from './views/SettingsView.vue'
 import { getAppVersion } from './utils/version'
 
 const settingsOpen = ref(false)
@@ -29,16 +30,14 @@ const viewTitles: Record<NavigationView, string> = {
 
     <mm-navigation v-if="!settingsOpen" :active-view="activeView" @navigate="activeView = $event" />
 
-    <main class="app-content">
-      <section v-if="settingsOpen" aria-labelledby="settings-title">
-        <h2 id="settings-title">Service Connections</h2>
-        <p>Service configuration will be implemented in a future milestone.</p>
-      </section>
+    <main class="app-content" :class="{ 'app-content--settings': settingsOpen }">
+      <settings-view v-if="settingsOpen" />
 
-      <section v-else aria-labelledby="view-title">
+      <section v-else class="app-content__placeholder" aria-labelledby="view-title">
         <h2 id="view-title" aria-live="polite" aria-atomic="true">
           {{ viewTitles[activeView] }}
         </h2>
+
         <p>This view will be implemented in a future milestone.</p>
       </section>
     </main>
@@ -61,12 +60,16 @@ const viewTitles: Record<NavigationView, string> = {
   padding: 20px;
 }
 
-.app-content h2 {
+.app-content--settings {
+  padding: 0;
+}
+
+.app-content__placeholder h2 {
   margin: 0 0 8px;
   font-size: 16px;
 }
 
-.app-content p {
+.app-content__placeholder p {
   margin: 0;
   font-size: 14px;
   line-height: 1.5;
