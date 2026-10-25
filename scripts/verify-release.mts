@@ -72,20 +72,14 @@ if (lockfile.version !== version || lockfile.packages?.['']?.version !== version
 }
 
 const changelog = readFileSync('CHANGELOG.md', 'utf8')
-
 const escapedVersion = version.replaceAll('.', '\\.')
 
 if (!new RegExp(`^## v${escapedVersion}\\s*$`, 'm').test(changelog)) {
   throw new Error(`CHANGELOG.md is missing the v${version} section.`)
 }
 
-const existingTags = git('tag', '--list', tag)
-
-if (existingTags.split('\n').includes(tag)) {
-  console.log(`Release tag ${tag} already exists. Skipping publication.`)
-  output('publish', 'false')
-  process.exit(0)
-}
+// Existing tags are handled by the publishing workflow.
+// They do not invalidate an otherwise legitimate release commit.
 
 console.log(`Verified release ${tag}`)
 

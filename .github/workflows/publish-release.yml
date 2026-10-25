@@ -6,6 +6,8 @@ on:
     paths:
       - package.json
 
+  workflow_dispatch:
+
 permissions:
   contents: write
 
@@ -88,41 +90,76 @@ jobs:
               .
           )
 
-          unzip -t \
-            "release/mediamanagarr-v${VERSION}-chrome.zip"
+          for browser in chrome firefox; do
+            archive="release/mediamanagarr-v${VERSION}-${browser}.zip"
 
-          unzip -t \
-            "release/mediamanagarr-v${VERSION}-firefox.zip"
+            unzip -t "$archive"
 
-          unzip -p \
-            "release/mediamanagarr-v${VERSION}-chrome.zip" \
-            manifest.json |
-            node -e "
-              let input = '';
-              process.stdin.on('data', chunk => input += chunk);
-              process.stdin.on('end', () => {
-                const manifest = JSON.parse(input);
-                if (manifest.version !== process.env.VERSION) {
-                  process.exit(1);
-                }
-              });
-            "
+            unzip -p "$archive" manifest.json |
+              node -e "
+                let input = '';
+                process.stdin.on('data', chunk => input += chunk);
+                process.stdin.on('end', () => {
+                  const manifest = JSON.parse(input);
+                  if (manifest.version !== process.env.VERSION) {
+                    process.exit(1);
+                  }
+                });
+              "
+          done
 
-          unzip -p \
-            "release/mediamanagarr-v${VERSION}-firefox.zip" \
-            manifest.json |
-            node -e "
-              let input = '';
-              process.stdin.on('data', chunk => input += chunk);
-              process.stdin.on('end', () => {
-                const manifest = JSON.parse(input);
-                if (manifest.version !== process.env.VERSION) {
-                  process.exit(1);
-                }
-              });
-            "
+      - name: Inspect existing release
+        if: steps.release.outputs.publish == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Publish GitHub Release
+          tag="v${VERSION}"
+
+          if git rev-parse "refs/tags/$tag" >/dev/null 2>&1; then
+            tagged_sha=$(git rev-list -n 1 "$tag")
+
+            if [[ "$tagged_sha" != "$RELEASE_SHA" ]]; then
+              echo "Tag $tag points to $tagged_sha, expected $RELEASE_SHA."
+              exit 1
+            fi
+
+            echo "Existing tag points to the correct commit."
+          else
+            echo "No existing tag."
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release does not exist."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: >-
+          steps.release.outputs.publish == 'true' &&
+          steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release create "v${VERSION}" \
+            --target "$RELEASE_SHA" \
+            --title "MediaManagarr v${VERSION}" \
+            --generate-notes
+
+      - name: Upload missing release assets
         if: steps.release.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -131,8 +168,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          gh release create "v${VERSION}" \
-            release/*.zip \
-            --target "$GITHUB_SHA" \
-            --title "MediaManagarr v${VERSION}" \
-            --generate-notes
+          tag="v${VERSION}"
+
+          for browser in chrome firefox; do
+            archive="mediamanagarr-v${VERSION}-${browser}.zip"
+
+            if gh release view "$tag" \
+              --json assets \
+              --jq '.assets[].name' |
+              grep -Fxq "$archive"; then
+              echo "$archive already exists. Skipping."
+              continue
+            fi
+
+            gh release upload "$tag" "release/$archive"
+
+            echo "Uploaded $archive."
+          done
+
+          echo "Release $tag is complete."
