@@ -3,6 +3,9 @@
   "name": "MediaManagarr",
   "version": "0.0.0",
   "description": "Manage your self-hosted media ecosystem.",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "action": {
     "default_popup": "index.html",
     "default_icon": {
