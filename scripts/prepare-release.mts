@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { format } from 'prettier'
 
 type ReleaseType = 'major' | 'minor' | 'patch'
 
@@ -161,7 +162,7 @@ function changelogSection(version: string, commits: Commit[]): string {
   return [`## v${version}`, '', ...sections].join('\n\n')
 }
 
-function updateChangelog(version: string, commits: Commit[]): void {
+async function updateChangelog(version: string, commits: Commit[]): Promise<void> {
   const existing = existsSync('CHANGELOG.md') ? readFileSync('CHANGELOG.md', 'utf8') : ''
 
   if (new RegExp(`^## v${version.replaceAll('.', '\\.')}\\s*$`, 'm').test(existing)) {
@@ -177,10 +178,14 @@ function updateChangelog(version: string, commits: Commit[]): void {
 
   const updated = [header, '', section, ...(previous ? ['', previous] : []), ''].join('\n')
 
-  writeFileSync('CHANGELOG.md', updated)
+  const formatted = await format(updated, {
+    filepath: 'CHANGELOG.md',
+  })
+
+  writeFileSync('CHANGELOG.md', formatted)
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as PackageJson
 
   const previousTag = latestTag()
@@ -211,7 +216,7 @@ function main(): void {
   console.log(`Preparing v${version}`)
 
   // Generate the changelog before changing package files.
-  updateChangelog(version, commits)
+  await updateChangelog(version, commits)
 
   run('npm', 'version', version, '--no-git-tag-version', '--ignore-scripts')
 
@@ -220,4 +225,4 @@ function main(): void {
   console.log(`Prepared release v${version}`)
 }
 
-main()
+await main()
