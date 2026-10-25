@@ -19,6 +19,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -29,89 +30,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate PR title
+      - name: Generate and validate PR report
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$PR_TITLE" | npx --no -- commitlint
-
-      - name: Validate commits and calculate release impact
-        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          node --input-type=module <<'EOF'
-          import { execFileSync } from 'node:child_process';
-          import { appendFileSync } from 'node:fs';
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/pr-report.mts
 
-          const base = process.env.BASE_SHA;
-          const head = process.env.HEAD_SHA;
-
-          const commits = execFileSync(
-            'git',
-            ['log', '--format=%B%x00', `${base}..${head}`],
-            { encoding: 'utf8' },
-          ).split('\0').map((message) => message.trim()).filter(Boolean);
-
-          if (commits.length === 0) {
-            throw new Error('No commits found for this pull request.');
-          }
-
-          const types = {};
-          let impact = 'none';
-          const rank = { none: 0, patch: 1, minor: 2, major: 3 };
-
-          for (const message of commits) {
-            execFileSync(
-              'npx',
-              ['--no', '--', 'commitlint'],
-              { input: message, stdio: ['pipe', 'inherit', 'inherit'] },
-            );
-
-            const header = message.split('\n')[0];
-            const match = header.match(/^(\w+)(?:\([^)]+\))?(!)?:/);
-
-            if (!match) {
-              throw new Error(`Cannot analyze commit: ${header}`);
-            }
-
-            const [, type, breakingMarker] = match;
-            types[type] = (types[type] ?? 0) + 1;
-
-            let change = 'none';
-
-            if (
-              breakingMarker ||
-              /^BREAKING[ -]CHANGE:/m.test(message)
-            ) {
-              change = 'major';
-            } else if (type === 'feat') {
-              change = 'minor';
-            } else if (type === 'fix' || type === 'perf') {
-              change = 'patch';
-            }
-
-            if (rank[change] > rank[impact]) {
-              impact = change;
-            }
-          }
-
-          const summary = [
-            '## MediaManagarr — PR Release Impact',
-            '',
-            `**Commits analyzed:** ${commits.length}`,
-            '',
-            '### Commit types',
-            '',
-            ...Object.entries(types).sort().map(
-              ([type, count]) => `- \`${type}\`: ${count}`,
-            ),
-            '',
-            `### Predicted PR impact: **${impact.toUpperCase()}**`,
-            '',
-            '_This is an informational prediction, not a version bump._',
-            '',
-          ].join('\n');
-
-          appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
-          console.log(summary);
-          EOF
+      - name: Upload PR report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-overview
+          path: pr-overview.md
+          if-no-files-found: error
+          retention-days: 7
