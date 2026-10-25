@@ -11,6 +11,11 @@ export interface ConnectServiceMessage {
   config: ServiceConnectionInput
 }
 
+export interface RemoveServiceMessage {
+  type: 'REMOVE_SERVICE'
+  serviceId: ServiceId
+}
+
 export interface GetJellyfinUsersMessage {
   type: 'GET_JELLYFIN_USERS'
 }
@@ -23,6 +28,7 @@ export interface SetJellyfinUserMessage {
 export type BackgroundMessage =
   | GetServiceConfigsMessage
   | ConnectServiceMessage
+  | RemoveServiceMessage
   | GetJellyfinUsersMessage
   | SetJellyfinUserMessage
 
@@ -32,6 +38,11 @@ export interface GetServiceConfigsSuccess {
 }
 
 export interface ConnectServiceSuccess {
+  success: true
+  serviceId: ServiceId
+}
+
+export interface RemoveServiceSuccess {
   success: true
   serviceId: ServiceId
 }
@@ -56,6 +67,8 @@ export type GetServiceConfigsResponse = GetServiceConfigsSuccess | BackgroundMes
 
 export type ConnectServiceResponse = ConnectServiceSuccess | BackgroundMessageFailure
 
+export type RemoveServiceResponse = RemoveServiceSuccess | BackgroundMessageFailure
+
 export type GetJellyfinUsersResponse = GetJellyfinUsersSuccess | BackgroundMessageFailure
 
 export type SetJellyfinUserResponse = SetJellyfinUserSuccess | BackgroundMessageFailure
@@ -64,8 +77,10 @@ export type BackgroundResponse<T extends BackgroundMessage> = T extends GetServi
   ? GetServiceConfigsResponse
   : T extends ConnectServiceMessage
     ? ConnectServiceResponse
-    : T extends GetJellyfinUsersMessage
-      ? GetJellyfinUsersResponse
-      : T extends SetJellyfinUserMessage
-        ? SetJellyfinUserResponse
-        : never
+    : T extends RemoveServiceMessage
+      ? RemoveServiceResponse
+      : T extends GetJellyfinUsersMessage
+        ? GetJellyfinUsersResponse
+        : T extends SetJellyfinUserMessage
+          ? SetJellyfinUserResponse
+          : never

@@ -12,37 +12,80 @@ interface Props {
   url?: string
   configured?: boolean
   loading?: boolean
+  removing?: boolean
   error?: string
+  success?: string
   jellyfinUsers?: JellyfinUser[]
   jellyfinUserId?: string
   jellyfinUsersLoading?: boolean
   jellyfinUserSaving?: boolean
   jellyfinUsersError?: string
+  jellyfinUserSuccess?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   url: '',
   configured: false,
   loading: false,
+  removing: false,
   error: '',
+  success: '',
   jellyfinUsers: () => [],
   jellyfinUserId: '',
   jellyfinUsersLoading: false,
   jellyfinUserSaving: false,
   jellyfinUsersError: '',
+  jellyfinUserSuccess: '',
 })
 
 const emit = defineEmits<{
   connect: [payload: { serviceId: ServiceId; url: string; apiKey: string }]
+  remove: [serviceId: ServiceId]
   selectJellyfinUser: [userId: string]
+  edit: []
 }>()
 
 const service = computed(() => SERVICE_INFO[props.serviceId])
+
 const serverUrl = ref(props.url)
 const apiKey = ref('')
 const validationError = ref('')
+const confirmingRemoval = ref(false)
 
-const showJellyfinUserSelect = computed(() => props.serviceId === 'jellyfin' && props.configured)
+const busy = computed(() => props.loading || props.removing)
+
+function getNormalizedUrl(value: string): string {
+  try {
+    return normalizeServerUrl(value)
+  } catch {
+    return ''
+  }
+}
+
+const isSavedUrl = computed(() => {
+  if (!props.configured) return false
+
+  const savedUrl = getNormalizedUrl(props.url)
+  const draftUrl = getNormalizedUrl(serverUrl.value)
+
+  return savedUrl !== '' && draftUrl === savedUrl
+})
+
+const showJellyfinUserSelect = computed(() => props.serviceId === 'jellyfin' && isSavedUrl.value)
+
+const showSuccess = computed(
+  () => Boolean(props.success) && !validationError.value && !props.error && !busy.value,
+)
+
+const showJellyfinUserSuccess = computed(
+  () =>
+    showJellyfinUserSelect.value &&
+    Boolean(props.jellyfinUserSuccess) &&
+    !props.jellyfinUserSaving &&
+    !props.jellyfinUsersLoading &&
+    !props.jellyfinUsersError &&
+    !busy.value,
+)
 
 const jellyfinUserOptions = computed(() =>
   props.jellyfinUsers.map((user) => ({
@@ -57,10 +100,28 @@ watch(
     serverUrl.value = props.url
     apiKey.value = ''
     validationError.value = ''
+    confirmingRemoval.value = false
   },
 )
 
+watch(
+  () => props.configured,
+  (configured) => {
+    if (!configured) {
+      confirmingRemoval.value = false
+    }
+  },
+)
+
+function handleEdit() {
+  validationError.value = ''
+  confirmingRemoval.value = false
+  emit('edit')
+}
+
 function handleConnect() {
+  if (busy.value) return
+
   validationError.value = ''
 
   let url: string
@@ -73,19 +134,39 @@ function handleConnect() {
   }
 
   const key = apiKey.value.trim()
-  const savedUrl = props.url ? normalizeServerUrl(props.url) : ''
-  const canReuseKey = props.configured && url === savedUrl
+  const canReuseKey = isSavedUrl.value
 
   if (!key && !canReuseKey) {
     validationError.value = 'Enter an API key.'
     return
   }
 
+  confirmingRemoval.value = false
+
   emit('connect', {
     serviceId: props.serviceId,
     url,
     apiKey: key,
   })
+}
+
+function requestRemoval() {
+  if (busy.value || !props.configured) return
+
+  validationError.value = ''
+  confirmingRemoval.value = true
+}
+
+function cancelRemoval() {
+  if (busy.value) return
+
+  confirmingRemoval.value = false
+}
+
+function confirmRemoval() {
+  if (busy.value || !props.configured || !confirmingRemoval.value) return
+
+  emit('remove', props.serviceId)
 }
 </script>
 
@@ -102,8 +183,9 @@ function handleConnect() {
         label="Server URL"
         type="url"
         placeholder="http://localhost:8096"
-        :disabled="loading"
+        :disabled="busy"
         required
+        @update:model-value="handleEdit"
       />
 
       <mm-input
@@ -112,7 +194,8 @@ function handleConnect() {
         type="password"
         :placeholder="configured ? 'Leave blank to keep saved key' : 'Enter API key'"
         :hint="configured ? 'Leave blank to reuse your saved API key.' : undefined"
-        :disabled="loading"
+        :disabled="busy"
+        @update:model-value="handleEdit"
       />
 
       <div v-if="showJellyfinUserSelect" class="service-form__jellyfin-user">
@@ -122,20 +205,88 @@ function handleConnect() {
           :options="jellyfinUserOptions"
           placeholder="Select a Jellyfin user"
           :loading="jellyfinUsersLoading"
-          :disabled="loading || jellyfinUserSaving || jellyfinUserOptions.length === 0"
+          :disabled="busy || jellyfinUserSaving || jellyfinUserOptions.length === 0"
           :error="jellyfinUsersError"
           hint="Choose the Jellyfin user whose library you want to view."
           @update:model-value="emit('selectJellyfinUser', $event)"
         />
+
+        <p
+          v-if="jellyfinUserSaving"
+          class="service-form__user-feedback"
+          role="status"
+          aria-live="polite"
+        >
+          Saving Jellyfin user…
+        </p>
+
+        <p
+          v-else-if="showJellyfinUserSuccess"
+          class="service-form__success"
+          role="status"
+          aria-live="polite"
+        >
+          {{ jellyfinUserSuccess }}
+        </p>
       </div>
 
       <p v-if="validationError || error" class="service-form__error" role="alert">
         {{ validationError || error }}
       </p>
 
-      <mm-button type="submit" variant="primary" block :loading="loading" :disabled="loading">
+      <p v-if="showSuccess" class="service-form__success" role="status">
+        {{ success }}
+      </p>
+
+      <mm-button type="submit" variant="primary" block :loading="loading" :disabled="busy">
         Connect &amp; Test
       </mm-button>
+
+      <template v-if="configured">
+        <div
+          v-if="confirmingRemoval"
+          class="service-form__confirmation"
+          role="group"
+          :aria-label="`Remove ${service.name} server confirmation`"
+        >
+          <h3 class="service-form__confirmation-title">Remove {{ service.name }} server?</h3>
+
+          <p class="service-form__confirmation-description">
+            This removes the saved server connection and API key from MediaManagarr. Your actual
+            server and media library won't be affected.
+            <template v-if="serviceId === 'jellyfin'">
+              Your selected Jellyfin user will also be cleared.
+            </template>
+          </p>
+
+          <div class="service-form__confirmation-actions">
+            <mm-button type="button" variant="secondary" :disabled="busy" @click="cancelRemoval">
+              Cancel
+            </mm-button>
+
+            <mm-button
+              type="button"
+              variant="danger"
+              :loading="removing"
+              :disabled="busy"
+              @click="confirmRemoval"
+            >
+              Confirm removal
+            </mm-button>
+          </div>
+        </div>
+
+        <mm-button
+          v-else
+          type="button"
+          variant="danger"
+          block
+          :disabled="busy"
+          @click="requestRemoval"
+        >
+          Remove server
+        </mm-button>
+      </template>
     </form>
   </section>
 </template>
@@ -145,12 +296,9 @@ function handleConnect() {
   display: flex;
   flex-direction: column;
   gap: 18px;
-
   padding: 16px;
-
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-
   background: var(--background);
 }
 
@@ -162,7 +310,6 @@ function handleConnect() {
 
 .service-form__title {
   margin: 0;
-
   color: var(--text);
   font-size: 14px;
   font-weight: 700;
@@ -170,7 +317,6 @@ function handleConnect() {
 
 .service-form__description {
   margin: 0;
-
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
@@ -182,11 +328,61 @@ function handleConnect() {
   gap: 14px;
 }
 
-.service-form__error {
-  margin: 0;
+.service-form__jellyfin-user {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
-  color: var(--danger);
+.service-form__error,
+.service-form__success,
+.service-form__user-feedback {
+  margin: 0;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.service-form__error {
+  color: var(--danger);
+}
+
+.service-form__success {
+  color: #86efac;
+}
+
+.service-form__user-feedback {
+  color: var(--text-muted);
+}
+
+.service-form__confirmation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+}
+
+.service-form__confirmation-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.service-form__confirmation-description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.service-form__confirmation-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.service-form__confirmation-actions > * {
+  flex: 1;
 }
 </style>

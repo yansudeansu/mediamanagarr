@@ -5,6 +5,7 @@ import MmServiceSelector from '../components/organisms/MmServiceSelector/MmServi
 import MmServiceForm from '../components/organisms/MmServiceForm/MmServiceForm.vue'
 import {
   SERVICES,
+  SERVICE_INFO,
   type SafeServiceConfigs,
   type ServiceId,
   type ServiceState,
@@ -24,32 +25,52 @@ const selectedService = ref<ServiceId>('jellyfin')
 const configs = ref<SafeServiceConfigs>({})
 const statuses = ref<Partial<Record<ServiceId, ServiceState>>>({})
 const loadingServices = ref<Partial<Record<ServiceId, boolean>>>({})
+const removingServices = ref<Partial<Record<ServiceId, boolean>>>({})
 const serviceErrors = ref<Partial<Record<ServiceId, string>>>({})
+const serviceSuccesses = ref<Partial<Record<ServiceId, string>>>({})
 
 const jellyfinUsers = ref<JellyfinUser[]>([])
 const jellyfinUserId = ref('')
 const jellyfinUsersLoading = ref(false)
 const jellyfinUserSaving = ref(false)
 const jellyfinUsersError = ref('')
+const jellyfinUserSuccess = ref('')
 
 const selectedUrl = computed(() => configs.value[selectedService.value]?.url ?? '')
 const configured = computed(() => configs.value[selectedService.value]?.configured ?? false)
 const loading = computed(() => loadingServices.value[selectedService.value] ?? false)
+const removing = computed(() => removingServices.value[selectedService.value] ?? false)
 const error = computed(() => serviceErrors.value[selectedService.value] ?? '')
+const success = computed(() => serviceSuccesses.value[selectedService.value] ?? '')
 
 function getErrorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : 'An unexpected error occurred.'
 }
 
+function clearConnectionFeedback(serviceId: ServiceId): void {
+  serviceErrors.value[serviceId] = ''
+  serviceSuccesses.value[serviceId] = ''
+}
+
+function clearJellyfinUserFeedback(): void {
+  jellyfinUsersError.value = ''
+  jellyfinUserSuccess.value = ''
+}
+
+function clearJellyfinUsers(): void {
+  jellyfinUsers.value = []
+  jellyfinUserId.value = ''
+  clearJellyfinUserFeedback()
+}
+
 async function loadJellyfinUsers(): Promise<void> {
   if (!configs.value.jellyfin?.configured) {
-    jellyfinUsers.value = []
-    jellyfinUserId.value = ''
+    clearJellyfinUsers()
     return
   }
 
   jellyfinUsersLoading.value = true
-  jellyfinUsersError.value = ''
+  clearJellyfinUserFeedback()
 
   try {
     const response = await sendBackgroundMessage({
@@ -72,10 +93,18 @@ async function loadJellyfinUsers(): Promise<void> {
 }
 
 async function selectJellyfinUser(userId: string): Promise<void> {
-  if (jellyfinUserSaving.value || jellyfinUsersLoading.value) return
+  if (
+    jellyfinUserSaving.value ||
+    jellyfinUsersLoading.value ||
+    removingServices.value.jellyfin ||
+    loadingServices.value.jellyfin ||
+    !configs.value.jellyfin?.configured
+  ) {
+    return
+  }
 
   jellyfinUserSaving.value = true
-  jellyfinUsersError.value = ''
+  clearJellyfinUserFeedback()
 
   try {
     const response = await sendBackgroundMessage({
@@ -88,6 +117,7 @@ async function selectJellyfinUser(userId: string): Promise<void> {
     }
 
     jellyfinUserId.value = response.userId
+    jellyfinUserSuccess.value = 'Jellyfin user saved successfully.'
   } catch (caught) {
     jellyfinUsersError.value = getErrorMessage(caught)
   } finally {
@@ -115,6 +145,8 @@ async function loadConfigs(): Promise<void> {
 
     if (response.configs.jellyfin?.configured) {
       await loadJellyfinUsers()
+    } else {
+      clearJellyfinUsers()
     }
   } catch (caught) {
     serviceErrors.value[selectedService.value] = getErrorMessage(caught)
@@ -124,10 +156,16 @@ async function loadConfigs(): Promise<void> {
 async function connectService(payload: ConnectPayload): Promise<void> {
   const { serviceId } = payload
 
-  if (loadingServices.value[serviceId]) return
+  if (loadingServices.value[serviceId] || removingServices.value[serviceId]) {
+    return
+  }
 
   loadingServices.value[serviceId] = true
-  serviceErrors.value[serviceId] = ''
+  clearConnectionFeedback(serviceId)
+
+  if (serviceId === 'jellyfin') {
+    clearJellyfinUserFeedback()
+  }
 
   try {
     const normalizedUrl = normalizeServerUrl(payload.url)
@@ -161,6 +199,7 @@ async function connectService(payload: ConnectPayload): Promise<void> {
     }
 
     statuses.value[serviceId] = 'connected'
+    serviceSuccesses.value[serviceId] = `Connected to ${SERVICE_INFO[serviceId].name} successfully.`
 
     if (serviceId === 'jellyfin') {
       await loadJellyfinUsers()
@@ -170,6 +209,54 @@ async function connectService(payload: ConnectPayload): Promise<void> {
     serviceErrors.value[serviceId] = getErrorMessage(caught)
   } finally {
     loadingServices.value[serviceId] = false
+  }
+}
+
+async function removeService(serviceId: ServiceId): Promise<void> {
+  if (
+    loadingServices.value[serviceId] ||
+    removingServices.value[serviceId] ||
+    !configs.value[serviceId]?.configured
+  ) {
+    return
+  }
+
+  if (serviceId === 'jellyfin' && (jellyfinUserSaving.value || jellyfinUsersLoading.value)) {
+    return
+  }
+
+  removingServices.value[serviceId] = true
+  clearConnectionFeedback(serviceId)
+
+  if (serviceId === 'jellyfin') {
+    clearJellyfinUserFeedback()
+  }
+
+  try {
+    const response = await sendBackgroundMessage({
+      type: 'REMOVE_SERVICE',
+      serviceId,
+    })
+
+    if (!response.success) {
+      throw new Error(response.error)
+    }
+
+    // Update local state only after background removal succeeds.
+    delete configs.value[serviceId]
+
+    statuses.value[serviceId] = 'not-configured'
+
+    if (serviceId === 'jellyfin') {
+      clearJellyfinUsers()
+    }
+
+    serviceSuccesses.value[serviceId] =
+      `${SERVICE_INFO[serviceId].name} server removed successfully.`
+  } catch (caught) {
+    serviceErrors.value[serviceId] = getErrorMessage(caught)
+  } finally {
+    removingServices.value[serviceId] = false
   }
 }
 
@@ -190,13 +277,18 @@ onMounted(() => {
         :url="selectedUrl"
         :configured="configured"
         :loading="loading"
+        :removing="removing"
         :error="error"
+        :success="success"
         :jellyfin-users="jellyfinUsers"
         :jellyfin-user-id="jellyfinUserId"
         :jellyfin-users-loading="jellyfinUsersLoading"
         :jellyfin-user-saving="jellyfinUserSaving"
         :jellyfin-users-error="jellyfinUsersError"
+        :jellyfin-user-success="jellyfinUserSuccess"
         @connect="connectService"
+        @remove="removeService"
+        @edit="clearConnectionFeedback(selectedService)"
         @select-jellyfin-user="selectJellyfinUser"
       />
     </template>

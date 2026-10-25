@@ -11,12 +11,15 @@ const meta = {
     url: '',
     configured: false,
     loading: false,
+    removing: false,
     error: '',
+    success: '',
     jellyfinUsers: [],
     jellyfinUserId: '',
     jellyfinUsersLoading: false,
     jellyfinUserSaving: false,
     jellyfinUsersError: '',
+    jellyfinUserSuccess: '',
   },
 
   argTypes: {
@@ -33,7 +36,13 @@ const meta = {
     loading: {
       control: 'boolean',
     },
+    removing: {
+      control: 'boolean',
+    },
     error: {
+      control: 'text',
+    },
+    success: {
       control: 'text',
     },
     jellyfinUserId: {
@@ -46,6 +55,9 @@ const meta = {
       control: 'boolean',
     },
     jellyfinUsersError: {
+      control: 'text',
+    },
+    jellyfinUserSuccess: {
       control: 'text',
     },
   },
@@ -75,6 +87,8 @@ const exampleUsers = [
   { id: 'user-3', name: 'Charlie' },
 ]
 
+// General configuration
+
 export const Playground: Story = {}
 
 export const FreshInstall: Story = {
@@ -93,6 +107,89 @@ export const Configured: Story = {
     jellyfinUserId: 'user-1',
   },
 }
+
+export const Sonarr: Story = {
+  args: {
+    serviceId: 'sonarr',
+    url: 'https://sonarr.example.com',
+    configured: true,
+  },
+}
+
+// Connection feedback
+
+export const Loading: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    loading: true,
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-1',
+  },
+}
+
+export const ConnectionSuccess: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    success: 'Connected to Jellyfin successfully.',
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-1',
+  },
+}
+
+export const ConnectionError: Story = {
+  args: {
+    serviceId: 'radarr',
+    url: 'https://radarr.example.com',
+    configured: true,
+    error: 'Could not reach the server.',
+  },
+}
+
+// Server removal
+
+export const RemovalConfirmation: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-1',
+  },
+}
+
+export const Removing: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    removing: true,
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-1',
+  },
+}
+
+export const RemovalSuccess: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    configured: false,
+    success: 'Jellyfin server removed successfully.',
+  },
+}
+
+export const RemovalError: Story = {
+  args: {
+    serviceId: 'sonarr',
+    url: 'https://sonarr.example.com',
+    configured: true,
+    error: 'Unable to remove server.',
+  },
+}
+
+// Jellyfin users
 
 export const JellyfinUserSelected: Story = {
   args: {
@@ -122,30 +219,37 @@ export const JellyfinUsersError: Story = {
   },
 }
 
-export const Sonarr: Story = {
-  args: {
-    serviceId: 'sonarr',
-    url: 'https://sonarr.example.com',
-    configured: true,
-  },
-}
+// Jellyfin user save feedback
 
-export const Loading: Story = {
+export const JellyfinUserSaving: Story = {
   args: {
     serviceId: 'jellyfin',
     url: 'https://jellyfin.example.com',
     configured: true,
-    loading: true,
     jellyfinUsers: exampleUsers,
     jellyfinUserId: 'user-1',
+    jellyfinUserSaving: true,
   },
 }
 
-export const ConnectionError: Story = {
+export const JellyfinUserSaved: Story = {
   args: {
-    serviceId: 'radarr',
-    url: 'https://radarr.example.com',
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
     configured: true,
-    error: 'Could not reach the server.',
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-2',
+    jellyfinUserSuccess: 'Jellyfin user saved successfully.',
+  },
+}
+
+export const JellyfinUserSaveError: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-1',
+    jellyfinUsersError: 'Unable to save Jellyfin user.',
   },
 }

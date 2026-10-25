@@ -3,6 +3,7 @@ import type {
   ConnectServiceResponse,
   GetJellyfinUsersResponse,
   GetServiceConfigsResponse,
+  RemoveServiceResponse,
   SetJellyfinUserResponse,
 } from '../types/messages'
 import { SERVICES, type ServiceConfig, type ServiceId } from '../types/service'
@@ -12,13 +13,19 @@ import { getHostPermission, resolveServiceConfig } from '../utils/service-config
 import {
   getSafeServiceConfigs,
   getServiceConfig,
+  removeServiceConfig,
   saveServiceConfig,
 } from '../utils/service-storage'
-import { getJellyfinUserSelection, saveJellyfinUserSelection } from '../utils/jellyfin-storage'
+import {
+  clearJellyfinUserSelection,
+  getJellyfinUserSelection,
+  saveJellyfinUserSelection,
+} from '../utils/jellyfin-storage'
 
 type MessageResponse =
   | ConnectServiceResponse
   | GetServiceConfigsResponse
+  | RemoveServiceResponse
   | GetJellyfinUsersResponse
   | SetJellyfinUserResponse
 
@@ -48,6 +55,18 @@ function isConnectMessage(
     typeof input.url === 'string' &&
     typeof input.apiKey === 'string'
   )
+}
+
+function isRemoveMessage(
+  value: unknown,
+): value is Extract<BackgroundMessage, { type: 'REMOVE_SERVICE' }> {
+  if (value === null || typeof value !== 'object') {
+    return false
+  }
+
+  const message = value as Record<string, unknown>
+
+  return message.type === 'REMOVE_SERVICE' && isServiceId(message.serviceId)
 }
 
 function isSetJellyfinUserMessage(
@@ -96,6 +115,26 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
         return {
           success: true,
           configs: await getSafeServiceConfigs(),
+        }
+      }
+
+      if (message.type === 'REMOVE_SERVICE') {
+        if (!isRemoveMessage(message)) {
+          return {
+            success: false,
+            error: 'Invalid background message.',
+          }
+        }
+
+        if (message.serviceId === 'jellyfin') {
+          await clearJellyfinUserSelection()
+        }
+
+        await removeServiceConfig(message.serviceId)
+
+        return {
+          success: true,
+          serviceId: message.serviceId,
         }
       }
 
