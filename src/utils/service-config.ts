@@ -1,33 +1,41 @@
 import type { ServiceConfig } from '../types/service'
 
 export function normalizeServerUrl(input: string): string {
+  const value = input.trim()
+
   let url: URL
 
   try {
-    url = new URL(input.trim())
+    url = new URL(value)
   } catch {
     throw new Error('Enter a valid server URL.')
   }
 
-  if (url.protocol !== 'https:') {
-    throw new Error('Only HTTPS server URLs are supported.')
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('Only HTTP and HTTPS server URLs are supported.')
   }
 
   if (url.username || url.password) {
     throw new Error('Do not include credentials in the URL.')
   }
 
-  if (url.pathname !== '/' || url.search || url.hash) {
-    throw new Error('Enter only the server origin, without a path or query.')
+  if (url.search || url.hash || value.includes('?') || value.includes('#')) {
+    throw new Error('Do not include a query string or fragment in the URL.')
   }
 
-  return url.origin
+  // Preserve reverse-proxy paths while removing trailing slashes.
+  const pathname = url.pathname.replace(/\/+$/, '')
+
+  return `${url.origin}${pathname}`
 }
 
 export function getHostPermission(url: string): string {
   const normalizedUrl = normalizeServerUrl(url)
+  const parsedUrl = new URL(normalizedUrl)
 
-  return `${normalizedUrl}/*`
+  // Extension host permissions are origin-based.
+  // Reverse-proxy paths belong in API requests, not permission patterns.
+  return `${parsedUrl.origin}/*`
 }
 
 export function resolveServiceConfig(
