@@ -2,7 +2,9 @@ name: Publish Storybook PR Preview
 
 on:
   workflow_run:
-    workflows: ['Storybook PR Preview']
+    workflows:
+      - Deploy Storybook
+      - Storybook PR Preview
     types: [completed]
 
   pull_request_target:
@@ -18,13 +20,12 @@ concurrency:
 
 jobs:
   publish:
-    name: Publish or Remove PR Preview
+    name: Publish Storybook Website
     runs-on: ubuntu-latest
 
     if: >-
       (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'pull_request') ||
+       github.event.workflow_run.conclusion == 'success') ||
       (github.event_name == 'pull_request_target' &&
        github.event.action == 'closed')
 
@@ -40,8 +41,37 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Download PR build metadata
-        if: github.event_name == 'workflow_run'
+      - name: Identify publishing operation
+        id: operation
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
+          CLOSED_PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
+            echo "type=remove" >> "$GITHUB_OUTPUT"
+            echo "number=$CLOSED_PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+          elif [[ "$WORKFLOW_NAME" == "Deploy Storybook" &&
+                  "$WORKFLOW_EVENT" == "push" ||
+                  "$WORKFLOW_NAME" == "Deploy Storybook" &&
+                  "$WORKFLOW_EVENT" == "workflow_dispatch" ]]; then
+            echo "type=production" >> "$GITHUB_OUTPUT"
+
+          elif [[ "$WORKFLOW_NAME" == "Storybook PR Preview" &&
+                  "$WORKFLOW_EVENT" == "pull_request" ]]; then
+            echo "type=preview" >> "$GITHUB_OUTPUT"
+
+          else
+            echo "type=skip" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download PR metadata
+        if: steps.operation.outputs.type == 'preview'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -57,90 +87,91 @@ jobs:
             --name storybook-pr-metadata \
             --dir metadata
 
-      - name: Identify pull request
-        id: pr
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          CLOSED_PR_NUMBER: ${{ github.event.pull_request.number }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
-            number=$(jq -r '.pr' metadata/build.json)
-            sha=$(jq -r '.sha' metadata/build.json)
-
-            echo "action=publish" >> "$GITHUB_OUTPUT"
-            echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          else
-            number="$CLOSED_PR_NUMBER"
-
-            echo "action=remove" >> "$GITHUB_OUTPUT"
-          fi
-
-          if ! [[ "$number" =~ ^[0-9]+$ ]]; then
-            echo "Invalid pull request number."
-            exit 1
-          fi
-
-          echo "number=$number" >> "$GITHUB_OUTPUT"
-
-      - name: Verify pull request
+      - name: Verify publishing operation
         id: verify
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          ACTION: ${{ steps.pr.outputs.action }}
-          BUILD_SHA: ${{ steps.pr.outputs.sha }}
+          TYPE: ${{ steps.operation.outputs.type }}
+          CLOSED_PR_NUMBER: ${{ steps.operation.outputs.number }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
         shell: bash
         run: |
           set -euo pipefail
 
-          pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
+          echo "proceed=false" >> "$GITHUB_OUTPUT"
 
-          if [[ "$ACTION" == "publish" ]]; then
-            state=$(jq -r '.state' <<< "$pr")
-            head_repo=$(jq -r '.head.repo.full_name' <<< "$pr")
-            current_sha=$(jq -r '.head.sha' <<< "$pr")
+          if [[ "$TYPE" == "skip" ]]; then
+            exit 0
+          fi
 
-            if [[ "$state" != "open" ]]; then
-              echo "PR is no longer open. Skipping publication."
-              echo "proceed=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            if [[ "$head_repo" != "$REPOSITORY" ]]; then
-              echo "Skipping preview from forked repository."
-              echo "proceed=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            if ! [[ "$BUILD_SHA" =~ ^[a-fA-F0-9]{40}$ ]]; then
-              echo "Invalid build commit SHA."
+          if [[ "$TYPE" == "production" ]]; then
+            if [[ "$RUN_REPOSITORY" != "$REPOSITORY" ]]; then
+              echo "Unexpected production repository."
               exit 1
             fi
 
-            if [[ "$current_sha" != "$BUILD_SHA" ]]; then
-              echo "A newer PR commit exists. Skipping outdated preview."
-              echo "proceed=false" >> "$GITHUB_OUTPUT"
+            current_master=$(gh api \
+              "repos/$REPOSITORY/branches/master" \
+              --jq '.commit.sha')
+
+            if [[ "$RUN_SHA" != "$current_master" ]]; then
+              echo "Skipping outdated production build."
               exit 0
             fi
 
-            # Verify that the completed run belongs to this PR.
+          elif [[ "$TYPE" == "preview" ]]; then
+            number=$(jq -r '.pr' metadata/build.json)
+            build_sha=$(jq -r '.sha' metadata/build.json)
+
+            if ! [[ "$number" =~ ^[0-9]+$ ]]; then
+              echo "Invalid PR number."
+              exit 1
+            fi
+
+            if ! [[ "$build_sha" =~ ^[a-fA-F0-9]{40}$ ]]; then
+              echo "Invalid build SHA."
+              exit 1
+            fi
+
             associated_prs=$(gh api \
               "repos/$REPOSITORY/actions/runs/$RUN_ID/pulls")
 
             associated=$(jq -r \
-              --argjson number "$PR_NUMBER" \
+              --argjson number "$number" \
               'any(.[]; .number == $number)' \
               <<< "$associated_prs")
 
             if [[ "$associated" != "true" ]]; then
-              echo "Workflow run is not associated with this PR."
+              echo "Build is not associated with this PR."
               exit 1
             fi
+
+            pr=$(gh api "repos/$REPOSITORY/pulls/$number")
+
+            state=$(jq -r '.state' <<< "$pr")
+            head_repo=$(jq -r '.head.repo.full_name' <<< "$pr")
+            current_sha=$(jq -r '.head.sha' <<< "$pr")
+
+            if [[ "$state" != "open" ||
+                  "$head_repo" != "$REPOSITORY" ||
+                  "$current_sha" != "$build_sha" ]]; then
+              echo "Skipping closed, external, or outdated PR."
+              exit 0
+            fi
+
+            echo "number=$number" >> "$GITHUB_OUTPUT"
+            echo "sha=$build_sha" >> "$GITHUB_OUTPUT"
+
+          elif [[ "$TYPE" == "remove" ]]; then
+            if ! [[ "$CLOSED_PR_NUMBER" =~ ^[0-9]+$ ]]; then
+              echo "Invalid closed PR number."
+              exit 1
+            fi
+
+            echo "number=$CLOSED_PR_NUMBER" >> "$GITHUB_OUTPUT"
           fi
 
           echo "proceed=true" >> "$GITHUB_OUTPUT"
@@ -153,10 +184,29 @@ jobs:
           path: site
           persist-credentials: false
 
-      - name: Download Storybook preview
+      - name: Download production Storybook
         if: >-
           steps.verify.outputs.proceed == 'true' &&
-          steps.pr.outputs.action == 'publish'
+          steps.operation.outputs.type == 'production'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p production
+
+          gh run download "$RUN_ID" \
+            --repo "$REPOSITORY" \
+            --name production-storybook \
+            --dir production
+
+      - name: Download PR Storybook
+        if: >-
+          steps.verify.outputs.proceed == 'true' &&
+          steps.operation.outputs.type == 'preview'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -172,22 +222,34 @@ jobs:
             --name storybook-pr-preview \
             --dir preview
 
-      - name: Update preview directory
+      - name: Update website files
         if: steps.verify.outputs.proceed == 'true'
         env:
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          ACTION: ${{ steps.pr.outputs.action }}
-          BUILD_SHA: ${{ steps.pr.outputs.sha }}
+          TYPE: ${{ steps.operation.outputs.type }}
+          PR_NUMBER: ${{ steps.verify.outputs.number }}
+          BUILD_SHA: ${{ steps.verify.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
 
-          destination="site/pr-preview/pr-$PR_NUMBER"
+          if [[ "$TYPE" == "production" ]]; then
+            mkdir -p site/pr-preview
 
-          rm -rf "$destination"
+            find site -mindepth 1 -maxdepth 1 \
+              ! -name .git \
+              ! -name pr-preview \
+              -exec rm -rf {} +
 
-          if [[ "$ACTION" == "publish" ]]; then
+            cp -a production/. site/
+
+            echo "Updated production Storybook."
+
+          elif [[ "$TYPE" == "preview" ]]; then
+            destination="site/pr-preview/pr-$PR_NUMBER"
+
+            rm -rf "$destination"
             mkdir -p "$destination"
+
             cp -a preview/. "$destination/"
 
             jq -n \
@@ -196,9 +258,12 @@ jobs:
               '{pr: $pr, sha: $sha}' \
               > "$destination/deployment.json"
 
-            echo "Prepared preview for PR #$PR_NUMBER"
-          else
-            echo "Removed preview for PR #$PR_NUMBER"
+            echo "Updated preview for PR #$PR_NUMBER."
+
+          elif [[ "$TYPE" == "remove" ]]; then
+            rm -rf "site/pr-preview/pr-$PR_NUMBER"
+
+            echo "Removed preview for PR #$PR_NUMBER."
           fi
 
           touch site/.nojekyll
@@ -208,8 +273,7 @@ jobs:
         working-directory: site
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          ACTION: ${{ steps.pr.outputs.action }}
+          TYPE: ${{ steps.operation.outputs.type }}
         shell: bash
         run: |
           set -euo pipefail
@@ -222,7 +286,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No website changes to commit."
           else
-            git commit -m "ci: $ACTION Storybook preview for PR #$PR_NUMBER"
+            git commit -m "ci: update generated Storybook website"
 
             authorization=$(
               printf 'x-access-token:%s' "$GH_TOKEN" |
@@ -252,22 +316,24 @@ jobs:
       - name: Update PR overview deployment status
         if: >-
           steps.verify.outputs.proceed == 'true' &&
-          steps.pr.outputs.action == 'publish'
+          steps.operation.outputs.type == 'preview'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          BUILD_SHA: ${{ steps.pr.outputs.sha }}
+          PR_NUMBER: ${{ steps.verify.outputs.number }}
+          BUILD_SHA: ${{ steps.verify.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
 
-          current_sha=$(gh api \
-            "repos/$REPOSITORY/pulls/$PR_NUMBER" \
-            --jq '.head.sha')
+          pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
 
-          if [[ "$current_sha" != "$BUILD_SHA" ]]; then
-            echo "PR changed during deployment. Skipping comment update."
+          current_sha=$(jq -r '.head.sha' <<< "$pr")
+          state=$(jq -r '.state' <<< "$pr")
+
+          if [[ "$current_sha" != "$BUILD_SHA" ||
+                "$state" != "open" ]]; then
+            echo "PR changed during deployment."
             exit 0
           fi
 
@@ -284,15 +350,18 @@ jobs:
             exit 0
           fi
 
-          body=$(gh api \
+          gh api \
             "repos/$REPOSITORY/issues/comments/$comment_id" \
-            --jq '.body')
+            --jq '.body' \
+            > comment.md
 
-          updated_body="${body/Status: Pending deployment./Status: Deployed.}"
+          sed -i \
+            's/Status: Pending deployment\./Status: Deployed./' \
+            comment.md
 
           gh api \
             --method PATCH \
             "repos/$REPOSITORY/issues/comments/$comment_id" \
-            -f body="$updated_body"
+            -F body=@comment.md
 
-          echo "Updated PR #$PR_NUMBER preview status."
+          echo "Updated PR #$PR_NUMBER deployment status."
