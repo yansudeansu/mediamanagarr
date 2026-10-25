@@ -1,0 +1,189 @@
+name: Publish Release
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - package.json
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish Browser Extension Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Verify release
+        id: release
+        run: npm run release:check
+
+      - name: Install dependencies
+        if: steps.release.outputs.publish == 'true'
+        run: npm ci
+
+      - name: Run checks and build
+        if: steps.release.outputs.publish == 'true'
+        run: npm run check
+
+      - name: Verify built manifest
+        if: steps.release.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f dist/manifest.json
+
+          actual=$(node -p "require('./dist/manifest.json').version")
+
+          if [[ "$actual" != "$VERSION" ]]; then
+            echo "Manifest version mismatch: $actual != $VERSION"
+            exit 1
+          fi
+
+          echo "Verified manifest version $actual."
+
+      - name: Package extensions
+        if: steps.release.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p release
+
+          (
+            cd dist
+
+            zip -qr \
+              "../release/mediamanagarr-v${VERSION}-chrome.zip" \
+              .
+          )
+
+          (
+            cd dist
+
+            zip -qr \
+              "../release/mediamanagarr-v${VERSION}-firefox.zip" \
+              .
+          )
+
+          for browser in chrome firefox; do
+            archive="release/mediamanagarr-v${VERSION}-${browser}.zip"
+
+            unzip -t "$archive"
+
+            unzip -p "$archive" manifest.json |
+              node -e "
+                let input = '';
+                process.stdin.on('data', chunk => input += chunk);
+                process.stdin.on('end', () => {
+                  const manifest = JSON.parse(input);
+                  if (manifest.version !== process.env.VERSION) {
+                    process.exit(1);
+                  }
+                });
+              "
+          done
+
+      - name: Inspect existing release
+        if: steps.release.outputs.publish == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="v${VERSION}"
+
+          if git rev-parse "refs/tags/$tag" >/dev/null 2>&1; then
+            tagged_sha=$(git rev-list -n 1 "$tag")
+
+            if [[ "$tagged_sha" != "$RELEASE_SHA" ]]; then
+              echo "Tag $tag points to $tagged_sha, expected $RELEASE_SHA."
+              exit 1
+            fi
+
+            echo "Existing tag points to the correct commit."
+          else
+            echo "No existing tag."
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release does not exist."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: >-
+          steps.release.outputs.publish == 'true' &&
+          steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release create "v${VERSION}" \
+            --target "$RELEASE_SHA" \
+            --title "MediaManagarr v${VERSION}" \
+            --generate-notes
+
+      - name: Upload missing release assets
+        if: steps.release.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="v${VERSION}"
+
+          for browser in chrome firefox; do
+            archive="mediamanagarr-v${VERSION}-${browser}.zip"
+
+            if gh release view "$tag" \
+              --json assets \
+              --jq '.assets[].name' |
+              grep -Fxq "$archive"; then
+              echo "$archive already exists. Skipping."
+              continue
+            fi
+
+            gh release upload "$tag" "release/$archive"
+
+            echo "Uploaded $archive."
+          done
+
+          echo "Release $tag is complete."

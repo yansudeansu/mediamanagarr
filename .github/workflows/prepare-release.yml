@@ -1,0 +1,141 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare Release Pull Request
+    runs-on: ubuntu-latest
+
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare release
+        run: npm run release:prepare
+
+      - name: Read release version
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! -f release-version.txt ]]; then
+            echo "No release required."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          version=$(cat release-version.txt)
+
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid generated version."
+            exit 1
+          fi
+
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify prepared release
+        if: steps.release.outputs.ready == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+
+          const version = process.env.VERSION
+
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
+          const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'))
+          const changelog = readFileSync('CHANGELOG.md', 'utf8')
+
+          if (
+            pkg.version !== version ||
+            lock.version !== version ||
+            lock.packages?.['']?.version !== version
+          ) {
+            throw new Error('Generated package versions do not match.')
+          }
+
+          const escaped = version.replaceAll('.', '\\.')
+
+          if (!new RegExp(`^## v${escaped}\\s*$`, 'm').test(changelog)) {
+            throw new Error('Generated changelog section is missing.')
+          }
+
+          console.log(`Prepared release v${version} verified.`)
+          NODE
+
+      - name: Run checks
+        if: steps.release.outputs.ready == 'true'
+        run: npm run check
+
+      - name: Verify built manifest
+        if: steps.release.outputs.ready == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          actual=$(node -p "require('./dist/manifest.json').version")
+
+          if [[ "$actual" != "$VERSION" ]]; then
+            echo "Manifest version mismatch: $actual != $VERSION"
+            exit 1
+          fi
+
+      - name: Create release pull request
+        if: steps.release.outputs.ready == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          branch: release/v${{ steps.release.outputs.version }}
+          base: master
+          delete-branch: true
+          add-paths: |
+            package.json
+            package-lock.json
+            CHANGELOG.md
+          commit-message: 'chore(release): v${{ steps.release.outputs.version }}'
+          title: 'chore(release): v${{ steps.release.outputs.version }}'
+          body: |
+            ## MediaManagarr v${{ steps.release.outputs.version }}
+
+            Automated version bump and changelog generation.
+
+            ### Release checklist
+
+            - [ ] Review the version bump.
+            - [ ] Review CHANGELOG.md.
+            - [ ] Confirm all checks pass.
+            - [ ] Squash-merge when ready to publish.
+
+            Merging this PR into master will trigger release publishing.
