@@ -185,10 +185,41 @@ async function updateChangelog(version: string, commits: Commit[]): Promise<void
   writeFileSync('CHANGELOG.md', formatted)
 }
 
+function verifyReleaseStartingState(packageVersion: string, previousTag: string | null): void {
+  const changedFiles = git(
+    'status',
+    '--porcelain',
+    '--',
+    'package.json',
+    'package-lock.json',
+    'CHANGELOG.md',
+  )
+
+  if (changedFiles) {
+    throw new Error(
+      'Release files already contain uncommitted changes. ' +
+        'Finish or discard the existing preparation before running it again.',
+    )
+  }
+
+  if (previousTag) {
+    const expectedVersion = previousTag.slice(1)
+
+    if (packageVersion !== expectedVersion) {
+      throw new Error(
+        `Package version ${packageVersion} does not match latest release tag ${previousTag}.`,
+      )
+    }
+  } else if (packageVersion !== '0.0.0') {
+    throw new Error(`No release tags exist, but package.json is already at ${packageVersion}.`)
+  }
+}
+
 async function main(): Promise<void> {
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as PackageJson
 
   const previousTag = latestTag()
+  verifyReleaseStartingState(packageJson.version, previousTag)
   const commits = getCommits(previousTag)
   const impact = releaseImpact(commits)
 
