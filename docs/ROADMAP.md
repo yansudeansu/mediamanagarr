@@ -6,22 +6,7 @@ This roadmap tracks upcoming work, not completed features. Milestones are goals,
 
 Current priority
 
-Milestone 1 — Up Next (Jellyfin)
-
-Display recently added and unwatched media from Jellyfin.
-
-- Display recently added movies and episodes.
-- Use the Jellyfin user selected in Settings.
-- Show media artwork, titles, release information, and dates.
-- Add reusable filtering and pagination.
-- Track new and unwatched items.
-- Support notifications and marking items as seen.
-- Handle missing artwork, empty results, and connection failures.
-- Test API responses, background messaging, and user interactions.
-
-Upcoming milestones
-
-Milestone 2 — Calendar (Sonarr & Radarr)
+Milestone 1 — Calendar (Sonarr & Radarr)
 
 Display upcoming television episodes and movie releases.
 
@@ -33,7 +18,9 @@ Display upcoming television episodes and movie releases.
 - Support keyboard navigation.
 - Test calendar navigation, API responses, and date handling.
 
-Milestone 3 — Downloads (qBittorrent)
+Upcoming milestones
+
+Milestone 2 — Downloads (qBittorrent)
 
 Monitor and manage active downloads.
 
@@ -45,7 +32,7 @@ Monitor and manage active downloads.
 - Handle connection failures and authentication errors.
 - Test download actions and error handling.
 
-Milestone 4 — Service Health & Reliability
+Milestone 3 — Service Health & Reliability
 
 Improve the reliability of configured service integrations.
 
@@ -56,7 +43,7 @@ Improve the reliability of configured service integrations.
 - Handle temporary service outages gracefully.
 - Avoid unnecessary API requests.
 
-Milestone 5 — Testing & Accessibility
+Milestone 4 — Testing & Accessibility
 
 Expand automated testing and verify accessibility across the extension.
 
@@ -70,7 +57,7 @@ Expand automated testing and verify accessibility across the extension.
 
 Testing and accessibility remain ongoing requirements throughout every milestone.
 
-Milestone 6 — Feature Enhancements
+Milestone 5 — Feature Enhancements
 
 Refine existing features based on real-world usage and feedback.
 
@@ -85,7 +72,7 @@ Potential improvements include:
 
 Enhancements will be prioritized based on user feedback rather than speculative requirements.
 
-Milestone 7 — Branding & Documentation
+Milestone 6 — Branding & Documentation
 
 Prepare MediaManagarr for a wider audience.
 
@@ -96,7 +83,7 @@ Prepare MediaManagarr for a wider audience.
 - Improve contribution and development guides.
 - Review screenshots and other release materials.
 
-Milestone 8 — Release & Distribution
+Milestone 7 — Release & Distribution
 
 Prepare and publish MediaManagarr for supported browsers.
 

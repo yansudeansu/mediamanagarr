@@ -1,4 +1,4 @@
-import type { JellyfinUser } from './jellyfin'
+import type { JellyfinArrivalsPage, JellyfinArrivalsQuery, JellyfinUser } from './jellyfin'
 import type { SeerrRequestsPage, SeerrRequestsQuery } from './seerr'
 import type { SafeServiceConfigs, ServiceConnectionInput, ServiceId } from './service'
 
@@ -26,6 +26,26 @@ export interface SetJellyfinUserMessage {
   userId: string
 }
 
+export interface GetJellyfinArrivalsMessage extends JellyfinArrivalsQuery {
+  type: 'GET_JELLYFIN_ARRIVALS'
+}
+
+export interface GetJellyfinImageMessage {
+  type: 'GET_JELLYFIN_IMAGE'
+  itemId: string
+  imageTag: string | null
+}
+
+export interface SetJellyfinArrivalUnreadMessage {
+  type: 'SET_JELLYFIN_ARRIVAL_UNREAD'
+  itemId: string
+  unread: boolean
+}
+
+export interface ClearJellyfinNotificationsMessage {
+  type: 'CLEAR_JELLYFIN_NOTIFICATIONS'
+}
+
 export interface GetSeerrRequestsMessage extends SeerrRequestsQuery {
   type: 'GET_SEERR_REQUESTS'
 }
@@ -36,6 +56,10 @@ export type BackgroundMessage =
   | RemoveServiceMessage
   | GetJellyfinUsersMessage
   | SetJellyfinUserMessage
+  | GetJellyfinArrivalsMessage
+  | GetJellyfinImageMessage
+  | SetJellyfinArrivalUnreadMessage
+  | ClearJellyfinNotificationsMessage
   | GetSeerrRequestsMessage
 
 export interface GetServiceConfigsSuccess {
@@ -64,6 +88,27 @@ export interface SetJellyfinUserSuccess {
   userId: string
 }
 
+export interface GetJellyfinArrivalsSuccess {
+  success: true
+  arrivals: JellyfinArrivalsPage
+  unreadCount: number
+}
+
+export interface GetJellyfinImageSuccess {
+  success: true
+  image: string | null
+}
+
+export interface SetJellyfinArrivalUnreadSuccess {
+  success: true
+  unreadCount: number
+}
+
+export interface ClearJellyfinNotificationsSuccess {
+  success: true
+  unreadCount: number
+}
+
 export interface GetSeerrRequestsSuccess {
   success: true
   requests: SeerrRequestsPage
@@ -84,18 +129,29 @@ export type GetJellyfinUsersResponse = GetJellyfinUsersSuccess | BackgroundMessa
 
 export type SetJellyfinUserResponse = SetJellyfinUserSuccess | BackgroundMessageFailure
 
+export type GetJellyfinArrivalsResponse = GetJellyfinArrivalsSuccess | BackgroundMessageFailure
+
+export type GetJellyfinImageResponse = GetJellyfinImageSuccess | BackgroundMessageFailure
+
+export type SetJellyfinArrivalUnreadResponse =
+  SetJellyfinArrivalUnreadSuccess | BackgroundMessageFailure
+
+export type ClearJellyfinNotificationsResponse =
+  ClearJellyfinNotificationsSuccess | BackgroundMessageFailure
+
 export type GetSeerrRequestsResponse = GetSeerrRequestsSuccess | BackgroundMessageFailure
 
-export type BackgroundResponse<T extends BackgroundMessage> = T extends GetServiceConfigsMessage
-  ? GetServiceConfigsResponse
-  : T extends ConnectServiceMessage
-    ? ConnectServiceResponse
-    : T extends RemoveServiceMessage
-      ? RemoveServiceResponse
-      : T extends GetJellyfinUsersMessage
-        ? GetJellyfinUsersResponse
-        : T extends SetJellyfinUserMessage
-          ? SetJellyfinUserResponse
-          : T extends GetSeerrRequestsMessage
-            ? GetSeerrRequestsResponse
-            : never
+type BackgroundResponseMap = {
+  GET_SERVICE_CONFIGS: GetServiceConfigsResponse
+  CONNECT_SERVICE: ConnectServiceResponse
+  REMOVE_SERVICE: RemoveServiceResponse
+  GET_JELLYFIN_USERS: GetJellyfinUsersResponse
+  SET_JELLYFIN_USER: SetJellyfinUserResponse
+  GET_JELLYFIN_ARRIVALS: GetJellyfinArrivalsResponse
+  GET_JELLYFIN_IMAGE: GetJellyfinImageResponse
+  SET_JELLYFIN_ARRIVAL_UNREAD: SetJellyfinArrivalUnreadResponse
+  CLEAR_JELLYFIN_NOTIFICATIONS: ClearJellyfinNotificationsResponse
+  GET_SEERR_REQUESTS: GetSeerrRequestsResponse
+}
+
+export type BackgroundResponse<T extends BackgroundMessage> = BackgroundResponseMap[T['type']]

@@ -1,29 +1,41 @@
 import type {
   BackgroundMessage,
+  ClearJellyfinNotificationsResponse,
   ConnectServiceResponse,
+  GetJellyfinArrivalsResponse,
+  GetJellyfinImageResponse,
   GetJellyfinUsersResponse,
   GetSeerrRequestsResponse,
   GetServiceConfigsResponse,
   RemoveServiceResponse,
+  SetJellyfinArrivalUnreadResponse,
   SetJellyfinUserResponse,
 } from '../types/messages'
 import { SEERR_REQUEST_FILTERS, type SeerrRequestsQuery } from '../types/seerr'
 import { SERVICES, type ServiceConfig, type ServiceId } from '../types/service'
-import { testServiceConnection } from './services/connection'
-import { fetchJellyfinUsers } from './services/jellyfin-users'
-import { fetchSeerrRequests } from './services/seerr-requests'
 import { getHostPermission, resolveServiceConfig } from '../utils/service-config'
+import {
+  clearJellyfinUserSelection,
+  getJellyfinUserSelection,
+  saveJellyfinUserSelection,
+} from '../utils/jellyfin-storage'
 import {
   getSafeServiceConfigs,
   getServiceConfig,
   removeServiceConfig,
   saveServiceConfig,
 } from '../utils/service-storage'
+import { testServiceConnection } from './services/connection'
+import { fetchJellyfinImage } from './services/jellyfin-images'
+import { fetchJellyfinUsers } from './services/jellyfin-users'
+import { updateJellyfinBadge } from './services/jellyfin-badge'
 import {
-  clearJellyfinUserSelection,
-  getJellyfinUserSelection,
-  saveJellyfinUserSelection,
-} from '../utils/jellyfin-storage'
+  clearJellyfinNotifications,
+  loadJellyfinArrivalsPage,
+  setJellyfinArrivalUnread,
+} from './services/jellyfin-notifications'
+import { refreshJellyfinNotifications } from './services/jellyfin-scanner'
+import { fetchSeerrRequests } from './services/seerr-requests'
 
 type MessageResponse =
   | ConnectServiceResponse
@@ -31,6 +43,10 @@ type MessageResponse =
   | RemoveServiceResponse
   | GetJellyfinUsersResponse
   | SetJellyfinUserResponse
+  | GetJellyfinArrivalsResponse
+  | GetJellyfinImageResponse
+  | SetJellyfinArrivalUnreadResponse
+  | ClearJellyfinNotificationsResponse
   | GetSeerrRequestsResponse
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -70,6 +86,63 @@ function isSetJellyfinUserMessage(
     value.type === 'SET_JELLYFIN_USER' &&
     typeof value.userId === 'string' &&
     value.userId.trim().length > 0
+  )
+}
+
+function isJellyfinArrivalsMessage(
+  value: unknown,
+): value is Extract<BackgroundMessage, { type: 'GET_JELLYFIN_ARRIVALS' }> {
+  if (!isRecord(value) || value.type !== 'GET_JELLYFIN_ARRIVALS') {
+    return false
+  }
+
+  const { page, pageSize, filter } = value
+
+  if (page !== undefined && (typeof page !== 'number' || !Number.isSafeInteger(page) || page < 1)) {
+    return false
+  }
+
+  if (
+    pageSize !== undefined &&
+    (typeof pageSize !== 'number' ||
+      !Number.isSafeInteger(pageSize) ||
+      pageSize < 1 ||
+      pageSize > 100)
+  ) {
+    return false
+  }
+
+  if (filter !== undefined && filter !== 'all' && filter !== 'new') {
+    return false
+  }
+
+  const normalizedPage = page ?? 1
+  const normalizedPageSize = pageSize ?? 10
+
+  return Number.isSafeInteger((normalizedPage - 1) * normalizedPageSize)
+}
+
+function isJellyfinImageMessage(
+  value: unknown,
+): value is Extract<BackgroundMessage, { type: 'GET_JELLYFIN_IMAGE' }> {
+  return (
+    isRecord(value) &&
+    value.type === 'GET_JELLYFIN_IMAGE' &&
+    typeof value.itemId === 'string' &&
+    value.itemId.trim().length > 0 &&
+    (value.imageTag === null || typeof value.imageTag === 'string')
+  )
+}
+
+function isSetJellyfinArrivalUnreadMessage(
+  value: unknown,
+): value is Extract<BackgroundMessage, { type: 'SET_JELLYFIN_ARRIVAL_UNREAD' }> {
+  return (
+    isRecord(value) &&
+    value.type === 'SET_JELLYFIN_ARRIVAL_UNREAD' &&
+    typeof value.itemId === 'string' &&
+    value.itemId.trim().length > 0 &&
+    typeof value.unread === 'boolean'
   )
 }
 
@@ -153,6 +226,22 @@ async function getConfiguredSeerr(): Promise<ServiceConfig> {
   )
 }
 
+async function refreshJellyfinAfterSettingsChange(): Promise<void> {
+  try {
+    await refreshJellyfinNotifications()
+  } catch (error) {
+    console.warn('MediaManagarr: Unable to refresh Jellyfin notifications:', error)
+  }
+}
+
+async function updateJellyfinBadgeSafely(unreadCount: number): Promise<void> {
+  try {
+    await updateJellyfinBadge(unreadCount)
+  } catch (error) {
+    console.warn('MediaManagarr: Unable to update Jellyfin badge:', error)
+  }
+}
+
 export async function handleBackgroundMessage(message: unknown): Promise<MessageResponse> {
   try {
     if (isRecord(message)) {
@@ -176,6 +265,10 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
         }
 
         await removeServiceConfig(message.serviceId)
+
+        if (message.serviceId === 'jellyfin') {
+          await refreshJellyfinAfterSettingsChange()
+        }
 
         return {
           success: true,
@@ -212,10 +305,90 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
         }
 
         await saveJellyfinUserSelection(config.url, userId)
+        await refreshJellyfinAfterSettingsChange()
 
         return {
           success: true,
           userId,
+        }
+      }
+
+      if (message.type === 'GET_JELLYFIN_ARRIVALS') {
+        if (!isJellyfinArrivalsMessage(message)) {
+          return {
+            success: false,
+            error: 'Invalid background message.',
+          }
+        }
+
+        await getConfiguredJellyfin()
+
+        const result = await loadJellyfinArrivalsPage(
+          message.page ?? 1,
+          message.pageSize ?? 10,
+          message.filter ?? 'all',
+        )
+
+        await updateJellyfinBadgeSafely(result.unreadCount)
+
+        return {
+          success: true,
+          arrivals: {
+            items: result.items,
+            total: result.total,
+          },
+          unreadCount: result.unreadCount,
+        }
+      }
+
+      if (message.type === 'GET_JELLYFIN_IMAGE') {
+        if (!isJellyfinImageMessage(message)) {
+          return {
+            success: false,
+            error: 'Invalid background message.',
+          }
+        }
+
+        const config = await getConfiguredJellyfin()
+
+        const image = await fetchJellyfinImage(config, message.itemId, message.imageTag)
+
+        return {
+          success: true,
+          image,
+        }
+      }
+
+      if (message.type === 'SET_JELLYFIN_ARRIVAL_UNREAD') {
+        if (!isSetJellyfinArrivalUnreadMessage(message)) {
+          return {
+            success: false,
+            error: 'Invalid background message.',
+          }
+        }
+
+        await getConfiguredJellyfin()
+
+        const unreadCount = await setJellyfinArrivalUnread(message.itemId, message.unread)
+
+        await updateJellyfinBadgeSafely(unreadCount)
+
+        return {
+          success: true,
+          unreadCount,
+        }
+      }
+
+      if (message.type === 'CLEAR_JELLYFIN_NOTIFICATIONS') {
+        await getConfiguredJellyfin()
+
+        const unreadCount = await clearJellyfinNotifications()
+
+        await updateJellyfinBadgeSafely(unreadCount)
+
+        return {
+          success: true,
+          unreadCount,
         }
       }
 
@@ -268,6 +441,10 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
 
     await testServiceConnection(message.serviceId, config)
     await saveServiceConfig(message.serviceId, config)
+
+    if (message.serviceId === 'jellyfin') {
+      await refreshJellyfinAfterSettingsChange()
+    }
 
     return {
       success: true,

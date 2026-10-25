@@ -5,6 +5,7 @@ import MmNavigation from './components/molecules/MmNavigation/MmNavigation.vue'
 import type { NavigationView } from './components/molecules/MmNavigation/MmNavigation.vue'
 import MmFooter from './components/molecules/MmFooter/MmFooter.vue'
 import MmRequestView from './views/MmRequestView.vue'
+import MmUpNextView from './views/MmUpNextView.vue'
 import SettingsView from './views/SettingsView.vue'
 import { getAppVersion } from './utils/version'
 
@@ -35,6 +36,8 @@ const viewTitles: Record<NavigationView, string> = {
       <settings-view v-if="settingsOpen" />
 
       <mm-request-view v-else-if="activeView === 'requests'" />
+
+      <mm-up-next-view v-else-if="activeView === 'up-next'" />
 
       <section v-else class="app-content__placeholder" aria-labelledby="view-title">
         <h2 id="view-title" aria-live="polite" aria-atomic="true">
