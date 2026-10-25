@@ -138,7 +138,7 @@ const typeLines = Object.entries(types)
 
 const report = [
   '<!-- mediamanagarr-pr-overview -->',
-  '## 💚 MediaManagarr — Pull Request Overview',
+  '## MediaManagarr — Pull Request Overview',
   '',
   `**PR #${pr.number}:** ${pr.title}`,
   '',
