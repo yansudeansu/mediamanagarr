@@ -51,12 +51,13 @@ const viewTitles: Record<NavigationView, string> = {
 .app-shell {
   display: flex;
   flex-direction: column;
-  min-height: 480px;
+  height: 480px;
 }
 
 .app-content {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
   padding: 20px;
 }
 

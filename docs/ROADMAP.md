@@ -1,12 +1,12 @@
 # MediaManagarr Development Roadmap
 
-> **Status:** Early development. Milestones 0 and 1 are complete. Milestone 2 is next. Remaining milestones describe planned outcomes, not fixed delivery dates.
+> **Status:** Early development. Milestones 0 and 1 are complete. Milestone 2 is in its final verification stage. Remaining milestones describe planned outcomes, not fixed delivery dates.
 
 ## Vision
 
-MediaManagarr is a new Vue 3 + TypeScript + Vite browser-extension project inspired by Media Monitor v1.0.0. It will provide a unified interface for Jellyfin, Seerr, Sonarr, Radarr, and qBittorrent, with accessible UI, reusable components, automated tests, and platform-specific behavior behind adapters.
+MediaManagarr is a Vue 3 + TypeScript + Vite browser extension inspired by Media Monitor v1.0.0. It provides a foundation for a unified interface for Jellyfin, Seerr, Sonarr, Radarr, and qBittorrent, with accessible UI, reusable components, automated tests, and platform-specific behavior behind adapters.
 
-The original Media Monitor project remains separate and is used to understand behavior and edge cases, not as an architecture to migrate wholesale.
+The original Media Monitor project remains separate and serves as a reference for behavior and edge cases, not as an architecture to migrate wholesale.
 
 ## Principles
 
@@ -24,6 +24,7 @@ The original Media Monitor project remains separate and is used to understand be
 | ------------------------ | ------------------------------------------- |
 | Package management       | npm and committed `package-lock.json`       |
 | UI                       | Vue 3, TypeScript, Vite                     |
+| Extension architecture   | Custom Vite build, Manifest V3              |
 | Architecture             | Atomic Design; `src/views/` for screens     |
 | Unit and component tests | Vitest, Vue Test Utils                      |
 | Browser testing          | Playwright or Cypress (to be evaluated)     |
@@ -40,7 +41,18 @@ The build handles TypeScript validation; a separate `typecheck` command is not i
 The structure below is illustrative; create directories only as needed.
 
 ```text
+public/
+├── icons/
+│   ├── icon.svg
+│   ├── icon-16.png
+│   ├── icon-32.png
+│   ├── icon-48.png
+│   └── icon-128.png
+└── manifest.json
+
 src/
+├── assets/
+│   └── mm-logo.svg
 ├── views/
 │   ├── SettingsView.vue
 │   ├── RequestsView.vue
@@ -63,37 +75,98 @@ src/
 │   ├── contracts/
 │   ├── extension/
 │   └── web/
+├── stories/
+│   ├── Introduction.mdx
+│   └── DesignTokens.mdx
 ├── styles/
 │   ├── tokens.css
 │   └── global.css
 ├── types/
+├── utils/
+│   └── version.ts
 ├── App.vue
 └── main.ts
 ```
 
 **Atoms** are basic controls such as buttons, badges, and inputs. **Molecules** combine atoms, such as form fields and filters. **Organisms** are larger sections such as media cards, calendar grids, and service panels. **Templates** define reusable layouts. **Views** compose these elements into complete screens and coordinate application state.
 
+The existing application shell uses `MmHeader`, `MmNavigation`, and `MmFooter` molecules, with `MmButton` and `MmIcon` atoms. Components are developed incrementally with colocated tests and Storybook stories.
+
 ## Platforms
 
-The initial release targets a browser extension for Firefox, Zen Browser, Chrome, and compatible Chromium browsers. Components and views should not call extension APIs directly; platform adapters should handle storage, permissions, background messaging, and other browser-specific behavior. Manifest V3, host permissions, network requests, and packaging require browser-specific verification.
+The initial release targets a browser extension for Firefox, Zen Browser, Chrome, and compatible Chromium browsers.
 
-Evaluate WXT against a custom Vite-based extension setup before committing to an extension architecture. A standalone web app is a possible future goal, but CORS, mixed content, authentication, HTTPS, and access to local servers make it unsuitable as an initial requirement.
+**Architecture decision:** Use a custom Vite-based extension setup rather than WXT. The existing Vue/Vite application builds directly into a Manifest V3 extension without additional extension-framework dependencies.
+
+The extension currently uses:
+
+- `public/manifest.json` as the manifest template.
+- `index.html` as the popup entry point.
+- Relative asset paths through Vite's `base: './'` configuration.
+- SVG artwork for the application branding.
+- PNG extension icons generated from the SVG source for cross-browser compatibility.
+- A small Vite plugin that synchronizes the generated manifest version with `package.json`.
+
+The application shell has been loaded and visually verified in both Zen Browser and Chrome.
+
+Components and views should not call extension APIs directly. Future platform adapters should handle storage, permissions, background messaging, and other browser-specific behavior.
+
+Manifest V3, host permissions, network requests, background behavior, and packaging will require additional browser-specific verification as integrations are implemented.
+
+A standalone web app remains a possible future goal, but CORS, mixed content, authentication, HTTPS, and access to local servers make it unsuitable as an initial requirement.
 
 ## Design system and accessibility
 
-Use a dark interface with green accents inspired by Media Monitor, refined through shared tokens for color, typography, spacing, radii, focus, motion, and responsive sizing. Introduce components as features need them rather than implementing a catalog up front.
+MediaManagarr uses a dark interface with green accents inspired by Media Monitor.
 
-Aim for WCAG 2.2 AA where applicable. Provide semantic HTML, keyboard access, visible focus, labeled inputs, accessible icon buttons, status announcements, sufficient contrast, reduced-motion support, and appropriate dialog focus management. Use axe-core and Storybook accessibility tooling alongside manual keyboard and periodic screen-reader testing. Automated checks cannot replace manual review.
+Shared CSS tokens define the initial color palette, typography, radii, and interaction styling. The component library will expand as features require additional controls.
+
+The application shell currently provides:
+
+- Consistent branding using the MM logo.
+- Shared header actions for settings and back navigation.
+- Navigation between Requests, Up Next, Calendar, and Downloads.
+- Active-view indicators.
+- A settings placeholder.
+- A persistent footer displaying the application version.
+- Fixed popup dimensions with a scrollable content region.
+
+Aim for WCAG 2.2 AA where applicable. Provide semantic HTML, keyboard access, visible focus, labeled inputs, accessible icon buttons, status announcements, sufficient contrast, reduced-motion support, and appropriate dialog focus management.
+
+Use axe-core and Storybook accessibility tooling alongside manual keyboard and periodic screen-reader testing. Automated checks cannot replace manual review.
 
 ## Testing and documentation
 
-Use Vitest for calculations, transformations, status mapping, API handling, and notification logic. Use Vue Test Utils for rendering, events, loading and error states, forms, and keyboard interactions. Mock service API responses for success, authentication failures, network errors, and malformed data.
+Use Vitest for calculations, transformations, status mapping, API handling, and notification logic. Use Vue Test Utils for rendering, events, loading and error states, forms, and keyboard interactions.
 
-Evaluate Playwright or Cypress for browser automation, recognizing that testing a popup page is not the same as testing a packaged extension with permissions, storage, and background messaging. Prioritize meaningful test coverage, especially for destructive actions.
+Mock service API responses for success, authentication failures, network errors, and malformed data.
 
-Storybook is configured for Vue 3 and Vite, with accessibility checks powered by axe-core. The initial `Button` atom has colocated stories and component tests. Future reusable components should document their purpose, props, events, variants, interaction states, accessibility requirements, and examples.
+Evaluate Playwright or Cypress for browser automation, recognizing that testing a popup page is not the same as testing a packaged extension with permissions, storage, and background messaging.
 
-The component library is automatically built and deployed to [GitHub Pages](https://yansudeansu.github.io/mediamanagarr/) through GitHub Actions when changes are pushed to `master`. Publish only mock data—never credentials or private server addresses.
+Prioritize meaningful test coverage, especially for destructive actions.
+
+Storybook is configured for Vue 3 and Vite, with accessibility checks powered by axe-core.
+
+The component library currently includes documented atoms and molecules, including:
+
+- `MmButton`
+- `MmIcon`
+- `MmHeader`
+- `MmNavigation`
+- `MmFooter`
+
+Storybook also includes:
+
+- A branded Introduction page.
+- A Design Tokens foundations page.
+- Dark-themed documentation.
+- Colocated component stories and tests.
+
+Future reusable components should document their purpose, props, events, variants, interaction states, accessibility requirements, and examples.
+
+The component library is automatically built and deployed to [GitHub Pages](https://yansudeansu.github.io/mediamanagarr/) through GitHub Actions when changes are pushed to `master`.
+
+Publish only mock data—never credentials or private server addresses.
 
 ## Milestone 0 — Repository and development infrastructure ✅ Complete
 
@@ -126,15 +199,57 @@ The component library is automatically built and deployed to [GitHub Pages](http
 
 **Published component library:** [MediaManagarr Storybook](https://yansudeansu.github.io/mediamanagarr/)
 
-## Milestone 2 — Design system and application shell 🚧 Next
+## Milestone 2 — Design system and application shell 🚧 In progress
 
 **Goal:** A working, accessible application shell with documented shared components.
 
-- Define colors, typography, spacing, radii, focus, responsiveness, and interaction states.
-- Build buttons, icon buttons, badges, inputs, checkboxes, selects, spinners, progress indicators, pagination, dialogs, and empty/error states as needed.
-- Create navigation, active-view states, popup sizing, and application layout.
-- Introduce the platform abstraction and verify basic browser execution.
-- Add component tests, stories, and keyboard checks.
+### Design system
+
+- [x] Establish the initial dark color palette and green accent.
+- [x] Define shared CSS tokens for typography, colors, radii, and interaction styling.
+- [x] Implement the `MmButton` atom with variants, sizes, icons, loading, and disabled states.
+- [x] Implement the `MmIcon` atom using Lucide icons.
+- [x] Create the `MmHeader` molecule with branding and settings/back actions.
+- [x] Create the `MmNavigation` molecule with active-view states.
+- [x] Create the `MmFooter` molecule with branding and version information.
+- [x] Add component tests and Storybook stories.
+- [x] Add branded Introduction and Design Tokens documentation pages.
+- [ ] Introduce additional controls such as inputs, badges, dialogs, and empty/error states when needed by future features.
+
+### Application shell
+
+- [x] Assemble the application shell in `App.vue`.
+- [x] Implement navigation between Requests, Up Next, Calendar, and Downloads placeholders.
+- [x] Add a settings placeholder with back navigation.
+- [x] Implement fixed popup dimensions.
+- [x] Make the main content area scroll independently of the header, navigation, and footer.
+- [x] Verify popup rendering and scrolling in Zen Browser.
+- [x] Verify popup rendering and scrolling in Chrome.
+
+### Browser extension
+
+- [x] Evaluate WXT versus custom Vite and select custom Vite.
+- [x] Configure the Manifest V3 popup entry point.
+- [x] Use relative asset paths for extension compatibility.
+- [x] Create extension icons from the MM SVG logo.
+- [x] Verify SVG and PNG icon behavior across browsers.
+- [x] Load the unpacked extension in Chrome.
+- [x] Load the temporary extension in Zen Browser.
+- [x] Synchronize the generated manifest version with `package.json`.
+- [x] Display the application version in the popup footer.
+- [ ] Introduce platform adapters when storage, permissions, or background messaging are first required.
+
+### Final verification
+
+- [ ] Run ESLint successfully.
+- [ ] Pass Prettier formatting checks.
+- [ ] Pass all Vitest tests.
+- [ ] Complete a production Vite build.
+- [ ] Complete a production Storybook build.
+- [ ] Perform final keyboard and accessibility checks.
+- [ ] Commit the completed milestone.
+
+**Remaining work:** Final verification. Additional controls and platform adapters are intentionally deferred until features require them.
 
 ## Milestone 3 — Settings and service configuration
 
@@ -142,6 +257,7 @@ The component library is automatically built and deployed to [GitHub Pages](http
 
 - Build service configuration forms, validation, connection indicators, and test feedback.
 - Store URLs and API credentials securely according to the selected platform model.
+- Introduce platform adapters for extension storage and permissions.
 - Support optional integrations, connection tests, and browser permissions.
 - Handle authentication and network errors without logging credentials.
 - Add tests, Storybook stories, and cross-browser verification.
