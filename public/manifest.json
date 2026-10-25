@@ -22,7 +22,7 @@
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
-  "permissions": ["storage"],
+  "permissions": ["storage", "alarms"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "browser_specific_settings": {
     "gecko": {
