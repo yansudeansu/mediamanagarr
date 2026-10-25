@@ -1,4 +1,4 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{i as t,r as n}from"./react-DITjJg24.js";import{a as r}from"./chunk-W22LQPXL-Yejcpej5.js";import{a as i,o as a}from"./blocks-BdoYvh_o.js";function o(e){let n={code:`code`,h1:`h1`,h2:`h2`,p:`p`,pre:`pre`,...t(),...e.components};return(0,c.jsxs)(c.Fragment,{children:[(0,c.jsx)(i,{title:`Foundations/Design Tokens`}),`
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{i as t,r as n}from"./react-DITjJg24.js";import{a as r}from"./chunk-W22LQPXL-Yejcpej5.js";import{a as i,o as a}from"./blocks-DqfQ1tDc.js";function o(e){let n={code:`code`,h1:`h1`,h2:`h2`,p:`p`,pre:`pre`,...t(),...e.components};return(0,c.jsxs)(c.Fragment,{children:[(0,c.jsx)(i,{title:`Foundations/Design Tokens`}),`
 `,(0,c.jsx)(n.h1,{id:`design-tokens`,children:`Design Tokens`}),`
 `,(0,c.jsx)(n.p,{children:`MediaManagarr uses a small set of shared CSS custom properties to maintain visual consistency across the application.`}),`
 `,(0,c.jsx)(n.h2,{id:`colors`,children:`Colors`}),`
