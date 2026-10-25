@@ -53,7 +53,10 @@ function handleConnect() {
 
   const key = apiKey.value.trim()
 
-  if (!key && !props.configured) {
+  const savedUrl = props.url ? normalizeServerUrl(props.url) : ''
+  const canReuseKey = props.configured && url === savedUrl
+
+  if (!key && !canReuseKey) {
     validationError.value = 'Enter an API key.'
     return
   }
@@ -78,7 +81,7 @@ function handleConnect() {
         v-model="serverUrl"
         label="Server URL"
         type="url"
-        placeholder="https://your-server.example.com"
+        placeholder="http://localhost:8096"
         :disabled="loading"
         required
       />

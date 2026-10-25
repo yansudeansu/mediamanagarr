@@ -1,31 +1,121 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import MmSettingsTemplate from '../components/templates/MmSettingsTemplate/MmSettingsTemplate.vue'
 import MmServiceSelector from '../components/organisms/MmServiceSelector/MmServiceSelector.vue'
 import MmServiceForm from '../components/organisms/MmServiceForm/MmServiceForm.vue'
-import type { ServiceId, ServiceState } from '../types/service'
+import {
+  SERVICES,
+  type SafeServiceConfigs,
+  type ServiceId,
+  type ServiceState,
+} from '../types/service'
+import { sendBackgroundMessage } from '../utils/background-messaging'
+import { getHostPermission, normalizeServerUrl } from '../utils/service-config'
 
-interface Props {
-  statuses?: Partial<Record<ServiceId, ServiceState>>
-  urls?: Partial<Record<ServiceId, string>>
+interface ConnectPayload {
+  serviceId: ServiceId
+  url: string
+  apiKey: string
 }
-
-const props = withDefaults(defineProps<Props>(), {
-  statuses: () => ({}),
-  urls: () => ({}),
-})
-
-const emit = defineEmits<{
-  connect: [payload: { serviceId: ServiceId; url: string; apiKey: string }]
-}>()
 
 const selectedService = ref<ServiceId>('jellyfin')
 
-const selectedStatus = computed(() => props.statuses[selectedService.value] ?? 'not-configured')
+const configs = ref<SafeServiceConfigs>({})
+const statuses = ref<Partial<Record<ServiceId, ServiceState>>>({})
 
-const selectedUrl = computed(() => props.urls[selectedService.value] ?? '')
+const loadingServices = ref<Partial<Record<ServiceId, boolean>>>({})
+const serviceErrors = ref<Partial<Record<ServiceId, string>>>({})
+
+const selectedStatus = computed(() => statuses.value[selectedService.value] ?? 'not-configured')
+
+const selectedUrl = computed(() => configs.value[selectedService.value]?.url ?? '')
 
 const configured = computed(() => selectedStatus.value !== 'not-configured')
+
+const loading = computed(() => loadingServices.value[selectedService.value] ?? false)
+
+const error = computed(() => serviceErrors.value[selectedService.value] ?? '')
+
+function getErrorMessage(caught: unknown): string {
+  return caught instanceof Error ? caught.message : 'An unexpected error occurred.'
+}
+
+async function loadConfigs(): Promise<void> {
+  try {
+    const response = await sendBackgroundMessage({
+      type: 'GET_SERVICE_CONFIGS',
+    })
+
+    if (!response.success) {
+      throw new Error(response.error)
+    }
+
+    configs.value = response.configs
+
+    for (const serviceId of SERVICES) {
+      statuses.value[serviceId] = response.configs[serviceId]?.configured
+        ? 'configured'
+        : 'not-configured'
+    }
+  } catch (caught) {
+    serviceErrors.value[selectedService.value] = getErrorMessage(caught)
+  }
+}
+
+async function connectService(payload: ConnectPayload): Promise<void> {
+  const { serviceId } = payload
+
+  if (loadingServices.value[serviceId]) {
+    return
+  }
+
+  loadingServices.value[serviceId] = true
+  serviceErrors.value[serviceId] = ''
+
+  try {
+    const normalizedUrl = normalizeServerUrl(payload.url)
+    const permission = getHostPermission(normalizedUrl)
+
+    // Request permission directly from the user's Connect & Test action.
+    // Firefox requires this call to retain the user gesture.
+    const granted = await chrome.permissions.request({
+      origins: [permission],
+    })
+
+    if (!granted) {
+      throw new Error('Server access was not granted.')
+    }
+
+    const response = await sendBackgroundMessage({
+      type: 'CONNECT_SERVICE',
+      serviceId,
+      config: {
+        url: normalizedUrl,
+        apiKey: payload.apiKey,
+      },
+    })
+
+    if (!response.success) {
+      throw new Error(response.error)
+    }
+
+    configs.value[serviceId] = {
+      url: normalizedUrl,
+      configured: true,
+    }
+
+    statuses.value[serviceId] = 'connected'
+  } catch (caught) {
+    statuses.value[serviceId] = 'failed'
+    serviceErrors.value[serviceId] = getErrorMessage(caught)
+  } finally {
+    loadingServices.value[serviceId] = false
+  }
+}
+
+onMounted(() => {
+  void loadConfigs()
+})
 </script>
 
 <template>
@@ -39,7 +129,9 @@ const configured = computed(() => selectedStatus.value !== 'not-configured')
         :service-id="selectedService"
         :url="selectedUrl"
         :configured="configured"
-        @connect="emit('connect', $event)"
+        :loading="loading"
+        :error="error"
+        @connect="connectService"
       />
     </template>
   </mm-settings-template>
