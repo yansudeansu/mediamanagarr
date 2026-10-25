@@ -1,6 +1,6 @@
 # MediaManagarr Development Roadmap
 
-> **Status:** Early development. Milestones 0, 1, and 2 are complete. Milestone 2.5 is in progress and establishes Git workflow safeguards, pull-request tooling, and release automation before service integrations begin. Remaining milestones describe planned outcomes, not fixed delivery dates.
+> **Status:** Early development. Milestones 0, 1, and 2 are complete. Milestone 2.5 is in progress. Pull-request reporting, hosted Storybook previews, and release preparation are implemented and tested. GitHub Release publishing is implemented but still requires end-to-end verification. Remaining milestones describe planned outcomes, not fixed delivery dates.
 
 ## Vision
 
@@ -20,29 +20,29 @@ The original Media Monitor project remains separate and serves as a reference fo
 8. Keep the default branch stable through automated checks and reviewed changes.
 9. Use consistent versioning, commit conventions, and release documentation.
 10. Prefer developer guidance over unnecessary workflow restrictions.
-11. Keep release publishing intentional rather than automatic on every merge.
+11. Keep release preparation intentional and publishing restricted to approved release commits.
 
 ## Technology and workflow
 
-| Area                     | Choice                                      |
-| ------------------------ | ------------------------------------------- |
-| Package management       | npm and committed `package-lock.json`       |
-| UI                       | Vue 3, TypeScript, Vite                     |
-| Extension architecture   | Custom Vite build, Manifest V3              |
-| Architecture             | Atomic Design; `src/views/` for screens     |
-| Unit and component tests | Vitest, Vue Test Utils                      |
-| Browser testing          | Playwright or Cypress (to be evaluated)     |
-| Accessibility            | WCAG 2.2 AA target, axe-core, manual checks |
-| Documentation            | Storybook and GitHub Pages                  |
-| Code quality             | ESLint, Prettier, strict TypeScript         |
-| CI                       | GitHub Actions, default branch `master`     |
-| Commit conventions       | Conventional Commits                        |
-| Commit validation        | Commitlint                                  |
-| Local Git hooks          | Husky v9                                    |
-| Release automation       | To be selected; Release Please candidate    |
-| Versioning               | Semantic Versioning                         |
-| Changelog                | Automated `CHANGELOG.md` (planned)          |
-| License                  | MIT                                         |
+| Area                     | Choice                                       |
+| ------------------------ | -------------------------------------------- |
+| Package management       | npm and committed `package-lock.json`        |
+| UI                       | Vue 3, TypeScript, Vite                      |
+| Extension architecture   | Custom Vite build, Manifest V3               |
+| Architecture             | Atomic Design; `src/views/` for screens      |
+| Unit and component tests | Vitest, Vue Test Utils                       |
+| Browser testing          | Playwright or Cypress (to be evaluated)      |
+| Accessibility            | WCAG 2.2 AA target, axe-core, manual checks  |
+| Documentation            | Storybook and GitHub Pages                   |
+| Code quality             | ESLint, Prettier, strict TypeScript          |
+| CI                       | GitHub Actions, default branch `master`      |
+| Commit conventions       | Conventional Commits                         |
+| Commit validation        | Commitlint                                   |
+| Local Git hooks          | Husky v9                                     |
+| Release automation       | Custom TypeScript scripts and GitHub Actions |
+| Versioning               | Semantic Versioning                          |
+| Changelog                | Generated `CHANGELOG.md`                     |
+| License                  | MIT                                          |
 
 The build handles TypeScript validation; a separate `typecheck` command is not initially required. Use npm exclusively.
 
@@ -93,11 +93,11 @@ Husky validates commit messages locally through `.husky/commit-msg`.
 
 Contributors may amend or rebase commits on their own branches.
 
-The contributing guide should explain how merge commits, squash merges, and rebase merges affect release automation.
-
 A squash commit should use a valid Conventional Commit message. Individual commits preserved through merge or rebase should also follow the convention.
 
 Pull-request titles should follow Conventional Commits so that they provide a useful summary and can be validated independently.
+
+The release analysis uses non-merge commits. The contributing guide should explain how merge, squash, and rebase strategies affect the commit history available to that analysis.
 
 ### Local quality checks
 
@@ -130,9 +130,8 @@ Local hooks may be bypassed, so required CI checks remain necessary.
 
 Pull requests should provide a consistent, useful experience without introducing unnecessary restrictions.
 
-Planned improvements include:
+The intended pull-request template includes:
 
-- A repository pull-request template.
 - A clear description of the proposed changes.
 - Links to related issues where applicable.
 - Testing and verification notes.
@@ -141,23 +140,17 @@ Planned improvements include:
 - Screenshots or Storybook previews for visual changes.
 - A checklist for documentation and test updates.
 
-The template should be concise enough to remain useful for small changes.
+The template should remain concise enough to be useful for small changes.
 
-PR automation should:
+Pull-request automation now provides:
 
-- Validate the pull-request title.
-- Validate Conventional Commit messages.
-- Report the expected semantic-version impact.
-- Explain which commits contributed to that result.
-- Provide clear feedback when validation fails.
-- Avoid modifying application versions or publishing releases.
+- Conventional Commit validation.
+- Semantic-version impact analysis.
+- A generated PR overview.
+- Storybook preview information.
+- Automated quality checks.
 
-The release-impact report should distinguish between:
-
-1. **PR impact:** The version bump contributed by the pull request.
-2. **Next-release impact:** The bump implied by all unreleased changes, including the pull request.
-
-These values may differ when other unreleased changes already exist on `master`.
+Release-impact reporting is informational and does not modify application versions or publish releases.
 
 ### Semantic-version impact reporting
 
@@ -175,9 +168,14 @@ Use Conventional Commit metadata to predict release impact.
 | `ci:`           | None                              |
 | `refactor:`     | None unless explicitly configured |
 
-A documented pre-1.0 policy may adjust the resulting version numbers.
+The initial pre-1.0 policy follows the same impact categories. Any change to this policy must be reflected consistently in release preparation and PR reporting.
 
-The PR workflow and actual release workflow should use the same release-analysis rules to avoid conflicting predictions.
+The PR workflow and release preparation should use consistent release-analysis rules to avoid conflicting predictions.
+
+The report distinguishes between:
+
+1. **PR impact:** The version bump contributed by the pull request.
+2. **Next-release impact:** The bump implied by all unreleased changes, including the pull request.
 
 A PR summary might display:
 
@@ -196,44 +194,34 @@ Other changes:    1
 PR release impact: MINOR
 ```
 
-The report is informational until its accuracy and behavior have been verified.
+PR overview and preview automation have been verified on a real pull request.
 
-Validation failures should block merging only after the workflow has been tested and added to the repository's required checks.
+Additional edge-case testing remains useful for breaking changes, documentation-only changes, and different merge strategies.
 
 ### Pull-request Storybook previews
 
-Storybook previews should help contributors review component changes before merging.
+Storybook previews help contributors review component changes before merging.
 
-The existing production Storybook deployment uses GitHub Pages' artifact-based deployment workflow.
+The production Storybook deployment uses GitHub Pages and remains separate from pull-request preview publishing.
 
-Preserve the working production deployment while introducing previews incrementally.
+The implemented preview workflow:
 
-**Initial preview approach:**
+- Builds Storybook for pull requests.
+- Makes the build available as a workflow artifact.
+- Publishes hosted previews under PR-specific paths.
+- Provides the preview URL in pull-request automation.
+- Updates previews when pull requests change.
+- Removes preview content when pull requests close.
+- Preserves the production Storybook site.
+- Uses relative or correctly configured asset paths for nested preview URLs.
 
-- Build Storybook for pull requests.
-- Upload the generated Storybook site as a downloadable GitHub Actions artifact.
-- Make the artifact easy to find from the PR.
-- Avoid publishing or overwriting the production Storybook site.
-- Ensure preview builds contain mock data only.
+The preview build and privileged publishing stages are separated so untrusted pull-request code does not receive repository write credentials.
 
-**Future hosted preview approach:**
+Hosted preview publishing has been verified on PR #4.
 
-- Publish temporary Storybook previews for eligible pull requests.
-- Provide a preview URL directly in the PR.
-- Use a unique preview path or deployment per pull request.
-- Update the preview when the PR changes.
-- Remove the preview when the PR closes or merges.
-- Preserve the main Storybook deployment.
-- Handle concurrent preview deployments safely.
-- Configure asset paths correctly for nested preview URLs.
-- Avoid exposing repository write credentials to untrusted PR code.
-- Define a safe policy for external fork contributions.
+The preview implementation should continue to be reviewed for concurrency behavior, forked pull-request restrictions, and cleanup reliability.
 
-Potential hosting approaches include a dedicated Pages publishing branch or a separate preview-hosting service.
-
-GitHub Pages' standard artifact deployment should not be treated as an independent per-PR preview environment.
-
-Choose a hosting approach only after evaluating deployment complexity, security, cleanup, and maintenance.
+Never include credentials, private server addresses, or personal media data in preview builds.
 
 ### Versioning and releases
 
@@ -243,44 +231,70 @@ Use Semantic Versioning:
 - **Minor:** Backward-compatible features.
 - **Major:** Breaking changes.
 
-During early development, follow a documented `0.x.y` versioning policy rather than assuming that every breaking change must immediately produce `1.0.0`.
+During early development, the project uses `0.x.y` versions. The initial implementation applies Conventional Commit impact directly to SemVer increments; a breaking change may therefore advance the major version. Any alternative pre-1.0 policy must be explicitly implemented and documented.
 
 `package.json` is the source of truth for the application version. The Vite build synchronizes the generated extension manifest with that version.
 
-Release automation should:
+The release implementation uses custom TypeScript scripts and GitHub Actions rather than Release Please.
 
-- Analyze merged changes using Conventional Commits.
-- Determine the next version from commits since the previous release tag.
-- Propose version updates.
-- Generate or update `CHANGELOG.md`.
-- Keep `package.json` and `package-lock.json` synchronized.
-- Create version tags.
-- Publish GitHub Releases.
-- Avoid unnecessary releases for documentation-only or maintenance changes.
-- Prevent duplicate releases and accidental version changes.
+**Release preparation is manually initiated.**
 
-**Releases are manually initiated.**
+Ordinary pull-request merges must not automatically publish releases.
 
-Merging a pull request into `master` must not automatically publish a new release.
+The release process is:
 
-Because `master` requires pull requests, version and changelog updates should follow the repository's branch-protection requirements.
+1. A maintainer manually starts **Prepare Release** on `master`.
+2. The workflow analyzes unreleased Conventional Commits.
+3. It calculates the proposed version.
+4. It updates `package.json` and `package-lock.json`.
+5. It creates or updates `CHANGELOG.md`.
+6. It runs the project checks.
+7. It opens or updates a release pull request.
+8. Reviewers verify the release changes and required checks.
+9. The approved release pull request is merged into `master`.
+10. **Publish Release** validates the release commit and publishes the GitHub Release and artifacts.
 
-A possible release process is:
+The release preparation script creates `CHANGELOG.md` if it does not already exist.
 
-1. Manually trigger the release workflow.
-2. Analyze unreleased Conventional Commits.
-3. Determine the proposed version.
-4. Generate version and changelog updates.
-5. Open a release pull request.
-6. Run required checks.
-7. Merge the release pull request.
-8. Create the corresponding Git tag and GitHub Release.
+Preparation also refuses to run when release files already contain uncommitted changes, preventing repeated local preparation from incrementing the version again.
 
-The exact process depends on the selected release tool and must avoid accidental publication before the release is approved.
+Release preparation has been tested in a clean, detached worktree. The initial version calculation, generated changelog, repeated-run protection, formatting, tests, and production build all passed.
 
-Evaluate tools based on their support for manually triggered releases, protected branches, Conventional Commits, changelog generation, and GitHub Releases.
+The publishing workflow is designed to:
 
-The initial release process may publish source releases without browser-store packages. Signed extension packages and store distribution are addressed in Milestone 12.
+- Recognize validated release commits.
+- Verify that the new version exceeds the previous version.
+- Check package and lockfile consistency.
+- Verify the changelog contains the release section.
+- Build and validate the extension manifest.
+- Create or reuse the intended Git tag.
+- Create a GitHub Release if missing.
+- Upload missing browser ZIP assets.
+- Skip already uploaded assets.
+- Reject an existing tag that points to a different commit.
+- Support manual recovery after an interrupted publication.
+
+Publishing recovery has been implemented but has not yet been verified against a real GitHub Release.
+
+The release preparation workflow requires a `RELEASE_TOKEN` repository secret with appropriate permissions to create its release pull request.
+
+The publishing workflow uses the repository's GitHub Actions token with permission to create releases and upload assets.
+
+Browser-specific release archives currently use the same Vite build. Packaging and compatibility requirements remain subject to Milestone 12 verification.
+
+### Release safety and limitations
+
+Release automation should not publish a release merely because an ordinary feature, fix, or documentation pull request was merged.
+
+Only an explicitly prepared release commit with the expected `chore(release): vX.Y.Z` subject should be eligible for publication.
+
+Publishing must validate the intended tag target and avoid overwriting existing release assets.
+
+If a release is interrupted, the workflow should be safely rerunnable to complete missing publication steps.
+
+The current recovery approach treats existing asset filenames as already published. It does not compare asset contents or silently replace previously published archives.
+
+A complete first-release test is still required before considering publishing fully verified.
 
 ## Proposed architecture
 
@@ -334,27 +348,9 @@ src/
 └── main.ts
 ```
 
-Additional repository infrastructure may include:
+Additional repository infrastructure includes GitHub Actions workflows, Husky hooks, Commitlint configuration, release scripts, and generated release documentation.
 
-```text
-.github/
-├── PULL_REQUEST_TEMPLATE.md
-└── workflows/
-    ├── ci.yml
-    ├── storybook.yml
-    ├── pr.yml
-    ├── preview.yml
-    └── release.yml
-
-.husky/
-├── commit-msg
-└── pre-push
-
-commitlint.config.ts
-CHANGELOG.md
-```
-
-These filenames are illustrative. Preserve existing workflow filenames and avoid creating duplicate workflows.
+The exact workflow filenames should match the repository rather than introducing duplicate workflows.
 
 **Atoms** are basic controls such as buttons, badges, and inputs. **Molecules** combine atoms, such as form fields and filters. **Organisms** are larger sections such as media cards, calendar grids, and service panels. **Templates** define reusable layouts. **Views** compose these elements into complete screens and coordinate application state.
 
@@ -434,9 +430,7 @@ Future reusable components should document their purpose, props, events, variant
 
 The component library is automatically built and deployed to GitHub Pages through GitHub Actions when changes are pushed to `master`.
 
-The production Storybook deployment currently uses `actions/upload-pages-artifact` and `actions/deploy-pages`.
-
-Pull-request Storybook previews are planned separately and must not overwrite the production site.
+Production Storybook and pull-request preview publishing are separate workflows.
 
 Publish only mock data—never credentials or private server addresses.
 
@@ -541,8 +535,8 @@ Publish only mock data—never credentials or private server addresses.
 - [x] Add a pre-push hook running `npm run check`.
 - [x] Include lint, formatting, tests, and production build in `npm run check`.
 - [x] Verify the local Git hooks are installed.
-- [ ] Verify hooks after a clean `npm ci`.
-- [ ] Document how to run checks manually.
+- [x] Verify hooks after a clean `npm ci`.
+- [x] Document how to run checks manually.
 - [ ] Confirm that failing checks prevent a normal push.
 
 ### GitHub branch protection
@@ -565,71 +559,83 @@ Publish only mock data—never credentials or private server addresses.
 - [ ] Include related issues and testing notes.
 - [ ] Include accessibility and browser-compatibility considerations.
 - [ ] Include optional screenshots or Storybook preview references.
-- [ ] Document PR titles and Conventional Commit conventions.
+- [x] Document PR titles and Conventional Commit conventions in the README.
 - [ ] Document amending and rebasing feature branches.
 - [ ] Document supported merge methods.
 - [ ] Test the template with a real pull request.
 
 ### Pull-request validation and release-impact reporting
 
-- [ ] Add a PR-specific GitHub Actions workflow.
-- [ ] Validate PR titles against Conventional Commits.
-- [ ] Validate individual commit messages.
-- [ ] Determine PR release impact from Conventional Commits.
-- [ ] Report major, minor, patch, or no release impact.
-- [ ] Include a clear GitHub Actions job summary.
-- [ ] Distinguish PR impact from the overall next-release impact.
-- [ ] Reuse the release workflow's analysis rules.
+- [x] Add a PR-specific GitHub Actions workflow.
+- [x] Validate PR titles against Conventional Commits.
+- [x] Validate individual commit messages.
+- [x] Determine PR release impact from Conventional Commits.
+- [x] Report major, minor, patch, or no release impact.
+- [x] Include a clear GitHub Actions job summary.
+- [x] Distinguish PR impact from the overall next-release impact.
+- [ ] Reuse the release workflow's analysis rules through shared implementation.
 - [ ] Verify behavior for breaking changes.
 - [ ] Verify behavior for documentation-only changes.
 - [ ] Verify behavior with merge, squash, and rebase strategies.
 - [ ] Add validated PR checks to the required status checks.
 
+The PR overview and release-impact reporting have been verified on PR #4. Additional edge-case testing remains.
+
 ### Storybook pull-request previews
 
-- [ ] Build Storybook for pull requests.
-- [ ] Upload Storybook builds as downloadable workflow artifacts.
-- [ ] Make preview artifacts easy to find from the PR.
-- [ ] Ensure preview builds do not overwrite production Storybook.
-- [ ] Verify previews contain no private credentials or server addresses.
+- [x] Build Storybook for pull requests.
+- [x] Upload Storybook builds as downloadable workflow artifacts.
+- [x] Make preview artifacts easy to find from the PR.
+- [x] Ensure preview builds do not overwrite production Storybook.
+- [x] Verify previews contain no private credentials or server addresses.
 
 **Hosted preview enhancement:**
 
-- [ ] Evaluate hosting approaches for temporary PR previews.
-- [ ] Support a unique preview URL for each eligible PR.
-- [ ] Add the preview URL to the pull request.
-- [ ] Update previews when PR changes are pushed.
-- [ ] Automatically remove previews when PRs close.
-- [ ] Preserve the production Storybook site.
-- [ ] Prevent concurrent deployments from overwriting each other.
-- [ ] Verify nested asset paths work.
-- [ ] Define a safe policy for forked PRs.
+- [x] Evaluate hosting approaches for temporary PR previews.
+- [x] Support a unique preview URL for each eligible PR.
+- [x] Add the preview URL to the pull request.
+- [x] Update previews when PR changes are pushed.
+- [x] Automatically remove previews when PRs close.
+- [x] Preserve the production Storybook site.
+- [x] Prevent concurrent deployments from overwriting each other.
+- [x] Verify nested asset paths work.
+- [ ] Define and document a safe policy for forked PRs.
 - [ ] Document preview limitations and maintenance requirements.
+
+Hosted Storybook preview publishing has been verified on PR #4. Cleanup and concurrency safeguards are implemented but should continue to be monitored.
 
 ### Versioning and changelog
 
-- [ ] Use `master` as the single long-lived branch for releases.
-- [ ] Adopt Semantic Versioning with a documented pre-1.0 policy.
-- [ ] Track releases using Git tags.
-- [ ] Determine the next version from commits since the previous release.
-- [ ] Support manually triggered releases through GitHub Actions.
-- [ ] Evaluate release tools, including Release Please, for this workflow.
-- [ ] Ensure release automation respects protected-branch requirements.
-- [ ] Generate and maintain `CHANGELOG.md`.
-- [ ] Keep `package.json` and `package-lock.json` synchronized.
+- [x] Use `master` as the single long-lived branch for releases.
+- [x] Adopt Semantic Versioning with an initial pre-1.0 policy.
+- [x] Implement Git-tag-based release tracking.
+- [x] Determine the next version from commits since the previous release.
+- [x] Support manually triggered release preparation through GitHub Actions.
+- [x] Select custom TypeScript release scripts instead of Release Please.
+- [x] Prepare version changes through a release pull request.
+- [x] Generate and maintain `CHANGELOG.md`.
+- [x] Keep `package.json` and `package-lock.json` synchronized.
 - [x] Preserve automatic manifest-version synchronization.
-- [ ] Avoid version bumps when no qualifying changes exist.
+- [x] Avoid version bumps when no qualifying changes exist.
+- [x] Prevent repeated local release preparation from incrementing the version again.
+- [x] Verify release preparation in a clean detached worktree.
 
 ### Tags and GitHub Releases
 
-- [ ] Create Git tags from validated releases on `master`.
-- [ ] Publish GitHub Releases with generated release notes.
-- [ ] Ensure release automation only publishes commits from `master`.
-- [ ] Prevent duplicate tags and releases.
-- [ ] Ensure all required checks pass before publishing.
-- [ ] Document required GitHub Actions permissions.
-- [ ] Test release automation without publishing an unintended release.
+- [x] Implement Git tag creation for validated release commits.
+- [x] Implement GitHub Release publishing with generated release notes.
+- [x] Restrict publication to validated release commits.
+- [x] Implement duplicate-tag and duplicate-asset safeguards.
+- [x] Run required project checks before publishing.
+- [x] Document required GitHub Actions permissions in the README.
+- [x] Implement manual recovery for interrupted releases.
+- [ ] Configure and verify the required release repository secret.
+- [ ] Test actual Git tag creation and GitHub Release publishing.
+- [ ] Test recovery after a partially completed release.
 - [ ] Verify that merging ordinary PRs does not trigger releases.
+- [ ] Verify release artifacts in Chrome, Firefox, and Zen Browser.
+
+Implementation is complete for the initial publishing workflow, but the first controlled release and recovery tests remain outstanding.
 
 ## Milestone 3 — Settings and service configuration
 
@@ -742,7 +748,7 @@ These are candidates, not commitments for the initial release.
 - Exclude development files and validate packaged contents.
 - Investigate Firefox Add-ons and Chrome Web Store requirements.
 - Document signing, manual installation, and updates.
-- Automate extension release artifacts and attach them to GitHub Releases.
+- Refine automated extension release artifacts attached to GitHub Releases.
 - Establish store submission and update procedures.
 - Add issue templates, a security policy, dependency updates, and support guidance.
 
