@@ -3,15 +3,21 @@ import { handleBackgroundMessage } from './messages'
 import {
   getSafeServiceConfigs,
   getServiceConfig,
+  removeServiceConfig,
   saveServiceConfig,
 } from '../utils/service-storage'
 import { testServiceConnection } from './services/connection'
 import { fetchJellyfinUsers } from './services/jellyfin-users'
-import { getJellyfinUserSelection, saveJellyfinUserSelection } from '../utils/jellyfin-storage'
+import {
+  clearJellyfinUserSelection,
+  getJellyfinUserSelection,
+  saveJellyfinUserSelection,
+} from '../utils/jellyfin-storage'
 
 vi.mock('../utils/service-storage', () => ({
   getSafeServiceConfigs: vi.fn(),
   getServiceConfig: vi.fn(),
+  removeServiceConfig: vi.fn(),
   saveServiceConfig: vi.fn(),
 }))
 
@@ -24,6 +30,7 @@ vi.mock('./services/jellyfin-users', () => ({
 }))
 
 vi.mock('../utils/jellyfin-storage', () => ({
+  clearJellyfinUserSelection: vi.fn(),
   getJellyfinUserSelection: vi.fn(),
   saveJellyfinUserSelection: vi.fn(),
 }))
@@ -199,6 +206,94 @@ describe('handleBackgroundMessage', () => {
     })
 
     expect(testServiceConnection).not.toHaveBeenCalled()
+  })
+
+  describe('REMOVE_SERVICE', () => {
+    it('removes a configured service', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'REMOVE_SERVICE',
+        serviceId: 'sonarr',
+      })
+
+      expect(removeServiceConfig).toHaveBeenCalledWith('sonarr')
+      expect(clearJellyfinUserSelection).not.toHaveBeenCalled()
+
+      expect(result).toEqual({
+        success: true,
+        serviceId: 'sonarr',
+      })
+    })
+
+    it('clears the Jellyfin selection before removing Jellyfin', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'REMOVE_SERVICE',
+        serviceId: 'jellyfin',
+      })
+
+      expect(clearJellyfinUserSelection).toHaveBeenCalledOnce()
+      expect(removeServiceConfig).toHaveBeenCalledWith('jellyfin')
+
+      const clearCallOrder = vi.mocked(clearJellyfinUserSelection).mock.invocationCallOrder[0]
+      const removeCallOrder = vi.mocked(removeServiceConfig).mock.invocationCallOrder[0]
+
+      expect(clearCallOrder).toBeDefined()
+      expect(removeCallOrder).toBeDefined()
+      expect(clearCallOrder!).toBeLessThan(removeCallOrder!)
+
+      expect(result).toEqual({
+        success: true,
+        serviceId: 'jellyfin',
+      })
+    })
+
+    it('rejects an invalid service ID', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'REMOVE_SERVICE',
+        serviceId: 'unknown',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid background message.',
+      })
+
+      expect(removeServiceConfig).not.toHaveBeenCalled()
+      expect(clearJellyfinUserSelection).not.toHaveBeenCalled()
+    })
+
+    it('preserves the configuration if clearing the Jellyfin selection fails', async () => {
+      vi.mocked(clearJellyfinUserSelection).mockRejectedValue(
+        new Error('Unable to clear Jellyfin selection.'),
+      )
+
+      const result = await handleBackgroundMessage({
+        type: 'REMOVE_SERVICE',
+        serviceId: 'jellyfin',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unable to clear Jellyfin selection.',
+      })
+
+      expect(removeServiceConfig).not.toHaveBeenCalled()
+    })
+
+    it('reports a storage error when removal fails', async () => {
+      vi.mocked(removeServiceConfig).mockRejectedValue(new Error('Unable to remove service.'))
+
+      const result = await handleBackgroundMessage({
+        type: 'REMOVE_SERVICE',
+        serviceId: 'sonarr',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unable to remove service.',
+      })
+
+      expect(removeServiceConfig).toHaveBeenCalledWith('sonarr')
+    })
   })
 
   describe('GET_JELLYFIN_USERS', () => {
