@@ -21,7 +21,7 @@ const headers = {
   'X-GitHub-Api-Version': '2022-11-28',
 }
 
-async function github(path) {
+async function github(path: string) {
   const response = await fetch(`https://api.github.com${path}`, {
     headers,
   })
@@ -33,7 +33,7 @@ async function github(path) {
   return response.json()
 }
 
-async function githubAll(path) {
+async function githubAll(path: string) {
   const results = []
 
   for (let page = 1; ; page += 1) {
@@ -48,14 +48,14 @@ async function githubAll(path) {
   }
 }
 
-function validateCommit(message) {
+function validateCommit(message: string) {
   execFileSync('npx', ['--no', '--', 'commitlint'], {
     input: message,
     stdio: ['pipe', 'inherit', 'inherit'],
   })
 }
 
-function analyzeCommit(message) {
+function analyzeCommit(message: string) {
   const header = message.split('\n')[0]
   const match = header.match(/^(\w+)(?:\([^)]+\))?(!)?:/)
 
@@ -78,7 +78,12 @@ function analyzeCommit(message) {
   return { header, type, impact }
 }
 
-const rank = { none: 0, patch: 1, minor: 2, major: 3 }
+const rank: Record<string, number> = {
+  none: 0,
+  patch: 1,
+  minor: 2,
+  major: 3,
+}
 
 // Validate the PR title.
 validateCommit(PR_TITLE)
@@ -101,7 +106,7 @@ if (gitCommits.length === 0) {
   throw new Error('No commits found for this pull request.')
 }
 
-const types = {}
+const types: Record<string, number> = {}
 let impact = 'none'
 let breakingChanges = 0
 
@@ -127,7 +132,7 @@ const pr = await github(`/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}`)
 const commits = await githubAll(`/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/commits`)
 
 // Use the GitHub API commit list for display purposes.
-const commitLines = commits.map((commit) => {
+const commitLines = commits.map((commit: { sha: string; commit: { message: string } }) => {
   const subject = commit.commit.message.split('\n')[0]
   return `- \`${commit.sha.slice(0, 7)}\` ${subject}`
 })
@@ -135,6 +140,8 @@ const commitLines = commits.map((commit) => {
 const typeLines = Object.entries(types)
   .sort(([a], [b]) => a.localeCompare(b))
   .map(([type, count]) => `- \`${type}\`: ${count}`)
+
+const previewUrl = `https://yansudeansu.github.io/mediamanagarr/pr-preview/pr-${pr.number}/`
 
 const report = [
   '<!-- mediamanagarr-pr-overview -->',
@@ -162,11 +169,13 @@ const report = [
   '',
   '### Validation',
   '',
-  '✅ PR title and Conventional Commit messages passed.',
+  'PR title and Conventional Commit messages passed.',
   '',
   '### Storybook preview',
   '',
-  '⏳ Preview deployment not configured yet.',
+  `Preview URL: ${previewUrl}`,
+  '',
+  'Status: Pending deployment.',
   '',
   '_Release impact is informational; no version changes are made._',
   '',
