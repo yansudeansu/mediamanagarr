@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.1
+
+### Bug Fixes
+
+- restore normal publishing and avoid duplicate checks (1e48f59)
+
 ## v0.2.0
 
 ### Features
