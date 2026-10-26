@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmRequestCard from './MmRequestCard.vue'
+import MmMediaPoster from '../../atoms/MmMediaPoster/MmMediaPoster.vue'
 import type { SeerrRequest } from '../../../types/seerr'
 
 const movieRequest: SeerrRequest = {
@@ -58,6 +59,18 @@ describe('MmRequestCard', () => {
     expect(wrapper.get('.request-card__type').text()).toBe('TV Show')
   })
 
+  it('uses the shared media poster atom', () => {
+    const wrapper = mountRequest()
+
+    const poster = wrapper.getComponent(MmMediaPoster)
+
+    expect(poster.props()).toMatchObject({
+      title: 'Example Movie',
+      type: 'movie',
+      image: 'https://image.tmdb.org/t/p/w185/example-poster.jpg',
+    })
+  })
+
   it('renders a TMDB poster', () => {
     const wrapper = mountRequest()
 
@@ -75,9 +88,19 @@ describe('MmRequestCard', () => {
 
     expect(wrapper.find('img').exists()).toBe(false)
 
-    expect(wrapper.get('.request-card__poster-placeholder').attributes('aria-label')).toBe(
+    expect(wrapper.get('.media-poster__placeholder').attributes('aria-label')).toBe(
       'No poster available for Example Movie',
     )
+  })
+
+  it('renders a TV placeholder', () => {
+    const wrapper = mountRequest({
+      type: 'tv',
+      title: 'Example Series',
+      posterPath: null,
+    })
+
+    expect(wrapper.get('.media-poster__placeholder').text()).toContain('📺')
   })
 
   it('rejects non-relative poster paths', () => {
@@ -86,7 +109,7 @@ describe('MmRequestCard', () => {
     })
 
     expect(wrapper.find('img').exists()).toBe(false)
-    expect(wrapper.find('.request-card__poster-placeholder').exists()).toBe(true)
+    expect(wrapper.find('.media-poster__placeholder').exists()).toBe(true)
   })
 
   it('renders exactly one status badge', () => {
@@ -223,6 +246,28 @@ describe('MmRequestCard', () => {
 
     expect(wrapper.get('.request-card__badge').text()).toBe('Partially Available')
     expect(wrapper.get('.request-card__badge').classes()).toContain('request-card__badge--partial')
+  })
+
+  it('updates the poster when request props change', async () => {
+    const wrapper = mountRequest()
+
+    await wrapper.setProps({
+      request: createRequest({
+        title: 'Updated Series',
+        type: 'tv',
+        posterPath: null,
+      }),
+    })
+
+    const poster = wrapper.getComponent(MmMediaPoster)
+
+    expect(poster.props()).toMatchObject({
+      title: 'Updated Series',
+      type: 'tv',
+      image: null,
+    })
+
+    expect(wrapper.get('.media-poster__placeholder').text()).toContain('📺')
   })
 
   it('does not create an interactive control', () => {

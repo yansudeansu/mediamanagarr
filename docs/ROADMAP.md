@@ -6,21 +6,7 @@ This roadmap tracks upcoming work, not completed features. Milestones are goals,
 
 Current priority
 
-Milestone 1 — Calendar (Sonarr & Radarr)
-
-Display upcoming television episodes and movie releases.
-
-- Combine upcoming releases from Sonarr and Radarr.
-- Add month navigation and date selection.
-- Display release details and media artwork.
-- Add filtering by service and media type.
-- Handle missing information and service failures independently.
-- Support keyboard navigation.
-- Test calendar navigation, API responses, and date handling.
-
-Upcoming milestones
-
-Milestone 2 — Downloads (qBittorrent)
+Milestone 1 — Downloads (qBittorrent)
 
 Monitor and manage active downloads.
 
@@ -32,7 +18,9 @@ Monitor and manage active downloads.
 - Handle connection failures and authentication errors.
 - Test download actions and error handling.
 
-Milestone 3 — Service Health & Reliability
+Upcoming milestones
+
+Milestone 2 — Service Health & Reliability
 
 Improve the reliability of configured service integrations.
 
@@ -43,7 +31,7 @@ Improve the reliability of configured service integrations.
 - Handle temporary service outages gracefully.
 - Avoid unnecessary API requests.
 
-Milestone 4 — Testing & Accessibility
+Milestone 3 — Testing & Accessibility
 
 Expand automated testing and verify accessibility across the extension.
 
@@ -57,7 +45,7 @@ Expand automated testing and verify accessibility across the extension.
 
 Testing and accessibility remain ongoing requirements throughout every milestone.
 
-Milestone 5 — Feature Enhancements
+Milestone 4 — Feature Enhancements
 
 Refine existing features based on real-world usage and feedback.
 
@@ -72,7 +60,7 @@ Potential improvements include:
 
 Enhancements will be prioritized based on user feedback rather than speculative requirements.
 
-Milestone 6 — Branding & Documentation
+Milestone 5 — Branding & Documentation
 
 Prepare MediaManagarr for a wider audience.
 
@@ -83,7 +71,7 @@ Prepare MediaManagarr for a wider audience.
 - Improve contribution and development guides.
 - Review screenshots and other release materials.
 
-Milestone 7 — Release & Distribution
+Milestone 6 — Release & Distribution
 
 Prepare and publish MediaManagarr for supported browsers.
 

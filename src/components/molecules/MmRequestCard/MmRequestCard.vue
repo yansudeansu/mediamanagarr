@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import MmCard from '../../atoms/MmCard/MmCard.vue'
+import MmMediaPoster from '../../atoms/MmMediaPoster/MmMediaPoster.vue'
 import type { SeerrRequest, SeerrRequestStatus, SeerrMediaStatus } from '../../../types/seerr'
 
 interface Props {
@@ -79,26 +80,7 @@ const formattedDate = computed(() => {
 <template>
   <mm-card padding="none">
     <div class="request-card">
-      <div class="request-card__poster">
-        <img
-          v-if="posterUrl"
-          class="request-card__poster-image"
-          :src="posterUrl"
-          :alt="`${request.title} poster`"
-          loading="lazy"
-        />
-
-        <div
-          v-else
-          class="request-card__poster-placeholder"
-          role="img"
-          :aria-label="`No poster available for ${request.title}`"
-        >
-          <span aria-hidden="true">
-            {{ request.type === 'movie' ? '🎬' : '📺' }}
-          </span>
-        </div>
-      </div>
+      <mm-media-poster :title="request.title" :type="request.type" :image="posterUrl" />
 
       <div class="request-card__details">
         <div class="request-card__heading">
@@ -144,43 +126,6 @@ const formattedDate = computed(() => {
 
   min-width: 0;
   padding: 12px;
-}
-
-.request-card__poster {
-  flex: 0 0 64px;
-
-  width: 64px;
-  height: 96px;
-
-  overflow: hidden;
-
-  border-radius: var(--radius-sm);
-
-  background: var(--background);
-}
-
-.request-card__poster-image {
-  display: block;
-
-  width: 100%;
-  height: 100%;
-
-  object-fit: cover;
-}
-
-.request-card__poster-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 100%;
-  height: 100%;
-
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-
-  color: var(--muted);
-  font-size: 24px;
 }
 
 .request-card__details {
