@@ -45,7 +45,7 @@ jobs:
         if: steps.release.outputs.publish == 'true'
         run: npm run check
 
-      - name: Verify built manifest
+      - name: Verify browser manifests
         if: steps.release.outputs.publish == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
@@ -53,18 +53,53 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -f dist/manifest.json
+          for browser in chrome firefox; do
+            manifest="dist/${browser}/manifest.json"
 
-          actual=$(node -p "require('./dist/manifest.json').version")
+            if [[ ! -f "$manifest" ]]; then
+              echo "Missing ${browser} manifest: $manifest"
+              exit 1
+            fi
 
-          if [[ "$actual" != "$VERSION" ]]; then
-            echo "Manifest version mismatch: $actual != $VERSION"
-            exit 1
-          fi
+            BROWSER="$browser" node --input-type=module -e '
+              import { readFileSync } from "node:fs";
 
-          echo "Verified manifest version $actual."
+              const browser = process.env.BROWSER;
+              const expectedVersion = process.env.VERSION;
+              const manifest = JSON.parse(
+                readFileSync(`dist/${browser}/manifest.json`, "utf8"),
+              );
 
-      - name: Package extensions
+              if (manifest.version !== expectedVersion) {
+                throw new Error(
+                  `${browser} manifest version mismatch: ${manifest.version} != ${expectedVersion}`,
+                );
+              }
+
+              if (browser === "chrome") {
+                if (manifest.background?.service_worker !== "background.js") {
+                  throw new Error("Chrome manifest is missing its background service worker.");
+                }
+
+                if (manifest.browser_specific_settings !== undefined) {
+                  throw new Error("Chrome manifest contains Firefox-specific settings.");
+                }
+              }
+
+              if (browser === "firefox") {
+                if (
+                  !Array.isArray(manifest.background?.scripts) ||
+                  !manifest.background.scripts.includes("background.js")
+                ) {
+                  throw new Error("Firefox manifest is missing its background script.");
+                }
+              }
+
+              console.log(`Verified ${browser} manifest v${manifest.version}.`);
+            '
+          done
+
+      - name: Package browser extensions
         if: steps.release.outputs.publish == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
@@ -74,38 +109,80 @@ jobs:
 
           mkdir -p release
 
-          (
-            cd dist
+          for browser in chrome firefox; do
+            archive="mediamanagarr-v${VERSION}-${browser}.zip"
 
-            zip -qr \
-              "../release/mediamanagarr-v${VERSION}-chrome.zip" \
-              .
-          )
+            (
+              cd "dist/${browser}"
 
-          (
-            cd dist
+              zip -qr "../../release/${archive}" .
+            )
 
-            zip -qr \
-              "../release/mediamanagarr-v${VERSION}-firefox.zip" \
-              .
-          )
+            echo "Created release/${archive}"
+          done
+
+      - name: Verify release archives
+        if: steps.release.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
 
           for browser in chrome firefox; do
             archive="release/mediamanagarr-v${VERSION}-${browser}.zip"
 
+            if [[ ! -f "$archive" ]]; then
+              echo "Missing release archive: $archive"
+              exit 1
+            fi
+
             unzip -t "$archive"
 
-            unzip -p "$archive" manifest.json |
-              node -e "
-                let input = '';
-                process.stdin.on('data', chunk => input += chunk);
-                process.stdin.on('end', () => {
-                  const manifest = JSON.parse(input);
-                  if (manifest.version !== process.env.VERSION) {
-                    process.exit(1);
-                  }
-                });
-              "
+            if ! unzip -Z1 "$archive" | grep -Fxq "manifest.json"; then
+              echo "$archive does not contain a root-level manifest.json."
+              exit 1
+            fi
+
+            if ! unzip -Z1 "$archive" | grep -Fxq "background.js"; then
+              echo "$archive does not contain a root-level background.js."
+              exit 1
+            fi
+
+            BROWSER="$browser" unzip -p "$archive" manifest.json |
+              BROWSER="$browser" node --input-type=module -e '
+                let input = "";
+
+                for await (const chunk of process.stdin) {
+                  input += chunk;
+                }
+
+                const manifest = JSON.parse(input);
+                const browser = process.env.BROWSER;
+                const expectedVersion = process.env.VERSION;
+
+                if (manifest.version !== expectedVersion) {
+                  throw new Error(
+                    `${browser} archive version mismatch: ${manifest.version} != ${expectedVersion}`,
+                  );
+                }
+
+                if (
+                  browser === "chrome" &&
+                  manifest.background?.service_worker !== "background.js"
+                ) {
+                  throw new Error("Chrome archive contains an unexpected manifest.");
+                }
+
+                if (
+                  browser === "firefox" &&
+                  !manifest.background?.scripts?.includes("background.js")
+                ) {
+                  throw new Error("Firefox archive contains an unexpected manifest.");
+                }
+
+                console.log(`Verified ${browser} archive v${manifest.version}.`);
+              '
           done
 
       - name: Inspect existing release
@@ -157,7 +234,8 @@ jobs:
           gh release create "v${VERSION}" \
             --target "$RELEASE_SHA" \
             --title "MediaManagarr v${VERSION}" \
-            --generate-notes
+            --generate-notes \
+            --prerelease
 
       - name: Upload missing release assets
         if: steps.release.outputs.publish == 'true'

@@ -93,11 +93,11 @@ jobs:
           console.log(`Prepared release v${version} verified.`)
           NODE
 
-      - name: Run checks
+      - name: Run checks and build browser extensions
         if: steps.release.outputs.ready == 'true'
         run: npm run check
 
-      - name: Verify built manifest
+      - name: Verify browser manifests
         if: steps.release.outputs.ready == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
@@ -105,12 +105,54 @@ jobs:
         run: |
           set -euo pipefail
 
-          actual=$(node -p "require('./dist/manifest.json').version")
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync } from 'node:fs'
 
-          if [[ "$actual" != "$VERSION" ]]; then
-            echo "Manifest version mismatch: $actual != $VERSION"
-            exit 1
-          fi
+          const expectedVersion = process.env.VERSION
+
+          for (const browser of ['chrome', 'firefox']) {
+            const manifestPath = `dist/${browser}/manifest.json`
+
+            if (!existsSync(manifestPath)) {
+              throw new Error(`Missing ${browser} manifest: ${manifestPath}`)
+            }
+
+            const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+
+            if (manifest.version !== expectedVersion) {
+              throw new Error(
+                `${browser} manifest version mismatch: ${manifest.version} != ${expectedVersion}`,
+              )
+            }
+
+            if (browser === 'chrome') {
+              if (manifest.background?.service_worker !== 'background.js') {
+                throw new Error(
+                  'Chrome manifest is missing its background service worker.',
+                )
+              }
+
+              if (manifest.browser_specific_settings !== undefined) {
+                throw new Error(
+                  'Chrome manifest contains Firefox-specific settings.',
+                )
+              }
+            }
+
+            if (browser === 'firefox') {
+              if (
+                !Array.isArray(manifest.background?.scripts) ||
+                !manifest.background.scripts.includes('background.js')
+              ) {
+                throw new Error(
+                  'Firefox manifest is missing its background script.',
+                )
+              }
+            }
+
+            console.log(`Verified ${browser} manifest v${manifest.version}.`)
+          }
+          NODE
 
       - name: Create release pull request
         if: steps.release.outputs.ready == 'true'
