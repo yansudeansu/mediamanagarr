@@ -41,9 +41,9 @@ jobs:
         if: steps.release.outputs.publish == 'true'
         run: npm ci
 
-      - name: Run checks and build
+      - name: Build browser extensions
         if: steps.release.outputs.publish == 'true'
-        run: npm run check
+        run: npm run build
 
       - name: Verify browser manifests
         if: steps.release.outputs.publish == 'true'
@@ -234,8 +234,7 @@ jobs:
           gh release create "v${VERSION}" \
             --target "$RELEASE_SHA" \
             --title "MediaManagarr v${VERSION}" \
-            --generate-notes \
-            --prerelease
+            --generate-notes
 
       - name: Upload missing release assets
         if: steps.release.outputs.publish == 'true'
