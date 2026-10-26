@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import MmCard from '../../atoms/MmCard/MmCard.vue'
 import MmButton from '../../atoms/MmButton/MmButton.vue'
+import MmMediaPoster from '../../atoms/MmMediaPoster/MmMediaPoster.vue'
 import type { JellyfinArrival } from '../../../types/jellyfin'
 
 interface Props {
@@ -47,26 +48,11 @@ function toggleUnread(): void {
 <template>
   <mm-card padding="none">
     <article class="arrival-card" :class="{ 'arrival-card--unread': arrival.unread }">
-      <div class="arrival-card__poster">
-        <img
-          v-if="image"
-          class="arrival-card__poster-image"
-          :src="image"
-          :alt="`${arrival.title} poster`"
-          loading="lazy"
-        />
-
-        <div
-          v-else
-          class="arrival-card__poster-placeholder"
-          role="img"
-          :aria-label="`No poster available for ${arrival.title}`"
-        >
-          <span aria-hidden="true">
-            {{ arrival.type === 'Movie' ? '🎬' : '📺' }}
-          </span>
-        </div>
-      </div>
+      <mm-media-poster
+        :title="arrival.title"
+        :type="arrival.type === 'Movie' ? 'movie' : 'tv'"
+        :image="image"
+      />
 
       <div class="arrival-card__details">
         <div class="arrival-card__heading">
@@ -109,6 +95,7 @@ function toggleUnread(): void {
       <span
         v-if="arrival.unread"
         class="arrival-card__indicator"
+        role="img"
         aria-label="New arrival"
         title="New arrival"
       />
@@ -129,42 +116,6 @@ function toggleUnread(): void {
 
 .arrival-card--unread {
   box-shadow: inset 0 0 0 1px var(--primary);
-}
-
-.arrival-card__poster {
-  flex: 0 0 64px;
-
-  width: 64px;
-  height: 96px;
-
-  overflow: hidden;
-
-  border-radius: var(--radius-sm);
-  background: var(--background);
-}
-
-.arrival-card__poster-image {
-  display: block;
-
-  width: 100%;
-  height: 100%;
-
-  object-fit: cover;
-}
-
-.arrival-card__poster-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 100%;
-  height: 100%;
-
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-
-  color: var(--muted);
-  font-size: 24px;
 }
 
 .arrival-card__details {
@@ -241,6 +192,6 @@ function toggleUnread(): void {
   height: 7px;
 
   border-radius: 50%;
-  background: #22c55e;
+  background: var(--accent);
 }
 </style>

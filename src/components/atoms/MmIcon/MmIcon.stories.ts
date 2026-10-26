@@ -9,7 +9,14 @@ const meta = {
   argTypes: {
     name: {
       control: 'select',
-      options: ['settings', 'arrow-left', 'arrow-right', 'refresh'],
+      options: [
+        'settings',
+        'arrow-left',
+        'arrow-right',
+        'chevron-left',
+        'chevron-right',
+        'refresh',
+      ],
       description: 'Name of the icon to display.',
     },
     size: {
@@ -66,6 +73,24 @@ export const ArrowRight: Story = {
 }
 
 /**
+ * Previous month chevron.
+ */
+export const ChevronLeft: Story = {
+  args: {
+    name: 'chevron-left',
+  },
+}
+
+/**
+ * Next month chevron.
+ */
+export const ChevronRight: Story = {
+  args: {
+    name: 'chevron-right',
+  },
+}
+
+/**
  * Refresh icon, used for reloading service data.
  */
 export const Refresh: Story = {
@@ -81,12 +106,19 @@ export const Gallery: Story = {
   render: () => ({
     components: { MmIcon },
     setup() {
-      const icons = ['settings', 'arrow-left', 'arrow-right', 'refresh'] as const
+      const icons = [
+        'settings',
+        'arrow-left',
+        'arrow-right',
+        'chevron-left',
+        'chevron-right',
+        'refresh',
+      ] as const
 
       return { icons }
     },
     template: `
-      <div style="display: flex; gap: 24px; align-items: center;">
+      <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
         <div
           v-for="icon in icons"
           :key="icon"

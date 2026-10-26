@@ -1,24 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmIcon from './MmIcon.vue'
+import type { IconName } from './MmIcon.vue'
+
+function mountIcon(name: IconName, size?: number) {
+  return mount(MmIcon, {
+    props: {
+      name,
+      ...(size === undefined ? {} : { size }),
+    },
+  })
+}
 
 describe('MmIcon', () => {
   it('renders an SVG', () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'settings',
-      },
-    })
+    const wrapper = mountIcon('settings')
 
     expect(wrapper.find('svg').exists()).toBe(true)
   })
 
   it('uses the default size', () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'settings',
-      },
-    })
+    const wrapper = mountIcon('settings')
 
     const svg = wrapper.get('svg')
 
@@ -27,12 +29,7 @@ describe('MmIcon', () => {
   })
 
   it('supports custom sizes', () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'refresh',
-        size: 24,
-      },
-    })
+    const wrapper = mountIcon('refresh', 24)
 
     const svg = wrapper.get('svg')
 
@@ -41,11 +38,7 @@ describe('MmIcon', () => {
   })
 
   it('hides decorative icons from assistive technology', () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'settings',
-      },
-    })
+    const wrapper = mountIcon('settings')
 
     const svg = wrapper.get('svg')
 
@@ -54,74 +47,85 @@ describe('MmIcon', () => {
   })
 
   it('uses currentColor for its stroke', () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'arrow-left',
-      },
-    })
+    const wrapper = mountIcon('arrow-left')
 
     expect(wrapper.get('svg').attributes('stroke')).toBe('currentColor')
   })
 
   it('uses a consistent stroke width', () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'settings',
-      },
-    })
+    const wrapper = mountIcon('settings')
 
     expect(wrapper.get('svg').attributes('stroke-width')).toBe('2')
   })
 
   it('renders different SVG paths for different icons', () => {
-    const settings = mount(MmIcon, {
-      props: {
-        name: 'settings',
-      },
-    })
-
-    const refresh = mount(MmIcon, {
-      props: {
-        name: 'refresh',
-      },
-    })
+    const settings = mountIcon('settings')
+    const refresh = mountIcon('refresh')
 
     expect(settings.get('svg').html()).not.toBe(refresh.get('svg').html())
   })
 
   it('renders the right-arrow icon', () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'arrow-right',
-      },
-    })
+    const wrapper = mountIcon('arrow-right')
 
     expect(wrapper.find('svg').exists()).toBe(true)
     expect(wrapper.get('svg').attributes('stroke')).toBe('currentColor')
   })
 
   it('renders different paths for left and right arrows', () => {
-    const left = mount(MmIcon, {
-      props: {
-        name: 'arrow-left',
-      },
-    })
-
-    const right = mount(MmIcon, {
-      props: {
-        name: 'arrow-right',
-      },
-    })
+    const left = mountIcon('arrow-left')
+    const right = mountIcon('arrow-right')
 
     expect(left.get('svg').html()).not.toBe(right.get('svg').html())
   })
 
+  it('renders the left chevron', () => {
+    const wrapper = mountIcon('chevron-left')
+
+    expect(wrapper.find('svg').exists()).toBe(true)
+    expect(wrapper.get('svg').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('renders the right chevron', () => {
+    const wrapper = mountIcon('chevron-right')
+
+    expect(wrapper.find('svg').exists()).toBe(true)
+    expect(wrapper.get('svg').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('renders different paths for left and right chevrons', () => {
+    const left = mountIcon('chevron-left')
+    const right = mountIcon('chevron-right')
+
+    expect(left.get('svg').html()).not.toBe(right.get('svg').html())
+  })
+
+  it('uses different paths for arrows and chevrons', () => {
+    const arrow = mountIcon('arrow-left')
+    const chevron = mountIcon('chevron-left')
+
+    expect(arrow.get('svg').html()).not.toBe(chevron.get('svg').html())
+  })
+
+  it('renders every supported icon', () => {
+    const names: IconName[] = [
+      'settings',
+      'arrow-left',
+      'arrow-right',
+      'chevron-left',
+      'chevron-right',
+      'refresh',
+    ]
+
+    for (const name of names) {
+      const wrapper = mountIcon(name)
+
+      expect(wrapper.find('svg').exists()).toBe(true)
+    }
+  })
+
   it('updates the icon when its name changes', async () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'settings',
-      },
-    })
+    const wrapper = mountIcon('settings')
 
     const initialMarkup = wrapper.get('svg').html()
 
@@ -133,11 +137,7 @@ describe('MmIcon', () => {
   })
 
   it('updates from left arrow to right arrow', async () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'arrow-left',
-      },
-    })
+    const wrapper = mountIcon('arrow-left')
 
     const initialMarkup = wrapper.get('svg').html()
 
@@ -148,13 +148,20 @@ describe('MmIcon', () => {
     expect(wrapper.get('svg').html()).not.toBe(initialMarkup)
   })
 
-  it('updates the SVG dimensions when size changes', async () => {
-    const wrapper = mount(MmIcon, {
-      props: {
-        name: 'settings',
-        size: 18,
-      },
+  it('updates from left chevron to right chevron', async () => {
+    const wrapper = mountIcon('chevron-left')
+
+    const initialMarkup = wrapper.get('svg').html()
+
+    await wrapper.setProps({
+      name: 'chevron-right',
     })
+
+    expect(wrapper.get('svg').html()).not.toBe(initialMarkup)
+  })
+
+  it('updates the SVG dimensions when size changes', async () => {
+    const wrapper = mountIcon('settings', 18)
 
     await wrapper.setProps({
       size: 32,

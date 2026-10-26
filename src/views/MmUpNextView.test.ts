@@ -623,7 +623,7 @@ describe('MmUpNextView', () => {
     await settle()
 
     expect(wrapper.find('.arrival-card img').exists()).toBe(false)
-    expect(wrapper.find('.arrival-card__poster-placeholder').exists()).toBe(true)
+    expect(wrapper.find('.media-poster__placeholder').exists()).toBe(true)
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
   })
 

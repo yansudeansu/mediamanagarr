@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmArrivalCard from './MmArrivalCard.vue'
+import MmMediaPoster from '../../atoms/MmMediaPoster/MmMediaPoster.vue'
 import type { JellyfinArrival } from '../../../types/jellyfin'
 
 const movieArrival: JellyfinArrival = {
@@ -70,6 +71,28 @@ describe('MmArrivalCard', () => {
     expect(wrapper.get('.arrival-card__subtitle').text()).toBe('Example Series · S01E02')
   })
 
+  it('uses the shared media poster atom', () => {
+    const wrapper = mountArrival()
+
+    expect(wrapper.getComponent(MmMediaPoster).props()).toMatchObject({
+      title: 'Example Movie',
+      type: 'movie',
+      image: null,
+    })
+  })
+
+  it('maps Jellyfin episodes to TV posters', () => {
+    const wrapper = mountArrival({
+      type: 'Episode',
+      title: 'Example Episode',
+    })
+
+    expect(wrapper.getComponent(MmMediaPoster).props()).toMatchObject({
+      title: 'Example Episode',
+      type: 'tv',
+    })
+  })
+
   it('renders supplied artwork', () => {
     const wrapper = mountArrival({}, { image: 'data:image/png;base64,example' })
 
@@ -78,7 +101,7 @@ describe('MmArrivalCard', () => {
     expect(image.attributes('src')).toBe('data:image/png;base64,example')
     expect(image.attributes('alt')).toBe('Example Movie poster')
     expect(image.attributes('loading')).toBe('lazy')
-    expect(wrapper.find('.arrival-card__poster-placeholder').exists()).toBe(false)
+    expect(wrapper.find('.media-poster__placeholder').exists()).toBe(false)
   })
 
   it('renders a placeholder when artwork is missing', () => {
@@ -86,7 +109,7 @@ describe('MmArrivalCard', () => {
 
     expect(wrapper.find('img').exists()).toBe(false)
 
-    const placeholder = wrapper.get('.arrival-card__poster-placeholder')
+    const placeholder = wrapper.get('.media-poster__placeholder')
 
     expect(placeholder.attributes('role')).toBe('img')
     expect(placeholder.attributes('aria-label')).toBe('No poster available for Example Movie')
@@ -99,8 +122,8 @@ describe('MmArrivalCard', () => {
       title: 'Example Episode',
     })
 
-    expect(wrapper.get('.arrival-card__poster-placeholder').text()).toContain('📺')
-    expect(wrapper.get('.arrival-card__poster-placeholder').attributes('aria-label')).toBe(
+    expect(wrapper.get('.media-poster__placeholder').text()).toContain('📺')
+    expect(wrapper.get('.media-poster__placeholder').attributes('aria-label')).toBe(
       'No poster available for Example Episode',
     )
   })
@@ -109,7 +132,7 @@ describe('MmArrivalCard', () => {
     const wrapper = mountArrival({}, { image: null })
 
     expect(wrapper.find('img').exists()).toBe(false)
-    expect(wrapper.find('.arrival-card__poster-placeholder').exists()).toBe(true)
+    expect(wrapper.find('.media-poster__placeholder').exists()).toBe(true)
   })
 
   it('formats the date with time', () => {
@@ -153,6 +176,7 @@ describe('MmArrivalCard', () => {
 
     const indicator = wrapper.get('.arrival-card__indicator')
 
+    expect(indicator.attributes('role')).toBe('img')
     expect(indicator.attributes('aria-label')).toBe('New arrival')
     expect(indicator.attributes('title')).toBe('New arrival')
     expect(wrapper.get('.arrival-card').classes()).toContain('arrival-card--unread')
@@ -234,14 +258,14 @@ describe('MmArrivalCard', () => {
     })
 
     expect(wrapper.get('img').attributes('src')).toBe('data:image/jpeg;base64,updated')
-    expect(wrapper.find('.arrival-card__poster-placeholder').exists()).toBe(false)
+    expect(wrapper.find('.media-poster__placeholder').exists()).toBe(false)
 
     await wrapper.setProps({
       image: null,
     })
 
     expect(wrapper.find('img').exists()).toBe(false)
-    expect(wrapper.find('.arrival-card__poster-placeholder').exists()).toBe(true)
+    expect(wrapper.find('.media-poster__placeholder').exists()).toBe(true)
   })
 
   it('updates the action when unread changes', async () => {

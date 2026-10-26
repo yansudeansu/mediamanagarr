@@ -2,6 +2,8 @@ import type {
   BackgroundMessage,
   ClearJellyfinNotificationsResponse,
   ConnectServiceResponse,
+  GetCalendarImageResponse,
+  GetCalendarResponse,
   GetJellyfinArrivalsResponse,
   GetJellyfinImageResponse,
   GetJellyfinUsersResponse,
@@ -13,6 +15,7 @@ import type {
 } from '../types/messages'
 import { SEERR_REQUEST_FILTERS, type SeerrRequestsQuery } from '../types/seerr'
 import { SERVICES, type ServiceConfig, type ServiceId } from '../types/service'
+import { parseCalendarDateKey } from '../utils/calendar-date'
 import { getHostPermission, resolveServiceConfig } from '../utils/service-config'
 import {
   clearJellyfinUserSelection,
@@ -25,16 +28,18 @@ import {
   removeServiceConfig,
   saveServiceConfig,
 } from '../utils/service-storage'
+import { fetchCalendarImage } from './services/calendar-images'
+import { loadCalendar } from './services/calendar'
 import { testServiceConnection } from './services/connection'
-import { fetchJellyfinImage } from './services/jellyfin-images'
-import { fetchJellyfinUsers } from './services/jellyfin-users'
 import { updateJellyfinBadge } from './services/jellyfin-badge'
+import { fetchJellyfinImage } from './services/jellyfin-images'
 import {
   clearJellyfinNotifications,
   loadJellyfinArrivalsPage,
   setJellyfinArrivalUnread,
 } from './services/jellyfin-notifications'
 import { refreshJellyfinNotifications } from './services/jellyfin-scanner'
+import { fetchJellyfinUsers } from './services/jellyfin-users'
 import { fetchSeerrRequests } from './services/seerr-requests'
 
 type MessageResponse =
@@ -45,9 +50,11 @@ type MessageResponse =
   | SetJellyfinUserResponse
   | GetJellyfinArrivalsResponse
   | GetJellyfinImageResponse
+  | GetCalendarImageResponse
   | SetJellyfinArrivalUnreadResponse
   | ClearJellyfinNotificationsResponse
   | GetSeerrRequestsResponse
+  | GetCalendarResponse
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -134,6 +141,19 @@ function isJellyfinImageMessage(
   )
 }
 
+function isCalendarImageMessage(
+  value: unknown,
+): value is Extract<BackgroundMessage, { type: 'GET_CALENDAR_IMAGE' }> {
+  return (
+    isRecord(value) &&
+    value.type === 'GET_CALENDAR_IMAGE' &&
+    (value.service === 'sonarr' || value.service === 'radarr') &&
+    typeof value.mediaId === 'number' &&
+    Number.isSafeInteger(value.mediaId) &&
+    value.mediaId > 0
+  )
+}
+
 function isSetJellyfinArrivalUnreadMessage(
   value: unknown,
 ): value is Extract<BackgroundMessage, { type: 'SET_JELLYFIN_ARRIVAL_UNREAD' }> {
@@ -180,6 +200,24 @@ function isSeerrRequestsMessage(
   const normalizedPageSize = pageSize ?? 10
 
   return Number.isSafeInteger((normalizedPage - 1) * normalizedPageSize)
+}
+
+function isCalendarMessage(
+  value: unknown,
+): value is Extract<BackgroundMessage, { type: 'GET_CALENDAR' }> {
+  if (
+    !isRecord(value) ||
+    value.type !== 'GET_CALENDAR' ||
+    typeof value.start !== 'string' ||
+    typeof value.end !== 'string'
+  ) {
+    return false
+  }
+
+  const start = parseCalendarDateKey(value.start)
+  const end = parseCalendarDateKey(value.end)
+
+  return start !== null && end !== null && start.getTime() < end.getTime()
 }
 
 function errorMessage(error: unknown): string {
@@ -254,10 +292,7 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
 
       if (message.type === 'REMOVE_SERVICE') {
         if (!isRemoveMessage(message)) {
-          return {
-            success: false,
-            error: 'Invalid background message.',
-          }
+          return { success: false, error: 'Invalid background message.' }
         }
 
         if (message.serviceId === 'jellyfin') {
@@ -270,10 +305,7 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
           await refreshJellyfinAfterSettingsChange()
         }
 
-        return {
-          success: true,
-          serviceId: message.serviceId,
-        }
+        return { success: true, serviceId: message.serviceId }
       }
 
       if (message.type === 'GET_JELLYFIN_USERS') {
@@ -290,10 +322,7 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
 
       if (message.type === 'SET_JELLYFIN_USER') {
         if (!isSetJellyfinUserMessage(message)) {
-          return {
-            success: false,
-            error: 'Invalid background message.',
-          }
+          return { success: false, error: 'Invalid background message.' }
         }
 
         const config = await getConfiguredJellyfin()
@@ -307,18 +336,12 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
         await saveJellyfinUserSelection(config.url, userId)
         await refreshJellyfinAfterSettingsChange()
 
-        return {
-          success: true,
-          userId,
-        }
+        return { success: true, userId }
       }
 
       if (message.type === 'GET_JELLYFIN_ARRIVALS') {
         if (!isJellyfinArrivalsMessage(message)) {
-          return {
-            success: false,
-            error: 'Invalid background message.',
-          }
+          return { success: false, error: 'Invalid background message.' }
         }
 
         await getConfiguredJellyfin()
@@ -343,61 +366,56 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
 
       if (message.type === 'GET_JELLYFIN_IMAGE') {
         if (!isJellyfinImageMessage(message)) {
-          return {
-            success: false,
-            error: 'Invalid background message.',
-          }
+          return { success: false, error: 'Invalid background message.' }
         }
 
         const config = await getConfiguredJellyfin()
-
         const image = await fetchJellyfinImage(config, message.itemId, message.imageTag)
 
-        return {
-          success: true,
-          image,
+        return { success: true, image }
+      }
+
+      if (message.type === 'GET_CALENDAR_IMAGE') {
+        if (!isCalendarImageMessage(message)) {
+          return { success: false, error: 'Invalid background message.' }
         }
+
+        const config = await getConfiguredService(
+          message.service,
+          `Configure ${message.service} before loading posters.`,
+          `${message.service} server access has not been granted.`,
+        )
+
+        const image = await fetchCalendarImage(config, message.service, message.mediaId)
+
+        return { success: true, image }
       }
 
       if (message.type === 'SET_JELLYFIN_ARRIVAL_UNREAD') {
         if (!isSetJellyfinArrivalUnreadMessage(message)) {
-          return {
-            success: false,
-            error: 'Invalid background message.',
-          }
+          return { success: false, error: 'Invalid background message.' }
         }
 
         await getConfiguredJellyfin()
-
         const unreadCount = await setJellyfinArrivalUnread(message.itemId, message.unread)
 
         await updateJellyfinBadgeSafely(unreadCount)
 
-        return {
-          success: true,
-          unreadCount,
-        }
+        return { success: true, unreadCount }
       }
 
       if (message.type === 'CLEAR_JELLYFIN_NOTIFICATIONS') {
         await getConfiguredJellyfin()
-
         const unreadCount = await clearJellyfinNotifications()
 
         await updateJellyfinBadgeSafely(unreadCount)
 
-        return {
-          success: true,
-          unreadCount,
-        }
+        return { success: true, unreadCount }
       }
 
       if (message.type === 'GET_SEERR_REQUESTS') {
         if (!isSeerrRequestsMessage(message)) {
-          return {
-            success: false,
-            error: 'Invalid background message.',
-          }
+          return { success: false, error: 'Invalid background message.' }
         }
 
         const config = await getConfiguredSeerr()
@@ -410,18 +428,29 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
 
         const requests = await fetchSeerrRequests(config, query)
 
-        return {
-          success: true,
-          requests,
+        return { success: true, requests }
+      }
+
+      if (message.type === 'GET_CALENDAR') {
+        if (!isCalendarMessage(message)) {
+          return { success: false, error: 'Invalid background message.' }
         }
+
+        const start = parseCalendarDateKey(message.start)
+        const end = parseCalendarDateKey(message.end)
+
+        if (!start || !end) {
+          return { success: false, error: 'Invalid background message.' }
+        }
+
+        const calendar = await loadCalendar(start, end)
+
+        return { success: true, calendar }
       }
     }
 
     if (!isConnectMessage(message)) {
-      return {
-        success: false,
-        error: 'Invalid background message.',
-      }
+      return { success: false, error: 'Invalid background message.' }
     }
 
     const existing = await getServiceConfig(message.serviceId)
@@ -446,14 +475,8 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
       await refreshJellyfinAfterSettingsChange()
     }
 
-    return {
-      success: true,
-      serviceId: message.serviceId,
-    }
+    return { success: true, serviceId: message.serviceId }
   } catch (error) {
-    return {
-      success: false,
-      error: errorMessage(error),
-    }
+    return { success: false, error: errorMessage(error) }
   }
 }

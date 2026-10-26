@@ -8,7 +8,9 @@ import {
 } from '../utils/service-storage'
 import { testServiceConnection } from './services/connection'
 import { fetchJellyfinUsers } from './services/jellyfin-users'
+import { refreshJellyfinNotifications } from './services/jellyfin-scanner'
 import { fetchSeerrRequests } from './services/seerr-requests'
+import { loadCalendar } from './services/calendar'
 import {
   clearJellyfinUserSelection,
   getJellyfinUserSelection,
@@ -32,8 +34,16 @@ vi.mock('./services/jellyfin-users', () => ({
   fetchJellyfinUsers: vi.fn(),
 }))
 
+vi.mock('./services/jellyfin-scanner', () => ({
+  refreshJellyfinNotifications: vi.fn(),
+}))
+
 vi.mock('./services/seerr-requests', () => ({
   fetchSeerrRequests: vi.fn(),
+}))
+
+vi.mock('./services/calendar', () => ({
+  loadCalendar: vi.fn(),
 }))
 
 vi.mock('../utils/jellyfin-storage', () => ({
@@ -196,6 +206,7 @@ describe('handleBackgroundMessage', () => {
     })
 
     expect(testServiceConnection).toHaveBeenCalledWith('jellyfin', jellyfinConfig)
+    expect(refreshJellyfinNotifications).toHaveBeenCalledOnce()
   })
 
   it('does not save when the connection test fails', async () => {
@@ -260,6 +271,7 @@ describe('handleBackgroundMessage', () => {
 
       expect(clearJellyfinUserSelection).toHaveBeenCalledOnce()
       expect(removeServiceConfig).toHaveBeenCalledWith('jellyfin')
+      expect(refreshJellyfinNotifications).toHaveBeenCalledOnce()
 
       const clearCallOrder = vi.mocked(clearJellyfinUserSelection).mock.invocationCallOrder[0]
       const removeCallOrder = vi.mocked(removeServiceConfig).mock.invocationCallOrder[0]
@@ -419,6 +431,7 @@ describe('handleBackgroundMessage', () => {
       })
 
       expect(saveJellyfinUserSelection).toHaveBeenCalledWith(jellyfinConfig.url, 'user-2')
+      expect(refreshJellyfinNotifications).toHaveBeenCalledOnce()
 
       expect(result).toEqual({
         success: true,
@@ -627,6 +640,140 @@ describe('handleBackgroundMessage', () => {
       })
 
       expect(JSON.stringify(result)).not.toContain(seerrConfig.apiKey)
+    })
+  })
+
+  describe('GET_CALENDAR', () => {
+    const calendarResult = {
+      items: [
+        {
+          id: 'radarr-101',
+          source: 'radarr' as const,
+          type: 'movie' as const,
+          title: 'Example Movie',
+          subtitle: '2026',
+          date: '2026-11-05',
+          releaseType: 'digital' as const,
+          posterUrl: null,
+        },
+      ],
+      services: [
+        {
+          service: 'sonarr' as const,
+          state: 'connected' as const,
+        },
+        {
+          service: 'radarr' as const,
+          state: 'connected' as const,
+        },
+      ],
+    }
+
+    beforeEach(() => {
+      vi.mocked(loadCalendar).mockResolvedValue(calendarResult)
+    })
+
+    it('loads the calendar for a valid date range', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'GET_CALENDAR',
+        start: '2026-11-01',
+        end: '2026-12-01',
+      })
+
+      expect(result).toEqual({
+        success: true,
+        calendar: calendarResult,
+      })
+
+      expect(loadCalendar).toHaveBeenCalledOnce()
+
+      const [start, end] = vi.mocked(loadCalendar).mock.calls[0]
+
+      expect(start.getFullYear()).toBe(2026)
+      expect(start.getMonth()).toBe(10)
+      expect(start.getDate()).toBe(1)
+
+      expect(end.getFullYear()).toBe(2026)
+      expect(end.getMonth()).toBe(11)
+      expect(end.getDate()).toBe(1)
+    })
+
+    it.each([
+      { start: 'invalid', end: '2026-12-01' },
+      { start: '2026-02-30', end: '2026-12-01' },
+      { start: '2026-11-01', end: 'invalid' },
+      { start: '2026-11-01', end: '2026-11-01' },
+      { start: '2026-12-01', end: '2026-11-01' },
+      { start: '2026-11-01T00:00:00Z', end: '2026-12-01' },
+      { start: 123, end: '2026-12-01' },
+      { start: '2026-11-01' },
+      { end: '2026-12-01' },
+    ])('rejects invalid calendar date ranges: %j', async (query) => {
+      const result = await handleBackgroundMessage({
+        type: 'GET_CALENDAR',
+        ...query,
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid background message.',
+      })
+
+      expect(loadCalendar).not.toHaveBeenCalled()
+    })
+
+    it('returns aggregator errors as structured failures', async () => {
+      vi.mocked(loadCalendar).mockRejectedValue(new Error('Calendar unavailable.'))
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_CALENDAR',
+        start: '2026-11-01',
+        end: '2026-12-01',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Calendar unavailable.',
+      })
+    })
+
+    it('does not require both services to be configured', async () => {
+      vi.mocked(loadCalendar).mockResolvedValue({
+        items: [],
+        services: [
+          {
+            service: 'sonarr',
+            state: 'not-configured',
+          },
+          {
+            service: 'radarr',
+            state: 'not-configured',
+          },
+        ],
+      })
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_CALENDAR',
+        start: '2026-11-01',
+        end: '2026-12-01',
+      })
+
+      expect(result).toEqual({
+        success: true,
+        calendar: {
+          items: [],
+          services: [
+            {
+              service: 'sonarr',
+              state: 'not-configured',
+            },
+            {
+              service: 'radarr',
+              state: 'not-configured',
+            },
+          ],
+        },
+      })
     })
   })
 })
