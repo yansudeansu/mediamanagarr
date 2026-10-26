@@ -324,7 +324,7 @@ After the release pull request passes the required checks and is approved, mergi
 The publishing workflow is designed to:
 
 - Verify the release commit, version, lockfile, and changelog.
-- Run project checks and build both browser targets.
+- Build both browser targets from the release commit.
 - Validate the Chrome and Firefox manifest versions.
 - Verify browser-specific background configurations.
 - Package separate Chrome and Firefox ZIP archives.
@@ -334,10 +334,12 @@ The publishing workflow is designed to:
 
 Publishing can also be manually rerun for recovery.
 
+Full linting, formatting, and unit tests run during release preparation and pull-request CI. Release publishing builds the browser extensions and validates the generated artifacts without repeating those checks.
+
 > [!WARNING]
-> GitHub Release publishing and recovery have been implemented but have not yet been verified through a complete real release. The first development release will serve as an end-to-end verification of the release process.
->
 > Chrome and Firefox archives are built separately with browser-specific manifests. Both still require further compatibility testing before being considered ready for general distribution.
+>
+> Publishing a GitHub Release does not mean MediaManagarr is ready for browser-store distribution.
 
 Release preparation and publishing require appropriate GitHub Actions permissions and repository configuration. The release preparation workflow uses a repository secret named `RELEASE_TOKEN` to create the release pull request.
 
@@ -350,8 +352,6 @@ The current release process focuses on:
 - Generating a changelog.
 - Building and attaching separate browser extension ZIP archives.
 - Verifying that release automation works end to end.
-
-Development releases are marked as prereleases to communicate their experimental status.
 
 **Firefox Add-ons and Chrome Web Store publication are not part of this development release.**
 
