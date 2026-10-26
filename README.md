@@ -2,20 +2,42 @@
 
 **Your self-hosted media ecosystem, all in one place.**
 
-MediaManagarr is an open-source, cross-browser companion for monitoring and managing self-hosted media services from a unified interface. It is being built with Vue 3, TypeScript, and Vite, with an emphasis on accessibility, reusable components, privacy, and automated testing.
+MediaManagarr is an open-source browser extension for monitoring and managing self-hosted media services from a unified interface.
+
+Built with Vue 3, TypeScript, and Vite, the project emphasizes accessibility, reusable components, privacy, and automated testing.
+
+MediaManagarr now implements the core functionality of its predecessor, Media Monitor. Development continues with a focus on reliability, accessibility, usability, and browser compatibility.
 
 > [!IMPORTANT]
-> **Early development:** MediaManagarr is not yet ready for everyday use. The service integrations below are planned, not implemented. Browser-extension release packages are experimental until cross-browser packaging and compatibility testing are complete.
+> **Early development:** MediaManagarr's core service integrations are implemented, but the extension is not yet considered production-ready. Browser compatibility testing is ongoing, and release ZIP archives are intended for development and testing. MediaManagarr is not yet distributed through browser extension stores.
 
-## Planned integrations
+## Implemented integrations
 
-| Service     | Planned functionality                                      |
+| Service     | Functionality                                              |
 | ----------- | ---------------------------------------------------------- |
 | Jellyfin    | Recently added media, unwatched content, and notifications |
 | Seerr       | Media requests and their status                            |
 | Sonarr      | Upcoming television episodes                               |
 | Radarr      | Upcoming movie releases                                    |
 | qBittorrent | Torrent activity, progress, and management                 |
+
+### Current functionality
+
+MediaManagarr provides:
+
+- A unified interface for configured self-hosted services.
+- Media requests with status filtering and pagination.
+- Recently added and unwatched Jellyfin content.
+- Jellyfin notification management.
+- A calendar of upcoming television episodes and movie releases.
+- Torrent monitoring with progress, transfer speeds, ETA, and status.
+- Torrent start, stop, and removal actions.
+- Confirmation before removing torrents.
+- Explicit opt-in before deleting downloaded files.
+- Service configuration and Jellyfin user selection.
+- Loading, empty, and error states across the main views.
+
+These features are implemented but remain subject to ongoing testing and refinement.
 
 The initial target is a browser extension for Firefox, Zen Browser, Chrome, and compatible Chromium-based browsers. A standalone web application may be explored later.
 
@@ -73,24 +95,75 @@ npm run format:check
 npm run test
 npm run test:watch
 npm run build
+npm run build:chrome
+npm run build:firefox
 npm run storybook
 npm run build-storybook
 npm run check
 ```
 
-`npm run check` runs linting, formatting verification, tests, and a production build. It is the recommended command before opening or updating a pull request.
+`npm run check` runs linting, formatting verification, tests, and production builds for Chrome and Firefox. It is the recommended command before opening or updating a pull request.
 
 ### Build the browser extension
+
+Build both browser targets:
 
 ```bash
 npm run build
 ```
 
-The production build is written to `dist/`.
+Build a specific browser target:
 
-The generated `dist/manifest.json` receives its version from `package.json`. This keeps the application version and extension manifest synchronized without manually editing the manifest template.
+```bash
+npm run build:chrome
+npm run build:firefox
+```
 
-The application shell has been loaded and visually verified as an unpacked or temporary extension in Chrome and Zen Browser. This does not yet constitute complete browser compatibility or distribution testing.
+The production builds are written to separate directories:
+
+```text
+dist/
+├── chrome/
+│   ├── manifest.json
+│   ├── background.js
+│   └── ...
+└── firefox/
+    ├── manifest.json
+    ├── background.js
+    └── ...
+```
+
+Each build contains a browser-specific manifest:
+
+- Chrome uses a Manifest V3 background service worker.
+- Firefox uses a background script configuration.
+- Firefox-specific manifest settings are excluded from the Chrome build.
+
+Both generated manifests receive their version from `package.json`. This keeps the application version and browser extension versions synchronized without manually editing the manifest template.
+
+The application shell and service integrations have been developed and tested incrementally. However, complete compatibility testing across Firefox, Zen Browser, Chrome, and other Chromium-based browsers is still pending.
+
+### Development release archives
+
+MediaManagarr uses GitHub Releases to provide versioned browser-specific extension archives.
+
+The release process generates two separate ZIP files:
+
+```text
+mediamanagarr-vX.Y.Z-chrome.zip
+mediamanagarr-vX.Y.Z-firefox.zip
+```
+
+Each archive contains the corresponding browser build, with `manifest.json` at the root of the ZIP.
+
+The Chrome archive contains the Chromium-targeted extension, while the Firefox archive contains the Firefox-targeted extension.
+
+These archives are intended for development, testing, and release-process verification. They are **not official browser-store distributions**.
+
+> [!IMPORTANT]
+> Browser-specific builds do not guarantee complete browser compatibility. MediaManagarr has not yet completed cross-browser verification and is not currently distributed through browser extension stores.
+
+Installation and compatibility should be verified manually before relying on a release package.
 
 ## Component library
 
@@ -164,6 +237,8 @@ Stories should demonstrate relevant variants, interaction states, and accessibil
 Storybook includes accessibility tooling powered by axe-core to identify potential issues such as missing accessible names, insufficient color contrast, and invalid ARIA attributes.
 
 Automated checks are supplemented by manual keyboard and visual testing, with WCAG 2.2 AA as the accessibility target.
+
+A comprehensive accessibility audit remains planned.
 
 ## Development workflow
 
@@ -249,28 +324,56 @@ After the release pull request passes the required checks and is approved, mergi
 The publishing workflow is designed to:
 
 - Verify the release commit, version, lockfile, and changelog.
-- Run project checks and build the extension.
-- Validate the generated manifest version.
+- Run project checks and build both browser targets.
+- Validate the Chrome and Firefox manifest versions.
+- Verify browser-specific background configurations.
+- Package separate Chrome and Firefox ZIP archives.
 - Create the Git tag and GitHub Release.
-- Attach Chrome and Firefox ZIP archives.
+- Upload both browser archives.
 - Recover from certain interrupted publishing attempts without duplicating existing assets.
 
 Publishing can also be manually rerun for recovery.
 
 > [!WARNING]
-> GitHub Release publishing and recovery have been implemented but have not yet been verified through a complete real release. Browser-specific ZIP archives are currently produced from the same build and require further compatibility testing before being considered distributable releases.
+> GitHub Release publishing and recovery have been implemented but have not yet been verified through a complete real release. The first development release will serve as an end-to-end verification of the release process.
+>
+> Chrome and Firefox archives are built separately with browser-specific manifests. Both still require further compatibility testing before being considered ready for general distribution.
 
 Release preparation and publishing require appropriate GitHub Actions permissions and repository configuration. The release preparation workflow uses a repository secret named `RELEASE_TOKEN` to create the release pull request.
 
+### Release scope
+
+The current release process focuses on:
+
+- Generating a versioned GitHub Release.
+- Updating the package and extension manifest versions.
+- Generating a changelog.
+- Building and attaching separate browser extension ZIP archives.
+- Verifying that release automation works end to end.
+
+Development releases are marked as prereleases to communicate their experimental status.
+
+**Firefox Add-ons and Chrome Web Store publication are not part of this development release.**
+
+Browser-store submissions remain planned for a later milestone.
+
 ## Roadmap
 
-Development is organized into incremental milestones, starting with repository tooling, Storybook, the design system, and application shell, followed by workflow automation, service configuration, integrations, browser testing, and distribution.
+MediaManagarr's foundational development and core service integrations are complete.
 
-**Milestones 0, 1, and 2 are complete. Milestone 2.5 is in progress.**
+The extension now provides the main functionality of the original Media Monitor extension, including Jellyfin arrivals, Seerr requests, Sonarr and Radarr calendars, and qBittorrent download management.
 
-Milestone 2.5 covers Conventional Commits, Git safeguards, pull-request reporting, Storybook previews, changelog generation, and release automation.
+The next development priorities are:
 
-Read the [full roadmap](docs/ROADMAP.md) for planned milestones, architecture, accessibility, testing strategy, and remaining verification work.
+1. **Service Health & Reliability** — Improve connection monitoring, retries, and error handling.
+2. **Testing & Accessibility** — Expand browser automation, cross-browser testing, and accessibility verification.
+3. **Feature Enhancements** — Refine existing features based on real-world usage.
+4. **Branding & Documentation** — Prepare guides, artwork, and release materials.
+5. **Release & Distribution** — Complete browser compatibility testing and prepare browser-store submissions.
+
+Testing and accessibility remain ongoing requirements throughout every milestone.
+
+Read the [full roadmap](docs/ROADMAP.md) for planned milestones and remaining verification work.
 
 ## Architecture
 
@@ -280,7 +383,11 @@ The extension uses a custom Vite-based Manifest V3 setup rather than an addition
 
 ## Background
 
-MediaManagarr is inspired by the existing **Media Monitor** browser extension, which serves as a functional reference. MediaManagarr is a separate implementation, not a direct migration of its codebase.
+MediaManagarr is inspired by the existing **Media Monitor** browser extension, which serves as a functional reference.
+
+MediaManagarr is a separate implementation, not a direct migration of its codebase.
+
+The initial core functionality is now implemented. Future development will focus on making the experience more reliable, accessible, and polished while expanding capabilities where useful.
 
 ## Contributing
 
@@ -290,7 +397,9 @@ Suggestions, bug reports, and contributions are welcome. See [CONTRIBUTING.md](C
 
 Do not post real API keys, passwords, private server addresses, or personal media data in issues, tests, screenshots, or Storybook stories.
 
-Pull-request preview builds must contain mock data only. The final credential storage and extension permissions model has not yet been implemented.
+Pull-request preview builds must contain mock data only.
+
+Service configuration and credential handling are implemented, but their security and permissions model will continue to be reviewed as part of reliability and release-readiness work.
 
 See the [roadmap's security section](docs/ROADMAP.md#security-and-privacy) for additional design goals.
 
