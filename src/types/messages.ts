@@ -1,5 +1,6 @@
 import type { CalendarResult, CalendarServiceId } from './calendar'
 import type { JellyfinArrivalsPage, JellyfinArrivalsQuery, JellyfinUser } from './jellyfin'
+import type { QBittorrentSnapshot } from './qbittorrent'
 import type { SeerrRequestsPage, SeerrRequestsQuery } from './seerr'
 import type { SafeServiceConfigs, ServiceConnectionInput, ServiceId } from './service'
 
@@ -63,6 +64,26 @@ export interface GetCalendarMessage {
   end: string
 }
 
+export interface GetQBittorrentDownloadsMessage {
+  type: 'GET_QBITTORRENT_DOWNLOADS'
+}
+
+export interface StartQBittorrentTorrentMessage {
+  type: 'START_QBITTORRENT_TORRENT'
+  hash: string
+}
+
+export interface StopQBittorrentTorrentMessage {
+  type: 'STOP_QBITTORRENT_TORRENT'
+  hash: string
+}
+
+export interface DeleteQBittorrentTorrentMessage {
+  type: 'DELETE_QBITTORRENT_TORRENT'
+  hash: string
+  deleteFiles: boolean
+}
+
 export type BackgroundMessage =
   | GetServiceConfigsMessage
   | ConnectServiceMessage
@@ -76,6 +97,10 @@ export type BackgroundMessage =
   | ClearJellyfinNotificationsMessage
   | GetSeerrRequestsMessage
   | GetCalendarMessage
+  | GetQBittorrentDownloadsMessage
+  | StartQBittorrentTorrentMessage
+  | StopQBittorrentTorrentMessage
+  | DeleteQBittorrentTorrentMessage
 
 export interface GetServiceConfigsSuccess {
   success: true
@@ -139,6 +164,16 @@ export interface GetCalendarSuccess {
   calendar: CalendarResult
 }
 
+export interface GetQBittorrentDownloadsSuccess {
+  success: true
+  downloads: QBittorrentSnapshot
+}
+
+export interface QBittorrentTorrentActionSuccess {
+  success: true
+  completed: true
+}
+
 export interface BackgroundMessageFailure {
   success: false
   error: string
@@ -162,6 +197,12 @@ export type ClearJellyfinNotificationsResponse =
 export type GetSeerrRequestsResponse = GetSeerrRequestsSuccess | BackgroundMessageFailure
 export type GetCalendarResponse = GetCalendarSuccess | BackgroundMessageFailure
 
+export type GetQBittorrentDownloadsResponse =
+  GetQBittorrentDownloadsSuccess | BackgroundMessageFailure
+
+export type QBittorrentTorrentActionResponse =
+  QBittorrentTorrentActionSuccess | BackgroundMessageFailure
+
 type BackgroundResponseMap = {
   GET_SERVICE_CONFIGS: GetServiceConfigsResponse
   CONNECT_SERVICE: ConnectServiceResponse
@@ -175,6 +216,10 @@ type BackgroundResponseMap = {
   CLEAR_JELLYFIN_NOTIFICATIONS: ClearJellyfinNotificationsResponse
   GET_SEERR_REQUESTS: GetSeerrRequestsResponse
   GET_CALENDAR: GetCalendarResponse
+  GET_QBITTORRENT_DOWNLOADS: GetQBittorrentDownloadsResponse
+  START_QBITTORRENT_TORRENT: QBittorrentTorrentActionResponse
+  STOP_QBITTORRENT_TORRENT: QBittorrentTorrentActionResponse
+  DELETE_QBITTORRENT_TORRENT: QBittorrentTorrentActionResponse
 }
 
 export type BackgroundResponse<T extends BackgroundMessage> = BackgroundResponseMap[T['type']]

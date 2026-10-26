@@ -6,21 +6,7 @@ This roadmap tracks upcoming work, not completed features. Milestones are goals,
 
 Current priority
 
-Milestone 1 — Downloads (qBittorrent)
-
-Monitor and manage active downloads.
-
-- Display torrents, progress, download speeds, upload speeds, and ETA.
-- Show torrent states and download statistics.
-- Support starting, stopping, and removing torrents.
-- Require confirmation for destructive operations.
-- Never delete downloaded files without explicit permission.
-- Handle connection failures and authentication errors.
-- Test download actions and error handling.
-
-Upcoming milestones
-
-Milestone 2 — Service Health & Reliability
+Milestone 1 — Service Health & Reliability
 
 Improve the reliability of configured service integrations.
 
@@ -31,7 +17,9 @@ Improve the reliability of configured service integrations.
 - Handle temporary service outages gracefully.
 - Avoid unnecessary API requests.
 
-Milestone 3 — Testing & Accessibility
+Upcoming milestones
+
+Milestone 2 — Testing & Accessibility
 
 Expand automated testing and verify accessibility across the extension.
 
@@ -45,7 +33,7 @@ Expand automated testing and verify accessibility across the extension.
 
 Testing and accessibility remain ongoing requirements throughout every milestone.
 
-Milestone 4 — Feature Enhancements
+Milestone 3 — Feature Enhancements
 
 Refine existing features based on real-world usage and feedback.
 
@@ -60,7 +48,7 @@ Potential improvements include:
 
 Enhancements will be prioritized based on user feedback rather than speculative requirements.
 
-Milestone 5 — Branding & Documentation
+Milestone 4 — Branding & Documentation
 
 Prepare MediaManagarr for a wider audience.
 
@@ -71,7 +59,7 @@ Prepare MediaManagarr for a wider audience.
 - Improve contribution and development guides.
 - Review screenshots and other release materials.
 
-Milestone 6 — Release & Distribution
+Milestone 5 — Release & Distribution
 
 Prepare and publish MediaManagarr for supported browsers.
 

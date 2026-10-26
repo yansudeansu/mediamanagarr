@@ -7,8 +7,10 @@ import type {
   GetJellyfinArrivalsResponse,
   GetJellyfinImageResponse,
   GetJellyfinUsersResponse,
+  GetQBittorrentDownloadsResponse,
   GetSeerrRequestsResponse,
   GetServiceConfigsResponse,
+  QBittorrentTorrentActionResponse,
   RemoveServiceResponse,
   SetJellyfinArrivalUnreadResponse,
   SetJellyfinUserResponse,
@@ -40,6 +42,12 @@ import {
 } from './services/jellyfin-notifications'
 import { refreshJellyfinNotifications } from './services/jellyfin-scanner'
 import { fetchJellyfinUsers } from './services/jellyfin-users'
+import {
+  deleteQBittorrentTorrent,
+  fetchQBittorrentSnapshot,
+  startQBittorrentTorrent,
+  stopQBittorrentTorrent,
+} from './services/qbittorrent'
 import { fetchSeerrRequests } from './services/seerr-requests'
 
 type MessageResponse =
@@ -55,6 +63,8 @@ type MessageResponse =
   | ClearJellyfinNotificationsResponse
   | GetSeerrRequestsResponse
   | GetCalendarResponse
+  | GetQBittorrentDownloadsResponse
+  | QBittorrentTorrentActionResponse
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -220,6 +230,28 @@ function isCalendarMessage(
   return start !== null && end !== null && start.getTime() < end.getTime()
 }
 
+function isTorrentHash(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-fA-F0-9]{40}$/.test(value)
+}
+
+function isTorrentActionMessage(
+  value: unknown,
+  type: 'START_QBITTORRENT_TORRENT' | 'STOP_QBITTORRENT_TORRENT',
+): value is Extract<BackgroundMessage, { type: typeof type }> {
+  return isRecord(value) && value.type === type && isTorrentHash(value.hash)
+}
+
+function isDeleteTorrentMessage(
+  value: unknown,
+): value is Extract<BackgroundMessage, { type: 'DELETE_QBITTORRENT_TORRENT' }> {
+  return (
+    isRecord(value) &&
+    value.type === 'DELETE_QBITTORRENT_TORRENT' &&
+    isTorrentHash(value.hash) &&
+    typeof value.deleteFiles === 'boolean'
+  )
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'An unexpected error occurred.'
 }
@@ -261,6 +293,14 @@ async function getConfiguredSeerr(): Promise<ServiceConfig> {
     'seerr',
     'Configure Seerr before viewing requests.',
     'Seerr server access has not been granted.',
+  )
+}
+
+async function getConfiguredQBittorrent(): Promise<ServiceConfig> {
+  return getConfiguredService(
+    'qbittorrent',
+    'Configure qBittorrent in Settings before viewing downloads.',
+    'qBittorrent server access has not been granted.',
   )
 }
 
@@ -446,6 +486,49 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
         const calendar = await loadCalendar(start, end)
 
         return { success: true, calendar }
+      }
+
+      if (message.type === 'GET_QBITTORRENT_DOWNLOADS') {
+        const config = await getConfiguredQBittorrent()
+        const downloads = await fetchQBittorrentSnapshot(config)
+
+        return { success: true, downloads }
+      }
+
+      if (message.type === 'START_QBITTORRENT_TORRENT') {
+        if (!isTorrentActionMessage(message, 'START_QBITTORRENT_TORRENT')) {
+          return { success: false, error: 'Invalid background message.' }
+        }
+
+        const config = await getConfiguredQBittorrent()
+
+        await startQBittorrentTorrent(config, message.hash)
+
+        return { success: true, completed: true }
+      }
+
+      if (message.type === 'STOP_QBITTORRENT_TORRENT') {
+        if (!isTorrentActionMessage(message, 'STOP_QBITTORRENT_TORRENT')) {
+          return { success: false, error: 'Invalid background message.' }
+        }
+
+        const config = await getConfiguredQBittorrent()
+
+        await stopQBittorrentTorrent(config, message.hash)
+
+        return { success: true, completed: true }
+      }
+
+      if (message.type === 'DELETE_QBITTORRENT_TORRENT') {
+        if (!isDeleteTorrentMessage(message)) {
+          return { success: false, error: 'Invalid background message.' }
+        }
+
+        const config = await getConfiguredQBittorrent()
+
+        await deleteQBittorrentTorrent(config, message.hash, message.deleteFiles)
+
+        return { success: true, completed: true }
       }
     }
 

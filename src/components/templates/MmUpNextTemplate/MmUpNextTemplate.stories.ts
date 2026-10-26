@@ -14,7 +14,7 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'movie-1',
     type: 'Movie',
-    title: 'Dune: Part Two',
+    title: 'Movie 1',
     subtitle: '2024',
     dateAdded: '2026-10-24T18:30:00.000Z',
     imageId: 'movie-1',
@@ -24,8 +24,8 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'episode-2',
     type: 'Episode',
-    title: 'The We We Are',
-    subtitle: 'Severance · S01E09',
+    title: 'Episode 1',
+    subtitle: 'TV Show 1 · S01E09',
     dateAdded: '2026-10-23T14:15:00.000Z',
     imageId: 'series-2',
     imageTag: null,
@@ -34,7 +34,7 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'movie-3',
     type: 'Movie',
-    title: 'Interstellar',
+    title: 'Movie 2',
     subtitle: '2014',
     dateAdded: '2026-10-22T11:00:00.000Z',
     imageId: 'movie-3',
@@ -44,8 +44,8 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'episode-4',
     type: 'Episode',
-    title: 'When You’re Lost in the Darkness',
-    subtitle: 'The Last of Us · S01E01',
+    title: 'Episode 2',
+    subtitle: 'TV Show 2 · S01E01',
     dateAdded: '2026-10-21T20:45:00.000Z',
     imageId: 'series-4',
     imageTag: null,
@@ -54,7 +54,7 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'movie-5',
     type: 'Movie',
-    title: 'Oppenheimer',
+    title: 'Movie 3',
     subtitle: '2023',
     dateAdded: '2026-10-20T09:30:00.000Z',
     imageId: 'movie-5',
@@ -64,8 +64,8 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'episode-6',
     type: 'Episode',
-    title: 'Pilot',
-    subtitle: 'Fallout · S01E01',
+    title: 'Episode 3',
+    subtitle: 'TV Show 3 · S01E01',
     dateAdded: '2026-10-19T16:00:00.000Z',
     imageId: 'series-6',
     imageTag: null,
@@ -74,7 +74,7 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'movie-7',
     type: 'Movie',
-    title: 'The Batman',
+    title: 'Movie 4',
     subtitle: '2022',
     dateAdded: '2026-10-18T13:20:00.000Z',
     imageId: 'movie-7',
@@ -84,8 +84,8 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'episode-8',
     type: 'Episode',
-    title: 'The Heirs of the Dragon',
-    subtitle: 'House of the Dragon · S01E01',
+    title: 'Episode 4',
+    subtitle: 'TV Show 4 · S01E01',
     dateAdded: '2026-10-17T08:45:00.000Z',
     imageId: 'series-8',
     imageTag: null,
@@ -94,7 +94,7 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'movie-9',
     type: 'Movie',
-    title: 'Everything Everywhere All at Once',
+    title: 'Movie 5',
     subtitle: '2022',
     dateAdded: '2026-10-16T17:10:00.000Z',
     imageId: 'movie-9',
@@ -104,8 +104,8 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'episode-10',
     type: 'Episode',
-    title: 'System Shutdown',
-    subtitle: 'Silo · S01E10',
+    title: 'Episode 5',
+    subtitle: 'TV Show 5 · S01E10',
     dateAdded: '2026-10-15T12:00:00.000Z',
     imageId: 'series-10',
     imageTag: null,
@@ -114,7 +114,7 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'movie-11',
     type: 'Movie',
-    title: 'Blade Runner 2049',
+    title: 'Movie 6',
     subtitle: '2017',
     dateAdded: '2026-10-14T10:00:00.000Z',
     imageId: 'movie-11',
@@ -124,8 +124,8 @@ const mockArrivals: JellyfinArrival[] = [
   {
     id: 'episode-12',
     type: 'Episode',
-    title: 'The Original',
-    subtitle: 'Westworld · S01E01',
+    title: 'Episode 6',
+    subtitle: 'TV Show 6 · S01E01',
     dateAdded: '2026-10-13T19:30:00.000Z',
     imageId: 'series-12',
     imageTag: null,
@@ -147,7 +147,7 @@ const meta = {
   },
   decorators: [
     () => ({
-      template: '<div style="width: 340px;"><story /></div>',
+      template: '<div style="width: 340px; max-width: 100%;"><story /></div>',
     }),
   ],
 } satisfies Meta<typeof MmUpNextTemplate>
@@ -420,8 +420,8 @@ export const LongTitle: Story = {
       const arrival: JellyfinArrival = {
         ...mockArrivals[0]!,
         title:
-          'An Extremely Long Movie Title That Should Be Truncated Gracefully Without Breaking the Popup Layout',
-        subtitle: '2026 · An Extremely Long Subtitle That Should Also Be Truncated',
+          'Movie 1 — Extended Edition With Additional Bonus Content and an Extremely Long Title for Layout Testing',
+        subtitle: '2026 · Extended Edition With an Extremely Long Subtitle for Layout Testing',
       }
 
       return { arrival }

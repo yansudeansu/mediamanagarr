@@ -32,9 +32,9 @@ const connectedStatuses: Partial<Record<ServiceId, ServiceState>> = {
 }
 
 const exampleJellyfinUsers = [
-  { id: 'user-1', name: 'Alice' },
-  { id: 'user-2', name: 'Bob' },
-  { id: 'user-3', name: 'Charlie' },
+  { id: 'user-1', name: 'Test User 1' },
+  { id: 'user-2', name: 'Test User 2' },
+  { id: 'user-3', name: 'Test User 3' },
 ]
 
 function createStory(

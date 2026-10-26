@@ -4,12 +4,12 @@ import MmArrivalCard from './MmArrivalCard.vue'
 import type { JellyfinArrival } from '../../../types/jellyfin'
 
 const baseArrival: JellyfinArrival = {
-  id: 'movie-42',
+  id: 'movie-1',
   type: 'Movie',
-  title: 'Example Movie',
+  title: 'Movie 1',
   subtitle: '2026',
   dateAdded: '2026-10-20T12:00:00.000Z',
-  imageId: 'movie-42',
+  imageId: 'movie-1',
   imageTag: null,
   unread: false,
 }
@@ -45,11 +45,11 @@ export const Episode: Story = {
   args: {
     arrival: {
       ...baseArrival,
-      id: 'episode-42',
+      id: 'episode-1',
       type: 'Episode',
-      title: 'The Beginning',
-      subtitle: 'Example Series · S01E02',
-      imageId: 'series-42',
+      title: 'Episode 1',
+      subtitle: 'TV Show 1 · S01E01',
+      imageId: 'tv-show-1',
       unread: false,
     },
   },
@@ -59,11 +59,11 @@ export const NewEpisode: Story = {
   args: {
     arrival: {
       ...baseArrival,
-      id: 'episode-43',
+      id: 'episode-2',
       type: 'Episode',
-      title: 'The Next Chapter',
-      subtitle: 'Example Series · S01E03',
-      imageId: 'series-42',
+      title: 'Episode 2',
+      subtitle: 'TV Show 1 · S01E02',
+      imageId: 'tv-show-1',
       unread: true,
     },
   },
@@ -74,8 +74,8 @@ export const LongTitle: Story = {
     arrival: {
       ...baseArrival,
       title:
-        'An Extremely Long Movie Title That Should Be Truncated Gracefully Without Breaking the Card Layout',
-      subtitle: '2026 · A Very Long Subtitle That Should Also Be Truncated Gracefully',
+        'Movie 1 — Extended Edition With Additional Bonus Content and an Extremely Long Title for Layout Testing',
+      subtitle: '2026 · Extended Edition With an Extremely Long Subtitle for Layout Testing',
     },
   },
 }
@@ -90,7 +90,7 @@ export const WithArtwork: Story = {
   args: {
     arrival: {
       ...baseArrival,
-      title: 'Example Movie With Artwork',
+      title: 'Movie 2',
     },
     image:
       'data:image/svg+xml;charset=utf-8,' +
