@@ -1,0 +1,13 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{C as t,I as n,_ as r,a as i,d as a,m as o,p as s}from"./iframe-Bq8FMHBt.js";import{n as c,t as l}from"./_plugin-vue_export-helper-ktEZWxTd.js";var u,d,f;function p(){return(p=e((()=>{i(),u={class:`footer`},d={key:0,class:`footer__version`},f=r({__name:`MmFooter`,props:{version:{default:``}},setup(e){return(r,i)=>(t(),o(`footer`,u,[i[0]||=a(`span`,{class:`footer__brand`},`MediaManagarr`,-1),e.version?(t(),o(`span`,d,`v`+n(e.version),1)):s(``,!0)]))}})})))()}var m;function h(){return(h=e((()=>{p(),c(),m=l(f,[[`__scopeId`,`data-v-55aa905a`]]),f.__docgenInfo=Object.assign({displayName:f.name??f.__name},{exportName:`default`,displayName:`MmFooter`,description:``,tags:{},props:[{name:`version`,required:!1,type:{name:`string`},defaultValue:{func:!1,value:`''`}}],sourceFiles:[`/home/runner/work/mediamanagarr/mediamanagarr/src/components/molecules/MmFooter/MmFooter.vue`]})})))()}var g,_,v,y,b,x;function S(){return(S=e((()=>{h(),g={title:`Molecules/Footer`,component:m,tags:[`autodocs`],argTypes:{version:{control:`text`,description:`Extension version displayed in the footer.`}},args:{version:`0.1.0`},decorators:[()=>({template:`<div style="width: 380px"><story /></div>`})]},_={},v={args:{version:`0.1.0`}},y={args:{version:``}},b={args:{version:`1.0.0-beta.2`}},x=[`Playground`,`Default`,`WithoutVersion`,`Prerelease`],_.parameters={..._.parameters,docs:{..._.parameters?.docs,source:{originalSource:`{}`,..._.parameters?.docs?.source},description:{story:`Interactive playground.`,..._.parameters?.docs?.description}}},v.parameters={...v.parameters,docs:{...v.parameters?.docs,source:{originalSource:`{
+  args: {
+    version: '0.1.0'
+  }
+}`,...v.parameters?.docs?.source},description:{story:`Standard footer with the extension version.`,...v.parameters?.docs?.description}}},y.parameters={...y.parameters,docs:{...y.parameters?.docs,source:{originalSource:`{
+  args: {
+    version: ''
+  }
+}`,...y.parameters?.docs?.source},description:{story:`Footer without a version number.`,...y.parameters?.docs?.description}}},b.parameters={...b.parameters,docs:{...b.parameters?.docs,source:{originalSource:`{
+  args: {
+    version: '1.0.0-beta.2'
+  }
+}`,...b.parameters?.docs?.source},description:{story:`Footer with a longer version number.`,...b.parameters?.docs?.description}}}})))()}S();export{v as Default,_ as Playground,b as Prerelease,y as WithoutVersion,x as __namedExportsOrder,g as default};
