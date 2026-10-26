@@ -6,8 +6,8 @@ const tvItem: CalendarItem = {
   id: 'sonarr-101',
   source: 'sonarr',
   type: 'tv',
-  title: 'Example Series',
-  subtitle: 'S02E03 · The Adventure',
+  title: 'TV Show 1',
+  subtitle: 'S02E03 · Episode 3',
   date: '2026-11-05',
   releaseType: 'air',
   posterUrl: null,
@@ -17,7 +17,7 @@ const movieItem: CalendarItem = {
   id: 'radarr-201',
   source: 'radarr',
   type: 'movie',
-  title: 'Example Movie',
+  title: 'Movie 1',
   subtitle: '2026',
   date: '2026-11-05',
   releaseType: 'digital',
@@ -56,8 +56,8 @@ export const ManyReleases: Story = {
   args: {
     items: Array.from({ length: 7 }, (_, index) => ({
       ...tvItem,
-      id: `sonarr-${index}`,
-      title: `Example Series ${index + 1}`,
+      id: `sonarr-${index + 101}`,
+      title: `TV Show ${index + 1}`,
     })),
   },
 }

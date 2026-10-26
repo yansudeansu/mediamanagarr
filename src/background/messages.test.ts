@@ -18,6 +18,12 @@ import {
 } from '../utils/jellyfin-storage'
 import type { ServiceConfig } from '../types/service'
 import type { SeerrRequestsPage } from '../types/seerr'
+import {
+  deleteQBittorrentTorrent,
+  fetchQBittorrentSnapshot,
+  startQBittorrentTorrent,
+  stopQBittorrentTorrent,
+} from './services/qbittorrent'
 
 vi.mock('../utils/service-storage', () => ({
   getSafeServiceConfigs: vi.fn(),
@@ -50,6 +56,13 @@ vi.mock('../utils/jellyfin-storage', () => ({
   clearJellyfinUserSelection: vi.fn(),
   getJellyfinUserSelection: vi.fn(),
   saveJellyfinUserSelection: vi.fn(),
+}))
+
+vi.mock('./services/qbittorrent', () => ({
+  deleteQBittorrentTorrent: vi.fn(),
+  fetchQBittorrentSnapshot: vi.fn(),
+  startQBittorrentTorrent: vi.fn(),
+  stopQBittorrentTorrent: vi.fn(),
 }))
 
 const jellyfinConfig: ServiceConfig = {
@@ -245,6 +258,191 @@ describe('handleBackgroundMessage', () => {
     })
 
     expect(testServiceConnection).not.toHaveBeenCalled()
+  })
+
+  describe('qBittorrent messages', () => {
+    const config: ServiceConfig = {
+      url: 'https://downloads.example.com/qbittorrent',
+      apiKey: 'qbittorrent-test-key',
+    }
+
+    const hash = 'a'.repeat(40)
+
+    const snapshot = {
+      torrents: [
+        {
+          hash,
+          name: 'Example Torrent',
+          progress: 0.5,
+          state: 'downloading',
+          downloadSpeed: 1024,
+          uploadSpeed: 512,
+          eta: 3600,
+          size: 2048,
+          downloaded: 1024,
+        },
+      ],
+      downloadSpeed: 4096,
+      uploadSpeed: 2048,
+    }
+
+    beforeEach(() => {
+      vi.mocked(getServiceConfig).mockResolvedValue(config)
+      vi.mocked(fetchQBittorrentSnapshot).mockResolvedValue(snapshot)
+    })
+
+    it('fetches downloads with a configured service', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'GET_QBITTORRENT_DOWNLOADS',
+      })
+
+      expect(result).toEqual({
+        success: true,
+        downloads: snapshot,
+      })
+
+      expect(getServiceConfig).toHaveBeenCalledWith('qbittorrent')
+
+      expect(chrome.permissions.contains).toHaveBeenCalledWith({
+        origins: ['https://downloads.example.com/*'],
+      })
+
+      expect(fetchQBittorrentSnapshot).toHaveBeenCalledWith(config)
+    })
+
+    it('requires qBittorrent configuration', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(undefined)
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_QBITTORRENT_DOWNLOADS',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Configure qBittorrent in Settings before viewing downloads.',
+      })
+
+      expect(fetchQBittorrentSnapshot).not.toHaveBeenCalled()
+    })
+
+    it('requires qBittorrent host permission', async () => {
+      vi.stubGlobal('chrome', {
+        permissions: {
+          contains: vi.fn().mockResolvedValue(false),
+        },
+      })
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_QBITTORRENT_DOWNLOADS',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'qBittorrent server access has not been granted.',
+      })
+
+      expect(fetchQBittorrentSnapshot).not.toHaveBeenCalled()
+    })
+
+    it('starts a torrent', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'START_QBITTORRENT_TORRENT',
+        hash,
+      })
+
+      expect(startQBittorrentTorrent).toHaveBeenCalledWith(config, hash)
+
+      expect(result).toEqual({
+        success: true,
+        completed: true,
+      })
+    })
+
+    it('stops a torrent', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'STOP_QBITTORRENT_TORRENT',
+        hash,
+      })
+
+      expect(stopQBittorrentTorrent).toHaveBeenCalledWith(config, hash)
+
+      expect(result).toEqual({
+        success: true,
+        completed: true,
+      })
+    })
+
+    it('removes a torrent without deleting downloaded files', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'DELETE_QBITTORRENT_TORRENT',
+        hash,
+        deleteFiles: false,
+      })
+
+      expect(deleteQBittorrentTorrent).toHaveBeenCalledWith(config, hash, false)
+
+      expect(result).toEqual({
+        success: true,
+        completed: true,
+      })
+    })
+
+    it('deletes downloaded files only when explicitly requested', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'DELETE_QBITTORRENT_TORRENT',
+        hash,
+        deleteFiles: true,
+      })
+
+      expect(deleteQBittorrentTorrent).toHaveBeenCalledWith(config, hash, true)
+
+      expect(result).toEqual({
+        success: true,
+        completed: true,
+      })
+    })
+
+    it.each([
+      { type: 'START_QBITTORRENT_TORRENT', hash: 'invalid' },
+      { type: 'STOP_QBITTORRENT_TORRENT', hash: '' },
+      { type: 'DELETE_QBITTORRENT_TORRENT', hash: 'invalid', deleteFiles: false },
+      { type: 'DELETE_QBITTORRENT_TORRENT', hash, deleteFiles: 'true' },
+      { type: 'DELETE_QBITTORRENT_TORRENT', hash },
+    ])('rejects invalid torrent actions: %j', async (message) => {
+      const result = await handleBackgroundMessage(message)
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid background message.',
+      })
+
+      expect(startQBittorrentTorrent).not.toHaveBeenCalled()
+      expect(stopQBittorrentTorrent).not.toHaveBeenCalled()
+      expect(deleteQBittorrentTorrent).not.toHaveBeenCalled()
+    })
+
+    it('returns qBittorrent API failures as structured errors', async () => {
+      vi.mocked(fetchQBittorrentSnapshot).mockRejectedValue(
+        new Error('qBittorrent authentication failed. Check your API key.'),
+      )
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_QBITTORRENT_DOWNLOADS',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'qBittorrent authentication failed. Check your API key.',
+      })
+    })
+
+    it('does not expose the API key in download responses', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'GET_QBITTORRENT_DOWNLOADS',
+      })
+
+      expect(JSON.stringify(result)).not.toContain(config.apiKey)
+    })
   })
 
   describe('REMOVE_SERVICE', () => {

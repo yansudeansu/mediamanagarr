@@ -13,6 +13,8 @@ const meta = {
         'settings',
         'arrow-left',
         'arrow-right',
+        'arrow-up',
+        'arrow-down',
         'chevron-left',
         'chevron-right',
         'refresh',
@@ -73,6 +75,24 @@ export const ArrowRight: Story = {
 }
 
 /**
+ * Upload direction indicator.
+ */
+export const ArrowUp: Story = {
+  args: {
+    name: 'arrow-up',
+  },
+}
+
+/**
+ * Download direction indicator.
+ */
+export const ArrowDown: Story = {
+  args: {
+    name: 'arrow-down',
+  },
+}
+
+/**
  * Previous month chevron.
  */
 export const ChevronLeft: Story = {
@@ -110,6 +130,8 @@ export const Gallery: Story = {
         'settings',
         'arrow-left',
         'arrow-right',
+        'arrow-up',
+        'arrow-down',
         'chevron-left',
         'chevron-right',
         'refresh',

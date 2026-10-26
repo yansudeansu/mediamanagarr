@@ -5,10 +5,10 @@ import type { SeerrRequest } from '../../../types/seerr'
 const baseRequest: SeerrRequest = {
   id: 42,
   type: 'movie',
-  title: 'Example Movie',
+  title: 'Movie 1',
   status: 'Pending',
   mediaStatus: 'Processing',
-  requestedBy: 'Alice',
+  requestedBy: 'Test User 1',
   createdAt: '2026-10-20T12:00:00.000Z',
   posterPath: null,
 }
@@ -54,10 +54,10 @@ export const TVShow: Story = {
       ...baseRequest,
       id: 43,
       type: 'tv',
-      title: 'Example TV Series',
+      title: 'TV Show 1',
       status: 'Approved',
       mediaStatus: 'Partially Available',
-      requestedBy: 'Bob',
+      requestedBy: 'Test User 2',
     },
   },
 }
@@ -66,8 +66,9 @@ export const LongTitle: Story = {
   args: {
     request: {
       ...baseRequest,
-      title: 'An Extremely Long Movie Title That Should Be Truncated Gracefully Within the Card',
-      requestedBy: 'A Very Long Requester Username',
+      title:
+        'Movie 1 — Extended Edition With Additional Bonus Content and an Extremely Long Title for Layout Testing',
+      requestedBy: 'Test User With an Extremely Long Display Name',
     },
   },
 }
@@ -85,8 +86,8 @@ export const WithPoster: Story = {
   args: {
     request: {
       ...baseRequest,
-      title: 'Example Movie With Poster',
-      posterPath: '/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg',
+      title: 'Movie 2',
+      posterPath: '/storybook-test-poster.jpg',
     },
   },
 }

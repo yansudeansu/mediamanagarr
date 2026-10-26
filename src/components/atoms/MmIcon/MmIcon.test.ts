@@ -79,6 +79,27 @@ describe('MmIcon', () => {
     expect(left.get('svg').html()).not.toBe(right.get('svg').html())
   })
 
+  it('renders the up-arrow icon', () => {
+    const wrapper = mountIcon('arrow-up')
+
+    expect(wrapper.find('svg').exists()).toBe(true)
+    expect(wrapper.get('svg').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('renders the down-arrow icon', () => {
+    const wrapper = mountIcon('arrow-down')
+
+    expect(wrapper.find('svg').exists()).toBe(true)
+    expect(wrapper.get('svg').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('renders different paths for up and down arrows', () => {
+    const up = mountIcon('arrow-up')
+    const down = mountIcon('arrow-down')
+
+    expect(up.get('svg').html()).not.toBe(down.get('svg').html())
+  })
+
   it('renders the left chevron', () => {
     const wrapper = mountIcon('chevron-left')
 
@@ -112,6 +133,8 @@ describe('MmIcon', () => {
       'settings',
       'arrow-left',
       'arrow-right',
+      'arrow-up',
+      'arrow-down',
       'chevron-left',
       'chevron-right',
       'refresh',
@@ -143,6 +166,18 @@ describe('MmIcon', () => {
 
     await wrapper.setProps({
       name: 'arrow-right',
+    })
+
+    expect(wrapper.get('svg').html()).not.toBe(initialMarkup)
+  })
+
+  it('updates from up arrow to down arrow', async () => {
+    const wrapper = mountIcon('arrow-up')
+
+    const initialMarkup = wrapper.get('svg').html()
+
+    await wrapper.setProps({
+      name: 'arrow-down',
     })
 
     expect(wrapper.get('svg').html()).not.toBe(initialMarkup)

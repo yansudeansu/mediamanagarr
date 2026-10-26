@@ -6,8 +6,8 @@ const tvItem: CalendarItem = {
   id: 'sonarr-101',
   source: 'sonarr',
   type: 'tv',
-  title: 'The Example Show',
-  subtitle: 'S02E03 · The Adventure',
+  title: 'TV Show 1',
+  subtitle: 'S02E03 · Episode 3',
   date: '2026-11-05T20:00:00Z',
   releaseType: 'air',
   posterUrl: null,
@@ -17,12 +17,21 @@ const digitalMovie: CalendarItem = {
   id: 'radarr-201',
   source: 'radarr',
   type: 'movie',
-  title: 'The Example Movie',
+  title: 'Movie 1',
   subtitle: '2026',
   date: '2026-11-05',
   releaseType: 'digital',
   posterUrl: null,
 }
+
+const createPoster = (label: string): string =>
+  'data:image/svg+xml;charset=utf-8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="192" viewBox="0 0 128 192">
+      <rect width="128" height="192" fill="#272c35"/>
+      <text x="64" y="96" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="16" fill="#e5e7eb">${label}</text>
+    </svg>`,
+  )
 
 const meta = {
   title: 'Molecules/CalendarEvent',
@@ -59,7 +68,7 @@ export const PhysicalMovie: Story = {
     item: {
       ...digitalMovie,
       id: 'radarr-202',
-      title: 'Another Example Movie',
+      title: 'Movie 2',
       releaseType: 'physical',
     },
   },
@@ -67,14 +76,14 @@ export const PhysicalMovie: Story = {
 
 export const TvWithPoster: Story = {
   args: {
-    image: 'https://placehold.co/128x192/272c35/e5e7eb?text=TV',
+    image: createPoster('TV Show 1'),
   },
 }
 
 export const MovieWithPoster: Story = {
   args: {
     item: digitalMovie,
-    image: 'https://placehold.co/128x192/272c35/e5e7eb?text=Movie',
+    image: createPoster('Movie 1'),
   },
 }
 
@@ -82,8 +91,8 @@ export const LongTitle: Story = {
   args: {
     item: {
       ...tvItem,
-      title: 'An Exceptionally Long Series Title That Should Be Truncated Gracefully',
-      subtitle: 'S12E24 · An Equally Long Episode Title That Should Not Break the Layout',
+      title: 'TV Show 1 — Extended Edition With an Extremely Long Title for Layout Testing',
+      subtitle: 'S12E24 · Episode 24 With an Extremely Long Subtitle for Layout Testing',
     },
   },
 }

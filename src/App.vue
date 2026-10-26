@@ -7,6 +7,7 @@ import MmFooter from './components/molecules/MmFooter/MmFooter.vue'
 import MmRequestView from './views/MmRequestView.vue'
 import MmUpNextView from './views/MmUpNextView.vue'
 import MmCalendarView from './views/MmCalendarView.vue'
+import MmDownloadsView from './views/MmDownloadsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import { getAppVersion } from './utils/version'
 
@@ -14,13 +15,6 @@ const settingsOpen = ref(false)
 const activeView = ref<NavigationView>('requests')
 
 const version = getAppVersion()
-
-const viewTitles: Record<NavigationView, string> = {
-  requests: 'Requests',
-  'up-next': 'Up Next',
-  calendar: 'Calendar',
-  downloads: 'Downloads',
-}
 </script>
 
 <template>
@@ -42,13 +36,7 @@ const viewTitles: Record<NavigationView, string> = {
 
       <mm-calendar-view v-else-if="activeView === 'calendar'" />
 
-      <section v-else class="app-content__placeholder" aria-labelledby="view-title">
-        <h2 id="view-title" aria-live="polite" aria-atomic="true">
-          {{ viewTitles[activeView] }}
-        </h2>
-
-        <p>This view will be implemented in a future milestone.</p>
-      </section>
+      <mm-downloads-view v-else-if="activeView === 'downloads'" />
     </main>
 
     <mm-footer :version="version" />
@@ -71,17 +59,5 @@ const viewTitles: Record<NavigationView, string> = {
 
 .app-content--settings {
   padding: 0;
-}
-
-.app-content__placeholder h2 {
-  margin: 0 0 8px;
-  font-size: 16px;
-}
-
-.app-content__placeholder p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--muted);
 }
 </style>
