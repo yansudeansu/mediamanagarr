@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.0
+
+### Features
+
+- add detachable workspace support (30f0425)
+- add native browser sidebar support (8d54634)
+
 ## v0.2.1
 
 ### Bug Fixes
