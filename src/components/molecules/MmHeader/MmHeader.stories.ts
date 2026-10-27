@@ -14,8 +14,9 @@ const meta = {
     },
     windowMode: {
       control: 'radio',
-      options: ['popup', 'detached'],
-      description: 'Determines whether the workspace is attached or detached.',
+      options: ['popup', 'detached', 'sidebar'],
+      description:
+        'Determines whether the workspace is displayed as a popup, detached window, or native browser sidebar.',
     },
     onSettings: {
       description: 'Emitted when the settings button is clicked.',
@@ -41,6 +42,12 @@ const meta = {
         category: 'events',
       },
     },
+    onSidebar: {
+      description: 'Emitted when the native browser sidebar button is clicked.',
+      table: {
+        category: 'events',
+      },
+    },
   },
 
   args: {
@@ -61,30 +68,35 @@ type Story = StoryObj<typeof meta>
 
 /**
  * Interactive playground.
- * Switch between main and settings using Storybook Controls.
+ * Switch between main/settings and popup/detached/sidebar using Storybook Controls.
  */
 export const Playground: Story = {}
 
 /**
- * Default header with the application title and settings button.
+ * Default popup header with the application title,
+ * sidebar button, detach button, and settings button.
  */
 export const Main: Story = {
   args: {
     mode: 'main',
+    windowMode: 'popup',
   },
 }
 
 /**
- * Settings header with a back button and settings title.
+ * Popup settings header with the back button,
+ * sidebar button, and detach button.
  */
 export const Settings: Story = {
   args: {
     mode: 'settings',
+    windowMode: 'popup',
   },
 }
 
 /**
- * Detached workspace with the application title and settings button.
+ * Detached workspace with the application title,
+ * sidebar button, attach button, and settings button.
  */
 export const DetachedMain: Story = {
   args: {
@@ -94,11 +106,39 @@ export const DetachedMain: Story = {
 }
 
 /**
- * Detached workspace with a back button and settings title.
+ * Detached workspace with the settings title,
+ * sidebar button, attach button, and back button.
  */
 export const DetachedSettings: Story = {
   args: {
     mode: 'settings',
     windowMode: 'detached',
+  },
+}
+
+/**
+ * Native browser sidebar with the application title
+ * and settings button.
+ *
+ * Workspace actions are hidden because the application
+ * is already running inside the sidebar.
+ */
+export const SidebarMain: Story = {
+  args: {
+    mode: 'main',
+    windowMode: 'sidebar',
+  },
+}
+
+/**
+ * Native browser sidebar showing the settings title
+ * and back button.
+ *
+ * Workspace actions remain hidden in sidebar mode.
+ */
+export const SidebarSettings: Story = {
+  args: {
+    mode: 'settings',
+    windowMode: 'sidebar',
   },
 }

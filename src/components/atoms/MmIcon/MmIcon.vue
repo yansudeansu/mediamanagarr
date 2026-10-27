@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ExternalLink,
   Minimize2,
+  PanelRightOpen,
   RefreshCw,
   Settings,
 } from 'lucide-vue-next'
@@ -23,6 +24,7 @@ export type IconName =
   | 'refresh'
   | 'detach'
   | 'attach'
+  | 'sidebar'
 
 withDefaults(defineProps<{ name: IconName; size?: number }>(), {
   size: 18,
@@ -104,6 +106,14 @@ withDefaults(defineProps<{ name: IconName; size?: number }>(), {
 
   <minimize2
     v-else-if="name === 'attach'"
+    :size="size"
+    :stroke-width="2"
+    aria-hidden="true"
+    focusable="false"
+  />
+
+  <panel-right-open
+    v-else-if="name === 'sidebar'"
     :size="size"
     :stroke-width="2"
     aria-hidden="true"

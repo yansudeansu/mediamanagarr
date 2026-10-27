@@ -2,10 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from './App.vue'
 import { sendBackgroundMessage } from './utils/background-messaging'
+import { openWorkspaceSidebar } from './utils/workspace-sidebar'
 import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
 
 vi.mock('./utils/background-messaging', () => ({
   sendBackgroundMessage: vi.fn(),
+}))
+
+vi.mock('./utils/workspace-sidebar', () => ({
+  openWorkspaceSidebar: vi.fn(),
 }))
 
 vi.mock('./utils/workspace-state', () => ({
@@ -42,6 +47,7 @@ vi.mock('./views/SettingsView.vue', () => ({
 }))
 
 const mockedSendMessage = vi.mocked(sendBackgroundMessage)
+const mockedOpenSidebar = vi.mocked(openWorkspaceSidebar)
 const mockedGetWorkspaceState = vi.mocked(getWorkspaceNavigationState)
 const mockedSaveWorkspaceState = vi.mocked(saveWorkspaceNavigationState)
 
@@ -70,13 +76,13 @@ function getNavigationButton(wrapper: ReturnType<typeof mount>, label: string) {
   return button
 }
 
-function setWorkspaceMode(detached: boolean): void {
+function setWorkspaceMode(mode: 'popup' | 'detached' | 'sidebar'): void {
   const url = new URL(window.location.href)
 
-  if (detached) {
-    url.searchParams.set('workspace', 'detached')
-  } else {
+  if (mode === 'popup') {
     url.searchParams.delete('workspace')
+  } else {
+    url.searchParams.set('workspace', mode)
   }
 
   window.history.replaceState(null, '', url.toString())
@@ -104,6 +110,7 @@ describe('App', () => {
     })
 
     mockedSaveWorkspaceState.mockResolvedValue(undefined)
+    mockedOpenSidebar.mockResolvedValue(undefined)
 
     mockBackgroundMessages()
   })
@@ -453,6 +460,7 @@ describe('App', () => {
       const wrapper = mount(App)
 
       expect(wrapper.find('.app-shell--detached').exists()).toBe(false)
+      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(false)
       expect(wrapper.find('button[aria-label="Detach workspace into a window"]').exists()).toBe(
         true,
       )
@@ -462,11 +470,12 @@ describe('App', () => {
     })
 
     it('detects detached mode from the URL query parameter', () => {
-      setWorkspaceMode(true)
+      setWorkspaceMode('detached')
 
       const wrapper = mount(App)
 
       expect(wrapper.find('.app-shell--detached').exists()).toBe(true)
+      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(false)
       expect(wrapper.find('button[aria-label="Attach workspace to toolbar"]').exists()).toBe(true)
       expect(wrapper.find('button[aria-label="Detach workspace into a window"]').exists()).toBe(
         false,
@@ -481,6 +490,7 @@ describe('App', () => {
       const wrapper = mount(App)
 
       expect(wrapper.find('.app-shell--detached').exists()).toBe(false)
+      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(false)
       expect(wrapper.find('button[aria-label="Detach workspace into a window"]').exists()).toBe(
         true,
       )
@@ -541,7 +551,7 @@ describe('App', () => {
     })
 
     it('closes the detached window when Attach is clicked', async () => {
-      setWorkspaceMode(true)
+      setWorkspaceMode('detached')
 
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
@@ -563,7 +573,7 @@ describe('App', () => {
     })
 
     it('keeps navigation available in detached mode', async () => {
-      setWorkspaceMode(true)
+      setWorkspaceMode('detached')
 
       const wrapper = mount(App)
       await flushPromises()
@@ -572,6 +582,284 @@ describe('App', () => {
 
       expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
       expect(wrapper.find('.app-shell--detached').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('native sidebar workspace', () => {
+    it('shows the sidebar button in popup mode', () => {
+      const wrapper = mount(App)
+
+      expect(wrapper.find('button[aria-label="Open workspace in browser sidebar"]').exists()).toBe(
+        true,
+      )
+
+      wrapper.unmount()
+    })
+
+    it('detects sidebar mode from the URL query parameter', () => {
+      setWorkspaceMode('sidebar')
+
+      const wrapper = mount(App)
+
+      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(true)
+      expect(wrapper.find('.app-shell--detached').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('hides the sidebar button while already in sidebar mode', () => {
+      setWorkspaceMode('sidebar')
+
+      const wrapper = mount(App)
+
+      expect(wrapper.find('button[aria-label="Open workspace in browser sidebar"]').exists()).toBe(
+        false,
+      )
+
+      wrapper.unmount()
+    })
+
+    it('hides detach and attach buttons in sidebar mode', () => {
+      setWorkspaceMode('sidebar')
+
+      const wrapper = mount(App)
+
+      expect(wrapper.find('button[aria-label="Detach workspace into a window"]').exists()).toBe(
+        false,
+      )
+
+      expect(wrapper.find('button[aria-label="Attach workspace to toolbar"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('keeps the sidebar button available in detached mode', () => {
+      setWorkspaceMode('detached')
+
+      const wrapper = mount(App)
+
+      expect(wrapper.find('button[aria-label="Open workspace in browser sidebar"]').exists()).toBe(
+        true,
+      )
+
+      wrapper.unmount()
+    })
+
+    it('opens the native sidebar and closes the popup', async () => {
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open workspace in browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
+      expect(closeSpy).toHaveBeenCalledOnce()
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('opens the native sidebar and closes the detached window', async () => {
+      setWorkspaceMode('detached')
+
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open workspace in browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
+      expect(closeSpy).toHaveBeenCalledOnce()
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('saves navigation state before opening the sidebar', async () => {
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+      await flushPromises()
+
+      mockedSaveWorkspaceState.mockClear()
+
+      await wrapper.get('button[aria-label="Open workspace in browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
+        activeView: 'calendar',
+        settingsOpen: false,
+      })
+
+      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
+      expect(closeSpy).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('does not send a background message when opening the sidebar', async () => {
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open workspace in browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
+      expect(mockedSendMessage).not.toHaveBeenCalled()
+      expect(closeSpy).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('shows an error and keeps the popup open when opening the sidebar fails', async () => {
+      mockedOpenSidebar.mockRejectedValue(new Error('Sidebar unavailable.'))
+
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open workspace in browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Sidebar unavailable.')
+      expect(closeSpy).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('shows a fallback error when the sidebar rejects with an unknown value', async () => {
+      mockedOpenSidebar.mockRejectedValue('Unknown failure')
+
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open workspace in browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Unable to open the browser sidebar.')
+      expect(closeSpy).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('does not start another sidebar request while one is pending', async () => {
+      let resolveOpen: (() => void) | undefined
+
+      mockedOpenSidebar.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveOpen = resolve
+          }),
+      )
+
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      const button = wrapper.get('button[aria-label="Open workspace in browser sidebar"]')
+
+      await button.trigger('click')
+      await button.trigger('click')
+
+      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
+      expect(closeSpy).not.toHaveBeenCalled()
+
+      resolveOpen?.()
+      await flushPromises()
+
+      expect(closeSpy).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('allows another sidebar request after a failed attempt', async () => {
+      mockedOpenSidebar
+        .mockRejectedValueOnce(new Error('Temporary failure.'))
+        .mockResolvedValueOnce(undefined)
+
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      const button = wrapper.get('button[aria-label="Open workspace in browser sidebar"]')
+
+      await button.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Temporary failure.')
+      expect(closeSpy).not.toHaveBeenCalled()
+
+      await button.trigger('click')
+      await flushPromises()
+
+      expect(mockedOpenSidebar).toHaveBeenCalledTimes(2)
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+      expect(closeSpy).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('keeps navigation available in sidebar mode', async () => {
+      setWorkspaceMode('sidebar')
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
+      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('keeps settings available in sidebar mode', async () => {
+      setWorkspaceMode('sidebar')
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+
+      expect(wrapper.get('h1').text()).toBe('Settings')
+      expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
+
+      await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
+
+      expect(wrapper.get('h1').text()).toBe('MediaManagarr')
+
+      wrapper.unmount()
+    })
+
+    it('restores navigation state in sidebar mode', async () => {
+      setWorkspaceMode('sidebar')
+
+      mockedGetWorkspaceState.mockResolvedValue({
+        activeView: 'calendar',
+        settingsOpen: false,
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
+      expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
 
       wrapper.unmount()
     })

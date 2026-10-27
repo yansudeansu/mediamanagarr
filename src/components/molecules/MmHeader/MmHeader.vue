@@ -4,7 +4,7 @@ import mmLogo from '../../../assets/mm-logo.svg'
 
 interface Props {
   mode?: 'main' | 'settings'
-  windowMode?: 'popup' | 'detached'
+  windowMode?: 'popup' | 'detached' | 'sidebar'
 }
 
 withDefaults(defineProps<Props>(), {
@@ -17,6 +17,7 @@ const emit = defineEmits<{
   back: []
   detach: []
   attach: []
+  sidebar: []
 }>()
 </script>
 
@@ -31,25 +32,36 @@ const emit = defineEmits<{
     </div>
 
     <div class="header__actions">
-      <mm-button
-        v-if="windowMode === 'detached'"
-        variant="secondary"
-        icon="attach"
-        icon-only
-        aria-label="Attach workspace to toolbar"
-        title="Attach workspace to toolbar"
-        @click="emit('attach')"
-      />
+      <template v-if="windowMode !== 'sidebar'">
+        <mm-button
+          variant="secondary"
+          icon="sidebar"
+          icon-only
+          aria-label="Open workspace in browser sidebar"
+          title="Open workspace in browser sidebar"
+          @click="emit('sidebar')"
+        />
 
-      <mm-button
-        v-else
-        variant="secondary"
-        icon="detach"
-        icon-only
-        aria-label="Detach workspace into a window"
-        title="Detach workspace into a window"
-        @click="emit('detach')"
-      />
+        <mm-button
+          v-if="windowMode === 'detached'"
+          variant="secondary"
+          icon="attach"
+          icon-only
+          aria-label="Attach workspace to toolbar"
+          title="Attach workspace to toolbar"
+          @click="emit('attach')"
+        />
+
+        <mm-button
+          v-else
+          variant="secondary"
+          icon="detach"
+          icon-only
+          aria-label="Detach workspace into a window"
+          title="Detach workspace into a window"
+          @click="emit('detach')"
+        />
+      </template>
 
       <mm-button
         v-if="mode === 'settings'"
@@ -57,6 +69,7 @@ const emit = defineEmits<{
         icon="arrow-left"
         icon-only
         aria-label="Back to previous view"
+        title="Back to previous view"
         @click="emit('back')"
       />
 
@@ -66,6 +79,7 @@ const emit = defineEmits<{
         icon="settings"
         icon-only
         aria-label="Open settings"
+        title="Open settings"
         @click="emit('settings')"
       />
     </div>
