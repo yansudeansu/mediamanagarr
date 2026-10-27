@@ -289,7 +289,7 @@ jobs:
 
       - name: Configure GitHub Pages
         if: steps.verify.outputs.proceed == 'true'
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload complete website
         if: steps.verify.outputs.proceed == 'true'
