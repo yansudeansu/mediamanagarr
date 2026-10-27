@@ -53,15 +53,15 @@ const percentage = computed(() => `${normalizedValue.value.toFixed(1)}%`)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .mm-progress-bar__label {
   min-width: 0;
   overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -69,8 +69,8 @@ const percentage = computed(() => `${normalizedValue.value.toFixed(1)}%`)
 .mm-progress-bar__percentage {
   flex-shrink: 0;
   color: var(--text);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -85,7 +85,7 @@ const percentage = computed(() => `${normalizedValue.value.toFixed(1)}%`)
 .mm-progress-bar__fill {
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
+  background: var(--primary);
   transition: width var(--transition-fast);
 }
 

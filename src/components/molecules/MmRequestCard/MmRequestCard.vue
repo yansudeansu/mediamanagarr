@@ -122,46 +122,40 @@ const formattedDate = computed(() => {
 <style scoped>
 .request-card {
   display: flex;
-  gap: 12px;
-
+  gap: var(--space-3);
   min-width: 0;
-  padding: 12px;
+  padding: var(--space-3);
 }
 
 .request-card__details {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 9px;
-
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .request-card__heading {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-
+  gap: var(--space-1);
   min-width: 0;
 }
 
 .request-card__title {
   overflow: hidden;
-
   margin: 0;
-
   color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.35;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .request-card__type {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.3;
 }
 
@@ -169,80 +163,72 @@ const formattedDate = computed(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1);
 }
 
 .request-card__badge {
   display: inline-flex;
   align-items: center;
-
   width: fit-content;
   padding: 4px 7px;
-
   border: 1px solid transparent;
   border-radius: 999px;
-
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
   line-height: 1;
-
   white-space: nowrap;
 }
 
 .request-card__badge--pending {
-  color: #fcd34d;
-  background: #3b301a;
-  border-color: #655025;
+  color: var(--status-warning);
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
 }
 
 .request-card__badge--approved,
 .request-card__badge--available {
-  color: #86efac;
-  background: #153326;
-  border-color: #28563c;
+  color: var(--status-success);
+  background: var(--status-success-bg);
+  border-color: var(--status-success-border);
 }
 
 .request-card__badge--declined {
-  color: #fca5a5;
-  background: #382225;
-  border-color: #68383e;
+  color: var(--status-danger);
+  background: var(--status-danger-bg);
+  border-color: var(--status-danger-border);
 }
 
 .request-card__badge--processing {
-  color: #93c5fd;
-  background: #17283e;
-  border-color: #28476b;
+  color: var(--status-info);
+  background: var(--status-info-bg);
+  border-color: var(--status-info-border);
 }
 
 .request-card__badge--partial {
-  color: #c4b5fd;
-  background: #29213f;
-  border-color: #49386c;
+  color: var(--status-partial);
+  background: var(--status-partial-bg);
+  border-color: var(--status-partial-border);
 }
 
 .request-card__badge--unknown {
-  color: #aeb9c9;
-  background: #252a33;
-  border-color: #353d49;
+  color: var(--status-neutral);
+  background: var(--status-neutral-bg);
+  border-color: var(--status-neutral-border);
 }
 
 .request-card__metadata {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-
+  gap: var(--space-1);
   margin-top: auto;
-
   min-width: 0;
-
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   line-height: 1.4;
 }
 
 .request-card__requester {
   overflow: hidden;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }

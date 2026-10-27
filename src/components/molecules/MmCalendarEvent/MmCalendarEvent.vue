@@ -101,58 +101,49 @@ const dateTime = computed(() => calendarItemDateKey(props.item.date))
 <style scoped>
 .calendar-event {
   position: relative;
-
   display: flex;
-  gap: 12px;
-
+  gap: var(--space-3);
   min-width: 0;
-  padding: 12px;
+  padding: var(--space-3);
 }
 
 .calendar-event__details {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 7px;
-
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .calendar-event__heading {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-
+  gap: var(--space-1);
   min-width: 0;
 }
 
 .calendar-event__title {
   overflow: hidden;
-
   margin: 0;
-
   color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.35;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .calendar-event__type {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.3;
 }
 
 .calendar-event__subtitle {
   overflow: hidden;
-
   margin: 0;
-
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -163,20 +154,19 @@ const dateTime = computed(() => calendarItemDateKey(props.item.date))
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 8px;
-
+  gap: var(--space-2);
   margin-top: auto;
 }
 
 .calendar-event__release-type {
   color: var(--text);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   line-height: 1.4;
 }
 
 .calendar-event__date {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   line-height: 1.4;
 }
 
@@ -184,18 +174,16 @@ const dateTime = computed(() => calendarItemDateKey(props.item.date))
   position: absolute;
   top: 10px;
   right: 10px;
-
   width: 7px;
   height: 7px;
-
   border-radius: 50%;
 }
 
 .calendar-event__indicator--tv {
-  background: var(--accent);
+  background: var(--primary);
 }
 
 .calendar-event__indicator--movie {
-  background: #3b82f6;
+  background: var(--info);
 }
 </style>

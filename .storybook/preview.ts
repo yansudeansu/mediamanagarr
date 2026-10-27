@@ -1,8 +1,7 @@
 import type { Preview } from '@storybook/vue3-vite'
 import { themes } from 'storybook/theming'
 
-import '../src/styles/reset.css'
-import '../src/styles/tokens.css'
+import '../src/styles/app.css'
 
 const preview: Preview = {
   parameters: {

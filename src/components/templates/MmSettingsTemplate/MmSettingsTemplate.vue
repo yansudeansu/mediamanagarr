@@ -14,24 +14,22 @@
 .settings-template {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-
+  gap: var(--space-4);
   width: 100%;
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .settings-template__section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .settings-template__title {
   margin: 0;
-
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 700;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }

@@ -34,7 +34,6 @@ withDefaults(
   overflow: hidden;
 
   border-radius: var(--radius-md);
-
   color: var(--text);
 }
 
@@ -49,15 +48,15 @@ withDefaults(
 }
 
 .mm-card--padding-none {
-  --card-padding: 0px;
+  --card-padding: 0;
 }
 
 .mm-card--padding-sm {
-  --card-padding: 10px;
+  --card-padding: var(--space-2);
 }
 
 .mm-card--padding-md {
-  --card-padding: 14px;
+  --card-padding: var(--space-3);
 }
 
 .mm-card__header,

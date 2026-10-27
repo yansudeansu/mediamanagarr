@@ -56,26 +56,23 @@ const formattedUploadSpeed = computed(() => formatSpeed(props.uploadSpeed))
   display: grid;
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-
+  gap: var(--space-3);
   width: 100%;
   min-width: 0;
-  padding: 12px;
+  padding: var(--space-3);
 }
 
 .transfer-stats__item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .transfer-stats__heading {
   display: flex;
   align-items: center;
-  gap: 6px;
-
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -83,46 +80,41 @@ const formattedUploadSpeed = computed(() => formatSpeed(props.uploadSpeed))
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   flex-shrink: 0;
-
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .transfer-stats__label {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 .transfer-stats__value {
   overflow: hidden;
-
   color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
   line-height: 1.3;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .transfer-stats__divider {
   align-self: stretch;
-
   width: 1px;
   background: var(--border);
 }
 
 @media (max-width: 320px) {
   .transfer-stats {
-    gap: 8px;
-    padding: 10px;
+    gap: var(--space-2);
+    padding: var(--space-2);
   }
 
   .transfer-stats__value {
-    font-size: 13px;
+    font-size: var(--font-size-md);
   }
 }
 </style>

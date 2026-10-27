@@ -1,36 +1,213 @@
 :root {
   color-scheme: dark;
 
-  /* Backgrounds */
-  --background: #15171c;
-  --surface: #1e2229;
-  --surface-hover: #272c35;
+  /* ========================================
+     PALETTE — Neutral
+     ======================================== */
 
-  /* Borders */
-  --border: #2f343e;
+  --neutral-950: #15171c;
+  --neutral-900: #1e2229;
+  --neutral-800: #272c35;
+  --neutral-700: #2f343e;
+  --neutral-600: #353d49;
+  --neutral-500: #626b78;
+  --neutral-400: #8b919e;
+  --neutral-300: #aeb9c9;
+  --neutral-200: #cbd2dc;
+  --neutral-100: #e5e7eb;
 
-  /* Text */
-  --text: #e5e7eb;
-  --muted: #8b919e;
+  /* ========================================
+     PALETTE — Green / Primary
+     ======================================== */
 
-  /* Accents */
-  --accent: #22c55e;
-  --danger: #ef4444;
+  --green-950: #153326;
+  --green-900: #1e442f;
+  --green-800: #28563c;
+  --green-700: #197a3e;
+  --green-600: #1da84f;
+  --green-500: #22c55e;
+  --green-400: #4ade80;
+  --green-300: #86efac;
 
-  /* Typography */
+  /* ========================================
+     PALETTE — Blue / Info
+     ======================================== */
+
+  --blue-950: #17283e;
+  --blue-900: #203653;
+  --blue-800: #28476b;
+  --blue-700: #245a9a;
+  --blue-600: #3170d4;
+  --blue-500: #3b82f6;
+  --blue-400: #60a5fa;
+  --blue-300: #93c5fd;
+
+  /* ========================================
+     PALETTE — Red / Danger
+     ======================================== */
+
+  --red-950: #382225;
+  --red-900: #68383e;
+  --red-800: #87343d;
+  --red-700: #a23e49;
+  --red-600: #c75560;
+  --red-500: #ef4444;
+  --red-400: #f87171;
+  --red-300: #fca5a5;
+
+  /* ========================================
+     PALETTE — Yellow / Warning
+     ======================================== */
+
+  --yellow-950: #3b301a;
+  --yellow-900: #4c3d20;
+  --yellow-800: #655025;
+  --yellow-700: #8a6b24;
+  --yellow-600: #b68b29;
+  --yellow-500: #eab308;
+  --yellow-400: #facc15;
+  --yellow-300: #fcd34d;
+
+  /* ========================================
+     PALETTE — Purple / Partial
+     ======================================== */
+
+  --purple-950: #29213f;
+  --purple-900: #382d55;
+  --purple-800: #49386c;
+  --purple-700: #63489b;
+  --purple-600: #8059c7;
+  --purple-500: #a78bfa;
+  --purple-400: #b4a0fc;
+  --purple-300: #c4b5fd;
+
+  /* ========================================
+     SEMANTIC — Foundation
+     ======================================== */
+
+  --background: var(--neutral-950);
+  --surface: var(--neutral-900);
+  --surface-hover: var(--neutral-800);
+  --border: var(--neutral-700);
+
+  --text: var(--neutral-100);
+  --muted: var(--neutral-400);
+
+  /* ========================================
+     SEMANTIC — Brand & Actions
+     ======================================== */
+
+  --primary: var(--green-500);
+  --primary-foreground: #101712;
+
+  --info: var(--blue-500);
+  --danger: var(--red-500);
+
+  /* ========================================
+     SEMANTIC — Status Text
+     ======================================== */
+
+  --status-neutral: var(--neutral-300);
+  --status-info: var(--blue-300);
+  --status-success: var(--green-300);
+  --status-danger: var(--red-300);
+  --status-warning: var(--yellow-300);
+  --status-partial: var(--purple-300);
+
+  /* ========================================
+     SEMANTIC — Status Backgrounds
+     ======================================== */
+
+  --status-neutral-bg: var(--neutral-800);
+  --status-info-bg: var(--blue-950);
+  --status-success-bg: var(--green-950);
+  --status-danger-bg: var(--red-950);
+  --status-warning-bg: var(--yellow-950);
+  --status-partial-bg: var(--purple-950);
+
+  /* ========================================
+     SEMANTIC — Status Borders
+     ======================================== */
+
+  --status-neutral-border: var(--neutral-700);
+  --status-info-border: var(--blue-800);
+  --status-success-border: var(--green-800);
+  --status-danger-border: var(--red-900);
+  --status-warning-border: var(--yellow-800);
+  --status-partial-border: var(--purple-800);
+
+  /* ========================================
+     SEMANTIC — Buttons
+     ======================================== */
+
+  --button-danger-bg: var(--red-800);
+  --button-danger-border: #a9444d;
+  --button-danger-hover-bg: var(--red-700);
+  --button-danger-hover-border: var(--red-600);
+
+  /* ========================================
+     SEMANTIC — Effects & Transparency
+     ======================================== */
+
+  --primary-subtle: rgb(34 197 94 / 10%);
+  --primary-glow: rgb(34 197 94 / 30%);
+
+  --info-subtle: rgb(59 130 246 / 10%);
+  --info-hover: rgb(59 130 246 / 16%);
+
+  --overlay-subtle: rgb(255 255 255 / 4%);
+  --overlay-hover: rgb(255 255 255 / 7%);
+  --shadow: rgb(0 0 0 / 35%);
+
+  /* ========================================
+     TYPOGRAPHY — Family
+     ======================================== */
+
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-  /* Radii */
+  /* ========================================
+     TYPOGRAPHY — Sizes
+     ======================================== */
+
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+
+  /* ========================================
+     TYPOGRAPHY — Weights
+     ======================================== */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ========================================
+     SPACING
+     ======================================== */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ========================================
+     RADII
+     ======================================== */
+
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 10px;
 
-  /* Motion */
-  --transition-fast: 150ms ease;
-}
+  /* ========================================
+     MOTION
+     ======================================== */
 
-body {
-  font-family: var(--font-family);
-  background: var(--background);
-  color: var(--text);
+  --transition-fast: 150ms ease;
 }

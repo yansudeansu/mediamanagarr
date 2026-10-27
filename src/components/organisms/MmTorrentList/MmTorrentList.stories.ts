@@ -32,7 +32,7 @@ function createTorrents(count: number): QBittorrentTorrent[] {
 }
 
 const meta = {
-  title: 'Organisms/MmTorrentList',
+  title: 'Organisms/TorrentList',
   component: MmTorrentList,
   tags: ['autodocs'],
 

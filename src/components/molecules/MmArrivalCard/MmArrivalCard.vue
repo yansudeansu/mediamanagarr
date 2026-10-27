@@ -106,12 +106,10 @@ function toggleUnread(): void {
 <style scoped>
 .arrival-card {
   position: relative;
-
   display: flex;
-  gap: 12px;
-
+  gap: var(--space-3);
   min-width: 0;
-  padding: 12px;
+  padding: var(--space-3);
 }
 
 .arrival-card--unread {
@@ -122,46 +120,39 @@ function toggleUnread(): void {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 7px;
-
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .arrival-card__heading {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-
+  gap: var(--space-1);
   min-width: 0;
 }
 
 .arrival-card__title {
   overflow: hidden;
-
   margin: 0;
-
   color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.35;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .arrival-card__type {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.3;
 }
 
 .arrival-card__subtitle {
   overflow: hidden;
-
   margin: 0;
-
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -172,14 +163,13 @@ function toggleUnread(): void {
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 8px;
-
+  gap: var(--space-2);
   margin-top: auto;
 }
 
 .arrival-card__date {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   line-height: 1.4;
 }
 
@@ -187,11 +177,9 @@ function toggleUnread(): void {
   position: absolute;
   top: 10px;
   right: 10px;
-
   width: 7px;
   height: 7px;
-
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--primary);
 }
 </style>

@@ -12,6 +12,11 @@ const meta = {
       options: ['main', 'settings'],
       description: 'Determines the header title and navigation action.',
     },
+    windowMode: {
+      control: 'radio',
+      options: ['popup', 'detached'],
+      description: 'Determines whether the workspace is attached or detached.',
+    },
     onSettings: {
       description: 'Emitted when the settings button is clicked.',
       table: {
@@ -24,10 +29,23 @@ const meta = {
         category: 'events',
       },
     },
+    onDetach: {
+      description: 'Emitted when the detach button is clicked.',
+      table: {
+        category: 'events',
+      },
+    },
+    onAttach: {
+      description: 'Emitted when the attach button is clicked.',
+      table: {
+        category: 'events',
+      },
+    },
   },
 
   args: {
     mode: 'main',
+    windowMode: 'popup',
   },
 
   decorators: [
@@ -62,5 +80,25 @@ export const Main: Story = {
 export const Settings: Story = {
   args: {
     mode: 'settings',
+  },
+}
+
+/**
+ * Detached workspace with the application title and settings button.
+ */
+export const DetachedMain: Story = {
+  args: {
+    mode: 'main',
+    windowMode: 'detached',
+  },
+}
+
+/**
+ * Detached workspace with a back button and settings title.
+ */
+export const DetachedSettings: Story = {
+  args: {
+    mode: 'settings',
+    windowMode: 'detached',
   },
 }

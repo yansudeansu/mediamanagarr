@@ -103,66 +103,56 @@ function handleCancel() {
 .torrent-confirmation {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-
-  padding: 14px;
+  gap: var(--space-3);
+  padding: var(--space-3);
 }
 
 .torrent-confirmation__content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .torrent-confirmation__title {
   margin: 0;
-
   color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   line-height: 1.4;
 }
 
 .torrent-confirmation__name {
   overflow-wrap: anywhere;
-
   margin: 0;
-
   color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.5;
 }
 
 .torrent-confirmation__description {
   margin: 0;
-
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.6;
 }
 
 .torrent-confirmation__option {
-  padding: 12px;
-
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-
   background: var(--background);
 }
 
 .torrent-confirmation__warning {
   margin: 0;
-  padding: 10px 12px;
-
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--danger);
   border-radius: var(--radius-sm);
-
   color: var(--text);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   line-height: 1.5;
 }
 
@@ -170,18 +160,12 @@ function handleCancel() {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
-
-  padding-top: 12px;
-
+  gap: var(--space-2);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
 
 @media (max-width: 320px) {
-  .torrent-confirmation {
-    padding: 12px;
-  }
-
   .torrent-confirmation__actions {
     justify-content: stretch;
   }

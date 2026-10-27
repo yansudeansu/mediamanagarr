@@ -3,12 +3,12 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmCheckbox from './MmCheckbox.vue'
 
 const meta = {
-  title: 'Atoms/MmCheckbox',
+  title: 'Atoms/Checkbox',
   component: MmCheckbox,
   tags: ['autodocs'],
 
   args: {
-    label: 'Delete downloaded files',
+    label: 'Enable notifications',
     modelValue: false,
     hint: '',
     disabled: false,
@@ -59,14 +59,14 @@ export const Checked: Story = {
 
 export const WithHint: Story = {
   args: {
-    hint: 'This will permanently delete the downloaded data.',
+    hint: 'Receive updates when something changes.',
   },
 }
 
 export const CheckedWithHint: Story = {
   args: {
     modelValue: true,
-    hint: 'This will permanently delete the downloaded data.',
+    hint: 'Receive updates when something changes.',
   },
 }
 
@@ -85,7 +85,7 @@ export const DisabledChecked: Story = {
 
 export const Required: Story = {
   args: {
-    label: 'I understand the consequences',
+    label: 'I agree to the terms and conditions',
     required: true,
   },
 }
@@ -101,13 +101,13 @@ export const Interactive: Story = {
     },
 
     template: `
-      <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: var(--space-3);">
         <mm-checkbox
           v-bind="args"
           v-model="checked"
         />
 
-        <p style="margin: 0; color: var(--muted); font-size: 12px;">
+        <p style="margin: 0; color: var(--muted); font-size: var(--font-size-sm);">
           Checked: {{ checked ? 'Yes' : 'No' }}
         </p>
       </div>

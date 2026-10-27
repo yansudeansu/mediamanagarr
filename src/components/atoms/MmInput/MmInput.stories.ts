@@ -52,24 +52,26 @@ const meta = {
 
   args: {
     modelValue: '',
-    label: 'Server URL',
-    type: 'url',
-    placeholder: 'https://jellyfin.example.com',
+    label: 'Name',
+    type: 'text',
+    placeholder: 'Enter your name',
     hint: '',
     error: '',
     disabled: false,
     required: false,
     autocomplete: 'off',
-    name: 'url',
+    name: 'name',
   },
 
   render: (args) => ({
     components: { MmInput },
+
     setup() {
       return { args }
     },
+
     template: `
-      <div style="width: 320px">
+      <div style="width: 320px; max-width: 100%;">
         <mm-input
           v-bind="args"
           @update:model-value="args.modelValue = $event"
@@ -89,39 +91,32 @@ type Story = StoryObj<typeof meta>
 export const Playground: Story = {}
 
 /**
- * URL field used when configuring a service.
+ * Standard text input.
  */
-export const ServerUrl: Story = {
+export const Default: Story = {}
+
+/**
+ * URL input with native URL validation.
+ */
+export const Url: Story = {
   args: {
-    label: 'Server URL',
+    label: 'Website',
     type: 'url',
-    placeholder: 'https://jellyfin.example.com',
-    required: true,
+    placeholder: 'https://example.com',
+    name: 'website',
   },
 }
 
 /**
- * Password field used for service API keys.
+ * Password input with masked characters.
  */
-export const ApiKey: Story = {
+export const Password: Story = {
   args: {
-    label: 'API Key',
+    label: 'Password',
     type: 'password',
-    placeholder: 'Enter API key',
-    name: 'apiKey',
-  },
-}
-
-/**
- * Existing credentials can be reused.
- */
-export const ExistingApiKey: Story = {
-  args: {
-    label: 'API Key',
-    type: 'password',
-    placeholder: 'Leave blank to reuse saved API key',
-    hint: 'Leave this field empty to keep your existing API key.',
-    name: 'apiKey',
+    placeholder: 'Enter your password',
+    autocomplete: 'new-password',
+    name: 'password',
   },
 }
 
@@ -130,9 +125,10 @@ export const ExistingApiKey: Story = {
  */
 export const WithHint: Story = {
   args: {
-    label: 'Server URL',
-    type: 'url',
-    hint: 'Enter the HTTPS address of your server.',
+    label: 'Username',
+    placeholder: 'Choose a username',
+    hint: 'Use at least 3 characters.',
+    name: 'username',
   },
 }
 
@@ -141,10 +137,11 @@ export const WithHint: Story = {
  */
 export const WithError: Story = {
   args: {
-    label: 'Server URL',
-    type: 'url',
-    modelValue: 'http://localhost:8096',
-    error: 'Only HTTPS server URLs are supported.',
+    label: 'Username',
+    modelValue: 'ab',
+    placeholder: 'Choose a username',
+    error: 'Username must be at least 3 characters.',
+    name: 'username',
   },
 }
 
@@ -153,8 +150,10 @@ export const WithError: Story = {
  */
 export const Required: Story = {
   args: {
-    label: 'Server URL',
+    label: 'Full name',
+    placeholder: 'Enter your full name',
     required: true,
+    name: 'fullName',
   },
 }
 
@@ -163,8 +162,9 @@ export const Required: Story = {
  */
 export const Disabled: Story = {
   args: {
-    label: 'Server URL',
-    modelValue: 'https://jellyfin.example.com',
+    label: 'Username',
+    modelValue: 'example_user',
     disabled: true,
+    name: 'username',
   },
 }

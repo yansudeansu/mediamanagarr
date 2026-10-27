@@ -24,6 +24,7 @@ import {
   startQBittorrentTorrent,
   stopQBittorrentTorrent,
 } from './services/qbittorrent'
+import { openDetachedWorkspace } from './services/workspace-window'
 
 vi.mock('../utils/service-storage', () => ({
   getSafeServiceConfigs: vi.fn(),
@@ -63,6 +64,10 @@ vi.mock('./services/qbittorrent', () => ({
   fetchQBittorrentSnapshot: vi.fn(),
   startQBittorrentTorrent: vi.fn(),
   stopQBittorrentTorrent: vi.fn(),
+}))
+
+vi.mock('./services/workspace-window', () => ({
+  openDetachedWorkspace: vi.fn(),
 }))
 
 const jellyfinConfig: ServiceConfig = {
@@ -148,6 +153,38 @@ describe('handleBackgroundMessage', () => {
     ).resolves.toEqual({
       success: false,
       error: 'Invalid background message.',
+    })
+  })
+
+  describe('OPEN_DETACHED_WORKSPACE', () => {
+    it('opens the detached workspace', async () => {
+      vi.mocked(openDetachedWorkspace).mockResolvedValue(42)
+
+      const result = await handleBackgroundMessage({
+        type: 'OPEN_DETACHED_WORKSPACE',
+      })
+
+      expect(openDetachedWorkspace).toHaveBeenCalledOnce()
+
+      expect(result).toEqual({
+        success: true,
+        windowId: 42,
+      })
+    })
+
+    it('returns a structured error when opening fails', async () => {
+      vi.mocked(openDetachedWorkspace).mockRejectedValue(
+        new Error('Unable to create the detached workspace window.'),
+      )
+
+      const result = await handleBackgroundMessage({
+        type: 'OPEN_DETACHED_WORKSPACE',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unable to create the detached workspace window.',
+      })
     })
   })
 

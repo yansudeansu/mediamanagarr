@@ -50,8 +50,7 @@
 .calendar-template {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-
+  gap: var(--space-3);
   width: 100%;
   min-width: 0;
 }
@@ -60,7 +59,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .calendar-template__heading {
@@ -69,18 +68,16 @@
 
 .calendar-template__title {
   margin: 0;
-
   color: var(--text);
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
   line-height: 1.3;
 }
 
 .calendar-template__description {
-  margin: 5px 0 0;
-
+  margin: var(--space-1) 0 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
@@ -88,8 +85,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-
+  gap: var(--space-2);
   width: 100%;
   min-width: 0;
 }
@@ -102,7 +98,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-2);
   flex-shrink: 0;
 }
 
@@ -116,6 +112,6 @@
 .calendar-template__content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 </style>

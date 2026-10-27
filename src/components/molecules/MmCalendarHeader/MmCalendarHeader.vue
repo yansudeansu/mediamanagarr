@@ -68,15 +68,15 @@ const monthLabel = computed(() => {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) 32px;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
 }
 
 .calendar-header__title {
   margin: 0;
   color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.3;
   text-align: center;
 }

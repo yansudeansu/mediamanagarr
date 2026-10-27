@@ -95,14 +95,14 @@ function handleInput(event: Event) {
 .input-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   width: 100%;
 }
 
 .input-field__label {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   line-height: 1.4;
 }
 
@@ -116,18 +116,14 @@ function handleInput(event: Event) {
   display: block;
   width: 100%;
   min-height: 38px;
-  padding: 10px 12px;
-
+  padding: 10px var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-
   background: var(--background);
   color: var(--text);
-
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
-
   transition:
     border-color var(--transition-fast),
     box-shadow var(--transition-fast);
@@ -143,8 +139,8 @@ function handleInput(event: Event) {
 }
 
 .input-field__control:focus-visible {
-  border-color: var(--accent);
-  outline: 2px solid var(--accent);
+  border-color: var(--primary);
+  outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
 
@@ -165,7 +161,7 @@ function handleInput(event: Event) {
 .input-field__hint,
 .input-field__error {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 

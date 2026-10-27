@@ -23,15 +23,11 @@ describe('MmSelect', () => {
   describe('rendering', () => {
     it('renders its label', () => {
       const wrapper = createWrapper()
-
       expect(wrapper.get('.select-field__label').text()).toBe('Jellyfin user')
     })
 
     it('associates its label and visible value with the trigger', () => {
-      const wrapper = createWrapper({
-        modelValue: 'user-1',
-      })
-
+      const wrapper = createWrapper({ modelValue: 'user-1' })
       const label = wrapper.get('.select-field__label')
       const value = wrapper.get('.select-field__value')
       const trigger = wrapper.get('.select-field__trigger')
@@ -39,35 +35,26 @@ describe('MmSelect', () => {
       expect(trigger.attributes('aria-labelledby')).toBe(
         `${label.attributes('id')} ${value.attributes('id')}`,
       )
-
       expect(value.text()).toBe('Alice')
     })
 
     it('renders the placeholder when nothing is selected', () => {
-      const wrapper = createWrapper({
-        placeholder: 'Select a user',
-      })
-
+      const wrapper = createWrapper({ placeholder: 'Select a user' })
       expect(wrapper.get('.select-field__value').text()).toBe('Select a user')
     })
 
     it('renders the fallback placeholder when none is provided', () => {
       const wrapper = createWrapper()
-
       expect(wrapper.get('.select-field__value').text()).toBe('Select an option')
     })
 
     it('displays the selected option label', () => {
-      const wrapper = createWrapper({
-        modelValue: 'user-2',
-      })
-
+      const wrapper = createWrapper({ modelValue: 'user-2' })
       expect(wrapper.get('.select-field__value').text()).toBe('Bob')
     })
 
     it('renders all options when opened', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       const renderedOptions = wrapper.findAll('[role="option"]')
@@ -78,37 +65,27 @@ describe('MmSelect', () => {
 
     it('does not render the dropdown while closed', () => {
       const wrapper = createWrapper()
-
       expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
     })
 
     it('shows an empty state when no options are available', async () => {
-      const wrapper = createWrapper({
-        options: [],
-      })
-
+      const wrapper = createWrapper({ options: [] })
       await wrapper.get('.select-field__trigger').trigger('click')
 
       expect(wrapper.get('.select-field__empty').text()).toBe('No options available')
     })
 
     it('reacts when its model value changes', async () => {
-      const wrapper = createWrapper({
-        modelValue: 'user-1',
-      })
-
+      const wrapper = createWrapper({ modelValue: 'user-1' })
       expect(wrapper.get('.select-field__value').text()).toBe('Alice')
 
-      await wrapper.setProps({
-        modelValue: 'user-2',
-      })
+      await wrapper.setProps({ modelValue: 'user-2' })
 
       expect(wrapper.get('.select-field__value').text()).toBe('Bob')
     })
 
     it('reacts when its options change', async () => {
       const wrapper = createWrapper()
-
       await wrapper.setProps({
         options: [{ label: 'Diana', value: 'user-4' }],
       })
@@ -125,7 +102,6 @@ describe('MmSelect', () => {
   describe('selection', () => {
     it('opens the dropdown when clicked', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       expect(wrapper.find('[role="listbox"]').exists()).toBe(true)
@@ -134,7 +110,6 @@ describe('MmSelect', () => {
 
     it('closes the dropdown when clicked again', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
       await wrapper.get('.select-field__trigger').trigger('click')
 
@@ -144,19 +119,14 @@ describe('MmSelect', () => {
 
     it('emits an update when an option is selected', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
-
-      const renderedOptions = wrapper.findAll('[role="option"]')
-
-      await renderedOptions[1]!.trigger('click')
+      await wrapper.findAll('[role="option"]')[1]!.trigger('click')
 
       expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['user-2'])
     })
 
     it('closes the dropdown after selecting an option', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
       await wrapper.get('[role="option"]').trigger('click')
 
@@ -164,10 +134,7 @@ describe('MmSelect', () => {
     })
 
     it('marks the selected option', async () => {
-      const wrapper = createWrapper({
-        modelValue: 'user-2',
-      })
-
+      const wrapper = createWrapper({ modelValue: 'user-2' })
       await wrapper.get('.select-field__trigger').trigger('click')
 
       const renderedOptions = wrapper.findAll('[role="option"]')
@@ -179,7 +146,6 @@ describe('MmSelect', () => {
 
     it('does not emit an update when opening the dropdown', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       expect(wrapper.emitted('update:modelValue')).toBeUndefined()
@@ -189,7 +155,6 @@ describe('MmSelect', () => {
   describe('disabled and loading states', () => {
     it('supports disabled options', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       const disabledOption = wrapper.findAll('[role="option"]')[2]
@@ -199,28 +164,19 @@ describe('MmSelect', () => {
     })
 
     it('supports disabled fields', () => {
-      const wrapper = createWrapper({
-        disabled: true,
-      })
-
+      const wrapper = createWrapper({ disabled: true })
       expect(wrapper.get('.select-field__trigger').attributes('disabled')).toBeDefined()
     })
 
     it('does not open when disabled', async () => {
-      const wrapper = createWrapper({
-        disabled: true,
-      })
-
+      const wrapper = createWrapper({ disabled: true })
       await wrapper.get('.select-field__trigger').trigger('click')
 
       expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
     })
 
     it('disables the dropdown while loading', () => {
-      const wrapper = createWrapper({
-        loading: true,
-      })
-
+      const wrapper = createWrapper({ loading: true })
       const trigger = wrapper.get('.select-field__trigger')
 
       expect(trigger.attributes('disabled')).toBeDefined()
@@ -230,20 +186,16 @@ describe('MmSelect', () => {
 
     it('does not mark the trigger as busy by default', () => {
       const wrapper = createWrapper()
-
       expect(wrapper.get('.select-field__trigger').attributes('aria-busy')).toBeUndefined()
     })
 
     it('closes an open dropdown when disabled', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       expect(wrapper.find('[role="listbox"]').exists()).toBe(true)
 
-      await wrapper.setProps({
-        disabled: true,
-      })
+      await wrapper.setProps({ disabled: true })
 
       expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
     })
@@ -251,16 +203,12 @@ describe('MmSelect', () => {
 
   describe('validation and accessibility', () => {
     it('supports required fields', () => {
-      const wrapper = createWrapper({
-        required: true,
-      })
-
+      const wrapper = createWrapper({ required: true })
       expect(wrapper.get('.select-field__required').text()).toBe('*')
     })
 
     it('does not show a required indicator by default', () => {
       const wrapper = createWrapper()
-
       expect(wrapper.find('.select-field__required').exists()).toBe(false)
     })
 
@@ -304,7 +252,6 @@ describe('MmSelect', () => {
 
     it('does not mark valid selects as invalid', () => {
       const wrapper = createWrapper()
-
       expect(wrapper.get('.select-field__trigger').attributes('aria-invalid')).toBeUndefined()
     })
 
@@ -322,7 +269,6 @@ describe('MmSelect', () => {
 
     it('does not render a hidden input without a name', () => {
       const wrapper = createWrapper()
-
       expect(wrapper.find('input[type="hidden"]').exists()).toBe(false)
     })
 
@@ -370,7 +316,6 @@ describe('MmSelect', () => {
 
     it('does not reference a missing listbox while closed', () => {
       const wrapper = createWrapper()
-
       const trigger = wrapper.get('.select-field__trigger')
 
       expect(trigger.attributes('aria-expanded')).toBe('false')
@@ -380,7 +325,6 @@ describe('MmSelect', () => {
 
     it('exposes the listbox relationship while open', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       const trigger = wrapper.get('.select-field__trigger')
@@ -392,7 +336,6 @@ describe('MmSelect', () => {
 
     it('removes the listbox reference after closing', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       expect(wrapper.get('.select-field__trigger').attributes('aria-controls')).toBeDefined()
@@ -427,7 +370,6 @@ describe('MmSelect', () => {
 
     it('closes with Escape', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       await wrapper.get('[role="option"]').trigger('keydown', {
@@ -439,7 +381,6 @@ describe('MmSelect', () => {
 
     it('selects an option with Enter', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       await wrapper.get('[role="option"]').trigger('keydown', {
@@ -451,7 +392,6 @@ describe('MmSelect', () => {
 
     it('selects an option with Space', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       await wrapper.get('[role="option"]').trigger('keydown', {
@@ -464,24 +404,26 @@ describe('MmSelect', () => {
     it('moves to the next enabled option with ArrowDown', async () => {
       const wrapper = createWrapper()
 
-      await wrapper.get('.select-field__trigger').trigger('click')
-
-      const renderedOptions = wrapper.findAll('[role="option"]')
-
-      await renderedOptions[0]!.trigger('keydown', {
+      // Keyboard opening initializes Alice as the active option.
+      await wrapper.get('.select-field__trigger').trigger('keydown', {
         key: 'ArrowDown',
       })
 
       await nextTick()
 
-      expect(renderedOptions[1]?.attributes('tabindex')).toBe('0')
+      expect(wrapper.get('[role="option"][tabindex="0"]').text()).toBe('Alice')
+
+      await wrapper.get('[role="option"][tabindex="0"]').trigger('keydown', {
+        key: 'ArrowDown',
+      })
+
+      await nextTick()
+
+      expect(wrapper.get('[role="option"][tabindex="0"]').text()).toBe('Bob')
     })
 
     it('skips disabled options during keyboard navigation', async () => {
-      const wrapper = createWrapper({
-        modelValue: 'user-2',
-      })
-
+      const wrapper = createWrapper({ modelValue: 'user-2' })
       await wrapper.get('.select-field__trigger').trigger('click')
 
       const renderedOptions = wrapper.findAll('[role="option"]')
@@ -497,10 +439,7 @@ describe('MmSelect', () => {
     })
 
     it('moves to the first enabled option with Home', async () => {
-      const wrapper = createWrapper({
-        modelValue: 'user-2',
-      })
-
+      const wrapper = createWrapper({ modelValue: 'user-2' })
       await wrapper.get('.select-field__trigger').trigger('click')
 
       const renderedOptions = wrapper.findAll('[role="option"]')
@@ -516,7 +455,6 @@ describe('MmSelect', () => {
 
     it('moves to the last enabled option with End', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       const renderedOptions = wrapper.findAll('[role="option"]')
@@ -532,7 +470,6 @@ describe('MmSelect', () => {
 
     it('closes with Tab', async () => {
       const wrapper = createWrapper()
-
       await wrapper.get('.select-field__trigger').trigger('click')
 
       await wrapper.get('[role="option"]').trigger('keydown', {

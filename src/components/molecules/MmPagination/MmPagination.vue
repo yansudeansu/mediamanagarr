@@ -13,30 +13,9 @@ const emit = defineEmits<{
   'update:page': [page: number]
 }>()
 
-type PageItem = number | 'ellipsis-start' | 'ellipsis-end'
-
 const lastPage = computed(() => Math.max(1, props.totalPages))
 
 const currentPage = computed(() => Math.min(Math.max(1, props.page), lastPage.value))
-
-const pageItems = computed<PageItem[]>(() => {
-  const total = lastPage.value
-  const current = currentPage.value
-
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, index) => index + 1)
-  }
-
-  if (current <= 4) {
-    return [1, 2, 3, 4, 5, 'ellipsis-end', total]
-  }
-
-  if (current >= total - 3) {
-    return [1, 'ellipsis-start', total - 4, total - 3, total - 2, total - 1, total]
-  }
-
-  return [1, 'ellipsis-start', current - 1, current, current + 1, 'ellipsis-end', total]
-})
 
 function goToPage(page: number) {
   if (!Number.isInteger(page) || page < 1 || page > lastPage.value || page === currentPage.value) {
@@ -48,7 +27,7 @@ function goToPage(page: number) {
 </script>
 
 <template>
-  <div v-if="lastPage > 1" class="pagination">
+  <nav v-if="lastPage > 1" class="pagination" aria-label="Pagination">
     <mm-button
       variant="pagination"
       size="small"
@@ -60,27 +39,9 @@ function goToPage(page: number) {
       @click="goToPage(currentPage - 1)"
     />
 
-    <div class="pagination-pages">
-      <template v-for="item in pageItems" :key="item">
-        <span v-if="typeof item === 'string'" class="pagination-ellipsis" aria-hidden="true">
-          …
-        </span>
-
-        <mm-button
-          v-else
-          variant="pagination"
-          size="small"
-          class="pagination-page"
-          :class="{ active: item === currentPage }"
-          :aria-label="`Page ${item}`"
-          :aria-current="item === currentPage ? 'page' : undefined"
-          :disabled="item === currentPage"
-          @click="goToPage(item)"
-        >
-          {{ item }}
-        </mm-button>
-      </template>
-    </div>
+    <span class="pagination-label" aria-live="polite" aria-atomic="true">
+      Page {{ currentPage }} of {{ lastPage }}
+    </span>
 
     <mm-button
       variant="pagination"
@@ -92,7 +53,7 @@ function goToPage(page: number) {
       :disabled="currentPage >= lastPage"
       @click="goToPage(currentPage + 1)"
     />
-  </div>
+  </nav>
 </template>
 
 <style scoped>
@@ -100,46 +61,28 @@ function goToPage(page: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-
+  gap: var(--space-3);
   width: 100%;
-  margin-top: 12px;
-  padding: 14px 0 4px;
-
+  margin-top: var(--space-3);
+  padding: 14px 0 var(--space-1);
   border-top: 1px solid var(--border);
 }
 
-.pagination-pages {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-
-  min-width: 0;
-}
-
-.pagination-page {
-  width: 30px;
-  min-width: 30px;
-  padding: 0;
-}
-
 .pagination-arrow {
+  flex: 0 0 32px;
   width: 32px;
   min-width: 32px;
   padding: 0;
 }
 
-.pagination-ellipsis {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 30px;
-  height: 30px;
-
+.pagination-label {
+  min-width: 100px;
   color: var(--muted);
-  font-size: 13px;
-  user-select: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 </style>

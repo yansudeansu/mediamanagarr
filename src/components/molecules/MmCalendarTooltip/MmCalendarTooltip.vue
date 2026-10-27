@@ -78,35 +78,32 @@ const releaseCountLabel = computed(() =>
 .calendar-tooltip {
   display: flex;
   flex-direction: column;
-  gap: 9px;
-
+  gap: var(--space-2);
   width: 220px;
   max-width: 100%;
-  padding: 11px;
-
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
-
-  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
-
+  box-shadow: 0 8px 24px var(--shadow);
   color: var(--text);
   font-family: var(--font-family);
 }
 
 .calendar-tooltip__heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-
-  padding-bottom: 8px;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--border);
 }
 
 .calendar-tooltip__date {
-  font-size: 12px;
-  font-weight: 600;
+  flex: 1 1 100%;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.4;
 }
 
@@ -115,16 +112,13 @@ const releaseCountLabel = computed(() =>
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-
   min-height: 20px;
   padding: 3px 7px;
-
   border-radius: 999px;
   background: var(--surface-hover);
-
   color: var(--text);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -132,32 +126,30 @@ const releaseCountLabel = computed(() =>
 .calendar-tooltip__items {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--space-2);
 }
 
 .calendar-tooltip__item {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .calendar-tooltip__indicator {
   flex-shrink: 0;
-
   width: 7px;
   height: 7px;
   margin-top: 5px;
-
   border-radius: 50%;
 }
 
 .calendar-tooltip__indicator--tv {
-  background: var(--accent);
+  background: var(--primary);
 }
 
 .calendar-tooltip__indicator--movie {
-  background: #3b82f6;
+  background: var(--info);
 }
 
 .calendar-tooltip__details {
@@ -169,9 +161,8 @@ const releaseCountLabel = computed(() =>
 
 .calendar-tooltip__title {
   overflow: hidden;
-
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -179,9 +170,8 @@ const releaseCountLabel = computed(() =>
 
 .calendar-tooltip__subtitle {
   overflow: hidden;
-
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -189,8 +179,7 @@ const releaseCountLabel = computed(() =>
 
 .calendar-tooltip__remaining {
   padding-left: 15px;
-
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
 }
 </style>

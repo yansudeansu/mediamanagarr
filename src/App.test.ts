@@ -2,9 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from './App.vue'
 import { sendBackgroundMessage } from './utils/background-messaging'
+import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
 
 vi.mock('./utils/background-messaging', () => ({
   sendBackgroundMessage: vi.fn(),
+}))
+
+vi.mock('./utils/workspace-state', () => ({
+  getWorkspaceNavigationState: vi.fn(),
+  saveWorkspaceNavigationState: vi.fn(),
 }))
 
 vi.mock('./views/MmRequestView.vue', () => ({
@@ -36,6 +42,8 @@ vi.mock('./views/SettingsView.vue', () => ({
 }))
 
 const mockedSendMessage = vi.mocked(sendBackgroundMessage)
+const mockedGetWorkspaceState = vi.mocked(getWorkspaceNavigationState)
+const mockedSaveWorkspaceState = vi.mocked(saveWorkspaceNavigationState)
 
 const emptyDownloads = {
   success: true as const,
@@ -62,16 +70,50 @@ function getNavigationButton(wrapper: ReturnType<typeof mount>, label: string) {
   return button
 }
 
+function setWorkspaceMode(detached: boolean): void {
+  const url = new URL(window.location.href)
+
+  if (detached) {
+    url.searchParams.set('workspace', 'detached')
+  } else {
+    url.searchParams.delete('workspace')
+  }
+
+  window.history.replaceState(null, '', url.toString())
+}
+
 describe('App', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
+
+    window.history.replaceState(null, '', window.location.pathname)
+
+    vi.stubGlobal('chrome', {
+      storage: {
+        session: {
+          get: vi.fn(),
+          set: vi.fn(),
+        },
+      },
+    })
+
+    mockedGetWorkspaceState.mockResolvedValue({
+      activeView: 'requests',
+      settingsOpen: false,
+    })
+
+    mockedSaveWorkspaceState.mockResolvedValue(undefined)
+
     mockBackgroundMessages()
   })
 
   afterEach(() => {
+    window.history.replaceState(null, '', window.location.pathname)
     vi.clearAllTimers()
     vi.useRealTimers()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('renders the application header', () => {
@@ -95,12 +137,12 @@ describe('App', () => {
     wrapper.unmount()
   })
 
-  it('starts on the Requests view', () => {
+  it('starts on the Requests view', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
-
     expect(getNavigationButton(wrapper, 'Requests').attributes('aria-current')).toBe('page')
 
     wrapper.unmount()
@@ -108,12 +150,12 @@ describe('App', () => {
 
   it('navigates to Up Next', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     await getNavigationButton(wrapper, 'Up Next').trigger('click')
 
     expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(false)
-
     expect(getNavigationButton(wrapper, 'Up Next').attributes('aria-current')).toBe('page')
 
     wrapper.unmount()
@@ -121,12 +163,12 @@ describe('App', () => {
 
   it('navigates to Calendar', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     await getNavigationButton(wrapper, 'Calendar').trigger('click')
 
     expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(false)
-
     expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
 
     wrapper.unmount()
@@ -134,6 +176,7 @@ describe('App', () => {
 
   it('navigates to Downloads and loads qBittorrent data', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     await getNavigationButton(wrapper, 'Downloads').trigger('click')
     await flushPromises()
@@ -151,6 +194,7 @@ describe('App', () => {
 
   it('unmounts the previous view when navigating', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     await getNavigationButton(wrapper, 'Downloads').trigger('click')
     await flushPromises()
@@ -167,6 +211,7 @@ describe('App', () => {
 
   it('opens settings and hides the active view and navigation', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     await wrapper.get('button[aria-label="Open settings"]').trigger('click')
 
@@ -180,9 +225,9 @@ describe('App', () => {
 
   it('returns to the previously selected view after closing settings', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     await getNavigationButton(wrapper, 'Calendar').trigger('click')
-
     await wrapper.get('button[aria-label="Open settings"]').trigger('click')
 
     expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(false)
@@ -191,7 +236,6 @@ describe('App', () => {
 
     expect(wrapper.get('h1').text()).toBe('MediaManagarr')
     expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-
     expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
 
     wrapper.unmount()
@@ -199,6 +243,7 @@ describe('App', () => {
 
   it('stops Downloads polling when navigating away', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     await getNavigationButton(wrapper, 'Downloads').trigger('click')
     await flushPromises()
@@ -210,7 +255,6 @@ describe('App', () => {
     expect(mockedSendMessage).toHaveBeenCalledTimes(2)
 
     await getNavigationButton(wrapper, 'Calendar').trigger('click')
-
     await vi.advanceTimersByTimeAsync(15000)
 
     expect(mockedSendMessage).toHaveBeenCalledTimes(2)
@@ -220,6 +264,7 @@ describe('App', () => {
 
   it('starts a fresh Downloads session when navigating back', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     await getNavigationButton(wrapper, 'Downloads').trigger('click')
     await flushPromises()
@@ -241,6 +286,7 @@ describe('App', () => {
 
   it('stops Downloads polling while settings is open', async () => {
     const wrapper = mount(App)
+    await flushPromises()
 
     await getNavigationButton(wrapper, 'Downloads').trigger('click')
     await flushPromises()
@@ -248,7 +294,6 @@ describe('App', () => {
     expect(mockedSendMessage).toHaveBeenCalledTimes(1)
 
     await wrapper.get('button[aria-label="Open settings"]').trigger('click')
-
     await vi.advanceTimersByTimeAsync(10000)
 
     expect(mockedSendMessage).toHaveBeenCalledTimes(1)
@@ -268,5 +313,267 @@ describe('App', () => {
     expect(wrapper.find('.footer').exists()).toBe(true)
 
     wrapper.unmount()
+  })
+
+  describe('workspace navigation persistence', () => {
+    it('restores the previously selected navigation view', async () => {
+      mockedGetWorkspaceState.mockResolvedValue({
+        activeView: 'calendar',
+        settingsOpen: false,
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
+      expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
+
+      wrapper.unmount()
+    })
+
+    it('restores Settings when it was previously open', async () => {
+      mockedGetWorkspaceState.mockResolvedValue({
+        activeView: 'downloads',
+        settingsOpen: true,
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('saves navigation changes', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+      await flushPromises()
+
+      expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
+        activeView: 'calendar',
+        settingsOpen: false,
+      })
+
+      wrapper.unmount()
+    })
+
+    it('saves Settings being opened', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
+        activeView: 'requests',
+        settingsOpen: true,
+      })
+
+      wrapper.unmount()
+    })
+
+    it('saves Settings being closed', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+      await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
+        activeView: 'requests',
+        settingsOpen: false,
+      })
+
+      wrapper.unmount()
+    })
+
+    it('saves the current navigation state before detaching', async () => {
+      mockedSendMessage.mockResolvedValue({
+        success: true,
+        windowId: 42,
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+      await wrapper.get('button[aria-label="Detach workspace into a window"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
+        activeView: 'calendar',
+        settingsOpen: false,
+      })
+
+      expect(mockedSendMessage).toHaveBeenCalledWith({
+        type: 'OPEN_DETACHED_WORKSPACE',
+      })
+
+      wrapper.unmount()
+    })
+
+    it('continues with defaults if restoring navigation state fails', async () => {
+      mockedGetWorkspaceState.mockRejectedValue(new Error('Storage unavailable'))
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
+      expect(warnSpy).toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('does not attempt storage access when Chrome storage is unavailable', async () => {
+      vi.stubGlobal('chrome', undefined)
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(mockedGetWorkspaceState).not.toHaveBeenCalled()
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+      await flushPromises()
+
+      expect(mockedSaveWorkspaceState).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('detachable workspace', () => {
+    it('starts in popup mode by default', () => {
+      const wrapper = mount(App)
+
+      expect(wrapper.find('.app-shell--detached').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Detach workspace into a window"]').exists()).toBe(
+        true,
+      )
+      expect(wrapper.find('button[aria-label="Attach workspace to toolbar"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('detects detached mode from the URL query parameter', () => {
+      setWorkspaceMode(true)
+
+      const wrapper = mount(App)
+
+      expect(wrapper.find('.app-shell--detached').exists()).toBe(true)
+      expect(wrapper.find('button[aria-label="Attach workspace to toolbar"]').exists()).toBe(true)
+      expect(wrapper.find('button[aria-label="Detach workspace into a window"]').exists()).toBe(
+        false,
+      )
+
+      wrapper.unmount()
+    })
+
+    it('does not activate detached mode for unrelated query parameters', () => {
+      window.history.replaceState(null, '', `${window.location.pathname}?workspace=other`)
+
+      const wrapper = mount(App)
+
+      expect(wrapper.find('.app-shell--detached').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Detach workspace into a window"]').exists()).toBe(
+        true,
+      )
+
+      wrapper.unmount()
+    })
+
+    it('requests a detached window when Detach is clicked', async () => {
+      mockedSendMessage.mockResolvedValue({
+        success: true,
+        windowId: 42,
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Detach workspace into a window"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedSendMessage).toHaveBeenCalledWith({
+        type: 'OPEN_DETACHED_WORKSPACE',
+      })
+
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('shows an error if opening the detached window fails', async () => {
+      mockedSendMessage.mockResolvedValue({
+        success: false,
+        error: 'Unable to create workspace window.',
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Detach workspace into a window"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Unable to create workspace window.')
+
+      wrapper.unmount()
+    })
+
+    it('shows an error if the background message rejects', async () => {
+      mockedSendMessage.mockRejectedValue(new Error('Extension context unavailable.'))
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Detach workspace into a window"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Extension context unavailable.')
+
+      wrapper.unmount()
+    })
+
+    it('closes the detached window when Attach is clicked', async () => {
+      setWorkspaceMode(true)
+
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+
+      await wrapper.get('button[aria-label="Attach workspace to toolbar"]').trigger('click')
+
+      expect(closeSpy).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('does not show Attach in popup mode', () => {
+      const wrapper = mount(App)
+
+      expect(wrapper.find('button[aria-label="Attach workspace to toolbar"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('keeps navigation available in detached mode', async () => {
+      setWorkspaceMode(true)
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
+      expect(wrapper.find('.app-shell--detached').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
   })
 })

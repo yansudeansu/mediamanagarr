@@ -19,7 +19,7 @@ describe('MmHeader', () => {
   it('renders the settings button in main mode', () => {
     const wrapper = mount(MmHeader)
 
-    const button = wrapper.get('button')
+    const button = wrapper.get('[aria-label="Open settings"]')
 
     expect(button.attributes('aria-label')).toBe('Open settings')
     expect(button.classes()).toContain('button--icon-only')
@@ -44,7 +44,7 @@ describe('MmHeader', () => {
       },
     })
 
-    const button = wrapper.get('button')
+    const button = wrapper.get('[aria-label="Back to previous view"]')
 
     expect(button.attributes('aria-label')).toBe('Back to previous view')
     expect(button.classes()).toContain('button--icon-only')
@@ -52,7 +52,7 @@ describe('MmHeader', () => {
     expect(button.find('svg').exists()).toBe(true)
   })
 
-  it('renders exactly one action button in both modes', () => {
+  it('renders exactly two action buttons in both modes', () => {
     const main = mount(MmHeader)
     const settings = mount(MmHeader, {
       props: {
@@ -60,12 +60,12 @@ describe('MmHeader', () => {
       },
     })
 
-    expect(main.findAll('button')).toHaveLength(1)
-    expect(settings.findAll('button')).toHaveLength(1)
+    expect(main.findAll('button')).toHaveLength(2)
+    expect(settings.findAll('button')).toHaveLength(2)
   })
 
   it.each(['main', 'settings'] as const)(
-    'renders branding before the action button in %s mode',
+    'renders branding before the action buttons in %s mode',
     (mode) => {
       const wrapper = mount(MmHeader, {
         props: { mode },
@@ -76,7 +76,7 @@ describe('MmHeader', () => {
 
       expect(children).toHaveLength(2)
       expect(children[0]?.classList.contains('header__branding')).toBe(true)
-      expect(children[1]?.tagName).toBe('BUTTON')
+      expect(children[1]?.classList.contains('header__actions')).toBe(true)
     },
   )
 
@@ -143,16 +143,16 @@ describe('MmHeader', () => {
   it('hides decorative button icons from assistive technology', () => {
     const wrapper = mount(MmHeader)
 
-    const svg = wrapper.get('button svg')
-
-    expect(svg.attributes('aria-hidden')).toBe('true')
-    expect(svg.attributes('focusable')).toBe('false')
+    for (const svg of wrapper.findAll('button svg')) {
+      expect(svg.attributes('aria-hidden')).toBe('true')
+      expect(svg.attributes('focusable')).toBe('false')
+    }
   })
 
   it('emits settings when the settings button is clicked', async () => {
     const wrapper = mount(MmHeader)
 
-    await wrapper.get('button').trigger('click')
+    await wrapper.get('[aria-label="Open settings"]').trigger('click')
 
     expect(wrapper.emitted('settings')).toHaveLength(1)
     expect(wrapper.emitted('back')).toBeUndefined()
@@ -165,7 +165,7 @@ describe('MmHeader', () => {
       },
     })
 
-    await wrapper.get('button').trigger('click')
+    await wrapper.get('[aria-label="Back to previous view"]').trigger('click')
 
     expect(wrapper.emitted('back')).toHaveLength(1)
     expect(wrapper.emitted('settings')).toBeUndefined()
@@ -175,14 +175,14 @@ describe('MmHeader', () => {
     const wrapper = mount(MmHeader)
 
     expect(wrapper.get('h1').text()).toBe('MediaManagarr')
-    expect(wrapper.get('button').attributes('aria-label')).toBe('Open settings')
+    expect(wrapper.find('[aria-label="Open settings"]').exists()).toBe(true)
 
     await wrapper.setProps({
       mode: 'settings',
     })
 
     expect(wrapper.get('h1').text()).toBe('Settings')
-    expect(wrapper.get('button').attributes('aria-label')).toBe('Back to previous view')
+    expect(wrapper.find('[aria-label="Back to previous view"]').exists()).toBe(true)
   })
 
   it('updates the title and button when returning to main mode', async () => {
@@ -197,13 +197,13 @@ describe('MmHeader', () => {
     })
 
     expect(wrapper.get('h1').text()).toBe('MediaManagarr')
-    expect(wrapper.get('button').attributes('aria-label')).toBe('Open settings')
+    expect(wrapper.find('[aria-label="Open settings"]').exists()).toBe(true)
   })
 
   it('emits the correct event after switching modes', async () => {
     const wrapper = mount(MmHeader)
 
-    await wrapper.get('button').trigger('click')
+    await wrapper.get('[aria-label="Open settings"]').trigger('click')
 
     expect(wrapper.emitted('settings')).toHaveLength(1)
 
@@ -211,7 +211,7 @@ describe('MmHeader', () => {
       mode: 'settings',
     })
 
-    await wrapper.get('button').trigger('click')
+    await wrapper.get('[aria-label="Back to previous view"]').trigger('click')
 
     expect(wrapper.emitted('back')).toHaveLength(1)
     expect(wrapper.emitted('settings')).toHaveLength(1)
@@ -220,14 +220,111 @@ describe('MmHeader', () => {
   it('renders different button icons for main and settings modes', async () => {
     const wrapper = mount(MmHeader)
 
-    const settingsIcon = wrapper.get('button svg').html()
+    const settingsIcon = wrapper.get('[aria-label="Open settings"] svg').html()
 
     await wrapper.setProps({
       mode: 'settings',
     })
 
-    const backIcon = wrapper.get('button svg').html()
+    const backIcon = wrapper.get('[aria-label="Back to previous view"] svg').html()
 
     expect(backIcon).not.toBe(settingsIcon)
+  })
+
+  it('renders the detach button by default', () => {
+    const wrapper = mount(MmHeader)
+
+    const button = wrapper.get('[aria-label="Detach workspace into a window"]')
+
+    expect(button.attributes('title')).toBe('Detach workspace into a window')
+    expect(button.classes()).toContain('button--icon-only')
+    expect(button.classes()).toContain('button--secondary')
+    expect(button.find('svg').exists()).toBe(true)
+  })
+
+  it('renders the attach button in detached mode', () => {
+    const wrapper = mount(MmHeader, {
+      props: {
+        windowMode: 'detached',
+      },
+    })
+
+    const button = wrapper.get('[aria-label="Attach workspace to toolbar"]')
+
+    expect(button.attributes('title')).toBe('Attach workspace to toolbar')
+    expect(button.classes()).toContain('button--icon-only')
+    expect(button.classes()).toContain('button--secondary')
+    expect(button.find('svg').exists()).toBe(true)
+  })
+
+  it('emits detach when the detach button is clicked', async () => {
+    const wrapper = mount(MmHeader)
+
+    await wrapper.get('[aria-label="Detach workspace into a window"]').trigger('click')
+
+    expect(wrapper.emitted('detach')).toHaveLength(1)
+    expect(wrapper.emitted('attach')).toBeUndefined()
+  })
+
+  it('emits attach when the attach button is clicked', async () => {
+    const wrapper = mount(MmHeader, {
+      props: {
+        windowMode: 'detached',
+      },
+    })
+
+    await wrapper.get('[aria-label="Attach workspace to toolbar"]').trigger('click')
+
+    expect(wrapper.emitted('attach')).toHaveLength(1)
+    expect(wrapper.emitted('detach')).toBeUndefined()
+  })
+
+  it('updates the workspace button when switching window modes', async () => {
+    const wrapper = mount(MmHeader)
+
+    expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(true)
+
+    await wrapper.setProps({
+      windowMode: 'detached',
+    })
+
+    expect(wrapper.find('[aria-label="Attach workspace to toolbar"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(false)
+  })
+
+  it('keeps the workspace button visible in settings mode', () => {
+    const wrapper = mount(MmHeader, {
+      props: {
+        mode: 'settings',
+      },
+    })
+
+    expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Back to previous view"]').exists()).toBe(true)
+  })
+
+  it('renders different icons for detach and attach', async () => {
+    const wrapper = mount(MmHeader)
+
+    const detachIcon = wrapper.get('[aria-label="Detach workspace into a window"] svg').html()
+
+    await wrapper.setProps({
+      windowMode: 'detached',
+    })
+
+    const attachIcon = wrapper.get('[aria-label="Attach workspace to toolbar"] svg').html()
+
+    expect(attachIcon).not.toBe(detachIcon)
+  })
+
+  it('keeps the settings button when switching window modes', async () => {
+    const wrapper = mount(MmHeader)
+
+    await wrapper.setProps({
+      windowMode: 'detached',
+    })
+
+    expect(wrapper.find('[aria-label="Open settings"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Attach workspace to toolbar"]').exists()).toBe(true)
   })
 })

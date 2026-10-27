@@ -218,11 +218,9 @@ watch(
 <style scoped>
 .calendar-grid {
   position: relative;
-
   display: flex;
   flex-direction: column;
-  gap: 6px;
-
+  gap: var(--space-2);
   min-width: 0;
   overflow: visible;
 }
@@ -234,33 +232,29 @@ watch(
 }
 
 .calendar-grid__weekdays {
-  gap: 4px;
-  padding-bottom: 4px;
-
+  gap: var(--space-1);
+  padding-bottom: var(--space-1);
   border-bottom: 1px solid var(--border);
 }
 
 .calendar-grid__weekday {
   padding: 6px 0;
-
   color: var(--muted);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.2;
   text-align: center;
 }
 
 .calendar-grid__days {
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .calendar-grid__tooltip {
   position: absolute;
   z-index: 20;
-
   width: 220px;
   max-width: 100%;
-
   pointer-events: none;
 }
 </style>

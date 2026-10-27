@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmSelect from './MmSelect.vue'
 
-const users = [
-  { label: 'Alice', value: 'user-1' },
-  { label: 'Bob', value: 'user-2' },
-  { label: 'Charlie', value: 'user-3' },
+const priorities = [
+  { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'High', value: 'high' },
 ]
 
 const meta = {
@@ -51,30 +51,32 @@ const meta = {
     },
     name: {
       control: 'text',
-      description: 'Native HTML select name.',
+      description: 'Native form field name.',
     },
   },
 
   args: {
     modelValue: '',
-    label: 'Jellyfin user',
-    options: users,
-    placeholder: 'Select a user',
+    label: 'Priority',
+    options: priorities,
+    placeholder: 'Select a priority',
     hint: '',
     error: '',
     disabled: false,
     loading: false,
     required: false,
-    name: 'jellyfinUser',
+    name: 'priority',
   },
 
   render: (args) => ({
     components: { MmSelect },
+
     setup() {
       return { args }
     },
+
     template: `
-      <div style="width: 320px">
+      <div style="width: 320px; max-width: 100%;">
         <mm-select
           v-bind="args"
           @update:model-value="args.modelValue = $event"
@@ -89,32 +91,26 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * Interactive playground.
+ * Interactive playground for select properties.
  */
 export const Playground: Story = {}
 
 /**
- * Jellyfin account selection.
+ * Default select without a selected value.
  */
-export const JellyfinUser: Story = {
-  args: {
-    label: 'Jellyfin user',
-    placeholder: 'Select a user',
-    hint: 'Watched movies and episodes will be hidden for the selected user.',
-  },
-}
+export const Default: Story = {}
 
 /**
- * An existing user selection.
+ * Select with an existing value.
  */
 export const Selected: Story = {
   args: {
-    modelValue: 'user-2',
+    modelValue: 'medium',
   },
 }
 
 /**
- * A required selection.
+ * Required selection with a visual indicator.
  */
 export const Required: Story = {
   args: {
@@ -123,54 +119,53 @@ export const Required: Story = {
 }
 
 /**
- * A select with a disabled option.
+ * Select containing an unavailable option.
  */
 export const DisabledOption: Story = {
   args: {
     options: [
-      { label: 'Alice', value: 'user-1' },
-      { label: 'Bob', value: 'user-2', disabled: true },
-      { label: 'Charlie', value: 'user-3' },
+      { label: 'Low', value: 'low' },
+      { label: 'Medium', value: 'medium', disabled: true },
+      { label: 'High', value: 'high' },
     ],
   },
 }
 
 /**
- * Loading Jellyfin users.
+ * Select while options are loading.
  */
 export const Loading: Story = {
   args: {
     loading: true,
-    placeholder: 'Loading users...',
     options: [],
   },
 }
 
 /**
- * A disabled select.
+ * Disabled select with an existing value.
  */
 export const Disabled: Story = {
   args: {
     disabled: true,
-    modelValue: 'user-1',
+    modelValue: 'medium',
   },
 }
 
 /**
- * An invalid selection.
+ * Select displaying a validation error.
  */
 export const WithError: Story = {
   args: {
-    error: 'Please select a Jellyfin user.',
+    error: 'Please select a priority.',
     required: true,
   },
 }
 
 /**
- * A select with additional guidance.
+ * Select with additional guidance.
  */
 export const WithHint: Story = {
   args: {
-    hint: 'Choose the account whose watch history should be used.',
+    hint: 'Choose how important this item is.',
   },
 }

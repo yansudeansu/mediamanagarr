@@ -74,8 +74,7 @@ const releaseLabel = computed(() =>
 .calendar-details {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -83,41 +82,37 @@ const releaseLabel = computed(() =>
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .calendar-details__heading {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-
+  gap: var(--space-1);
   min-width: 0;
 }
 
 .calendar-details__title {
   margin: 0;
-
   color: var(--text);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.4;
 }
 
 .calendar-details__count {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
 }
 
 .calendar-details__state {
-  padding: 20px 12px;
-
+  padding: var(--space-5) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
-
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   text-align: center;
 }
@@ -125,6 +120,6 @@ const releaseLabel = computed(() =>
 .calendar-details__events {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 </style>
