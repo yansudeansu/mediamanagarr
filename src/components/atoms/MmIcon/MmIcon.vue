@@ -6,6 +6,8 @@ import {
   ArrowUp,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
+  Minimize2,
   RefreshCw,
   Settings,
 } from 'lucide-vue-next'
@@ -19,16 +21,12 @@ export type IconName =
   | 'chevron-left'
   | 'chevron-right'
   | 'refresh'
+  | 'detach'
+  | 'attach'
 
-withDefaults(
-  defineProps<{
-    name: IconName
-    size?: number
-  }>(),
-  {
-    size: 18,
-  },
-)
+withDefaults(defineProps<{ name: IconName; size?: number }>(), {
+  size: 18,
+})
 </script>
 
 <template>
@@ -90,6 +88,22 @@ withDefaults(
 
   <refresh-cw
     v-else-if="name === 'refresh'"
+    :size="size"
+    :stroke-width="2"
+    aria-hidden="true"
+    focusable="false"
+  />
+
+  <external-link
+    v-else-if="name === 'detach'"
+    :size="size"
+    :stroke-width="2"
+    aria-hidden="true"
+    focusable="false"
+  />
+
+  <minimize2
+    v-else-if="name === 'attach'"
     :size="size"
     :stroke-width="2"
     aria-hidden="true"

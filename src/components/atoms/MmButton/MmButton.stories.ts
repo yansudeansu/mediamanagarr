@@ -19,7 +19,7 @@ const meta = {
     },
     icon: {
       control: 'select',
-      options: [undefined, 'settings', 'arrow-left', 'refresh'],
+      options: [undefined, 'settings', 'arrow-left', 'refresh', 'detach', 'attach'],
       description: 'Optional icon displayed by the button.',
     },
     disabled: {

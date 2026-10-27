@@ -1,5 +1,19 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmIcon from './MmIcon.vue'
+import type { IconName } from './MmIcon.vue'
+
+const icons: IconName[] = [
+  'settings',
+  'arrow-left',
+  'arrow-right',
+  'arrow-up',
+  'arrow-down',
+  'chevron-left',
+  'chevron-right',
+  'refresh',
+  'detach',
+  'attach',
+]
 
 const meta = {
   title: 'Atoms/Icon',
@@ -9,18 +23,10 @@ const meta = {
   argTypes: {
     name: {
       control: 'select',
-      options: [
-        'settings',
-        'arrow-left',
-        'arrow-right',
-        'arrow-up',
-        'arrow-down',
-        'chevron-left',
-        'chevron-right',
-        'refresh',
-      ],
-      description: 'Name of the icon to display.',
+      options: icons,
+      description: 'Icon to display.',
     },
+
     size: {
       control: {
         type: 'number',
@@ -28,7 +34,7 @@ const meta = {
         max: 48,
         step: 2,
       },
-      description: 'Icon width and height in pixels.',
+      description: 'Icon size in pixels.',
     },
   },
 
@@ -42,138 +48,142 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-/**
- * Interactive icon playground.
- */
 export const Playground: Story = {}
 
-/**
- * Settings icon, used in the application header.
- */
 export const Settings: Story = {
   args: {
     name: 'settings',
   },
 }
 
-/**
- * Back navigation icon.
- */
 export const ArrowLeft: Story = {
   args: {
     name: 'arrow-left',
   },
 }
 
-/**
- * Forward navigation icon.
- */
 export const ArrowRight: Story = {
   args: {
     name: 'arrow-right',
   },
 }
 
-/**
- * Upload direction indicator.
- */
 export const ArrowUp: Story = {
   args: {
     name: 'arrow-up',
   },
 }
 
-/**
- * Download direction indicator.
- */
 export const ArrowDown: Story = {
   args: {
     name: 'arrow-down',
   },
 }
 
-/**
- * Previous month chevron.
- */
 export const ChevronLeft: Story = {
   args: {
     name: 'chevron-left',
   },
 }
 
-/**
- * Next month chevron.
- */
 export const ChevronRight: Story = {
   args: {
     name: 'chevron-right',
   },
 }
 
-/**
- * Refresh icon, used for reloading service data.
- */
 export const Refresh: Story = {
   args: {
     name: 'refresh',
   },
 }
 
-/**
- * All available icons displayed together.
- */
+export const Detach: Story = {
+  args: {
+    name: 'detach',
+  },
+}
+
+export const Attach: Story = {
+  args: {
+    name: 'attach',
+  },
+}
+
 export const Gallery: Story = {
   render: () => ({
-    components: { MmIcon },
-    setup() {
-      const icons = [
-        'settings',
-        'arrow-left',
-        'arrow-right',
-        'arrow-up',
-        'arrow-down',
-        'chevron-left',
-        'chevron-right',
-        'refresh',
-      ] as const
-
-      return { icons }
+    components: {
+      MmIcon,
     },
+
+    setup() {
+      return {
+        icons,
+      }
+    },
+
     template: `
-      <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+      <div
+        style="
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+          gap: 16px;
+          max-width: 600px;
+        "
+      >
         <div
           v-for="icon in icons"
           :key="icon"
-          style="display: flex; flex-direction: column; align-items: center; gap: 8px;"
+          style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 8px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+          "
         >
           <mm-icon :name="icon" :size="24" />
-          <span style="font-size: 12px;">{{ icon }}</span>
+
+          <span style="font-size: 12px">
+            {{ icon }}
+          </span>
         </div>
       </div>
     `,
   }),
 }
 
-/**
- * Compare common icon sizes.
- */
 export const Sizes: Story = {
   render: () => ({
-    components: { MmIcon },
+    components: {
+      MmIcon,
+    },
+
     setup() {
       return {
         sizes: [16, 18, 24, 32],
       }
     },
+
     template: `
-      <div style="display: flex; gap: 24px; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 24px">
         <div
           v-for="size in sizes"
           :key="size"
-          style="display: flex; flex-direction: column; align-items: center; gap: 8px;"
+          style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+          "
         >
           <mm-icon name="settings" :size="size" />
-          <span style="font-size: 12px;">{{ size }}px</span>
+
+          <span style="font-size: 12px">
+            {{ size }}px
+          </span>
         </div>
       </div>
     `,
