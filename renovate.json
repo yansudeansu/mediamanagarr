@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "minimumReleaseAge": "3 days",
+  "dependencyDashboard": true,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Automatically merge patch and minor dependency updates",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Automatically merge lockfile maintenance",
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Require manual review for major dependency updates",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
+}
