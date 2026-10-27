@@ -168,7 +168,7 @@ jobs:
 
       - name: Checkout publishing branch
         if: steps.verify.outputs.proceed == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: gh-pages
           path: site
