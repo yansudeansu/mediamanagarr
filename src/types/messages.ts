@@ -84,6 +84,10 @@ export interface DeleteQBittorrentTorrentMessage {
   deleteFiles: boolean
 }
 
+export interface OpenDetachedWorkspaceMessage {
+  type: 'OPEN_DETACHED_WORKSPACE'
+}
+
 export type BackgroundMessage =
   | GetServiceConfigsMessage
   | ConnectServiceMessage
@@ -101,6 +105,7 @@ export type BackgroundMessage =
   | StartQBittorrentTorrentMessage
   | StopQBittorrentTorrentMessage
   | DeleteQBittorrentTorrentMessage
+  | OpenDetachedWorkspaceMessage
 
 export interface GetServiceConfigsSuccess {
   success: true
@@ -174,6 +179,11 @@ export interface QBittorrentTorrentActionSuccess {
   completed: true
 }
 
+export interface OpenDetachedWorkspaceSuccess {
+  success: true
+  windowId: number
+}
+
 export interface BackgroundMessageFailure {
   success: false
   error: string
@@ -203,6 +213,8 @@ export type GetQBittorrentDownloadsResponse =
 export type QBittorrentTorrentActionResponse =
   QBittorrentTorrentActionSuccess | BackgroundMessageFailure
 
+export type OpenDetachedWorkspaceResponse = OpenDetachedWorkspaceSuccess | BackgroundMessageFailure
+
 type BackgroundResponseMap = {
   GET_SERVICE_CONFIGS: GetServiceConfigsResponse
   CONNECT_SERVICE: ConnectServiceResponse
@@ -220,6 +232,7 @@ type BackgroundResponseMap = {
   START_QBITTORRENT_TORRENT: QBittorrentTorrentActionResponse
   STOP_QBITTORRENT_TORRENT: QBittorrentTorrentActionResponse
   DELETE_QBITTORRENT_TORRENT: QBittorrentTorrentActionResponse
+  OPEN_DETACHED_WORKSPACE: OpenDetachedWorkspaceResponse
 }
 
 export type BackgroundResponse<T extends BackgroundMessage> = BackgroundResponseMap[T['type']]

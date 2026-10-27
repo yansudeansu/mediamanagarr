@@ -198,6 +198,12 @@ export function createMockBackground(options: MockBackgroundOptions = {}) {
 
   function handle(message: BackgroundMessage): BackgroundResponse<BackgroundMessage> {
     switch (message.type) {
+      case 'OPEN_DETACHED_WORKSPACE':
+        return {
+          success: true,
+          windowId: 42,
+        }
+
       case 'GET_SERVICE_CONFIGS':
         return {
           success: true,

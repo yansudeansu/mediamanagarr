@@ -10,6 +10,7 @@ import type {
   GetQBittorrentDownloadsResponse,
   GetSeerrRequestsResponse,
   GetServiceConfigsResponse,
+  OpenDetachedWorkspaceResponse,
   QBittorrentTorrentActionResponse,
   RemoveServiceResponse,
   SetJellyfinArrivalUnreadResponse,
@@ -49,6 +50,7 @@ import {
   stopQBittorrentTorrent,
 } from './services/qbittorrent'
 import { fetchSeerrRequests } from './services/seerr-requests'
+import { openDetachedWorkspace } from './services/workspace-window'
 
 type MessageResponse =
   | ConnectServiceResponse
@@ -65,6 +67,7 @@ type MessageResponse =
   | GetCalendarResponse
   | GetQBittorrentDownloadsResponse
   | QBittorrentTorrentActionResponse
+  | OpenDetachedWorkspaceResponse
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -323,6 +326,15 @@ async function updateJellyfinBadgeSafely(unreadCount: number): Promise<void> {
 export async function handleBackgroundMessage(message: unknown): Promise<MessageResponse> {
   try {
     if (isRecord(message)) {
+      if (message.type === 'OPEN_DETACHED_WORKSPACE') {
+        const windowId = await openDetachedWorkspace()
+
+        return {
+          success: true,
+          windowId,
+        }
+      }
+
       if (message.type === 'GET_SERVICE_CONFIGS') {
         return {
           success: true,
