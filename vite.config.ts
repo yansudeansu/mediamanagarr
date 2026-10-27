@@ -42,10 +42,29 @@ function extensionPlugin(browser: BrowserTarget): Plugin {
         manifest.background = {
           scripts: ['background.js'],
         }
+
+        // Firefox and Zen use the native sidebarAction API.
+        manifest.sidebar_action = {
+          default_panel: 'index.html?workspace=sidebar',
+          default_title: 'MediaManagarr',
+          default_icon: {
+            '16': 'icons/icon-16.png',
+            '32': 'icons/icon-32.png',
+            '48': 'icons/icon-48.png',
+            '128': 'icons/icon-128.png',
+          },
+        }
       } else {
         manifest.background = {
           service_worker: 'background.js',
         }
+
+        // Chromium browsers use the native sidePanel API.
+        manifest.side_panel = {
+          default_path: 'index.html?workspace=sidebar',
+        }
+
+        manifest.permissions = [...new Set([...(manifest.permissions as string[]), 'sidePanel'])]
 
         delete manifest.browser_specific_settings
       }

@@ -5,7 +5,7 @@ import App from './App.vue'
 import { createMockBackground } from './test/mock-background'
 import type { BackgroundMessage } from './types/messages'
 
-type WorkspaceMode = 'popup' | 'detached'
+type WorkspaceMode = 'popup' | 'detached' | 'sidebar'
 
 const WORKSPACE_EVENT = 'mediamanagarr:storybook-workspace'
 
@@ -39,13 +39,27 @@ export const Default: Story = {
     const originalUrl = window.location.href
 
     // Storybook-only replacement for chrome.storage.session.
-    // Values survive App remounts during detach/attach.
+    // Values survive App remounts when switching workspaces.
     const sessionStorage = new Map<string, unknown>()
+
+    // Tracks which workspace is being opened so window.close()
+    // does not immediately return the preview to popup mode.
+    let pendingWorkspaceMode: WorkspaceMode | null = null
 
     const initialUrl = new URL(originalUrl)
     initialUrl.searchParams.delete('workspace')
 
     window.history.replaceState(null, '', initialUrl.toString())
+
+    function dispatchWorkspaceMode(mode: WorkspaceMode): void {
+      pendingWorkspaceMode = mode
+
+      window.dispatchEvent(
+        new CustomEvent<WorkspaceMode>(WORKSPACE_EVENT, {
+          detail: mode,
+        }),
+      )
+    }
 
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
@@ -87,6 +101,20 @@ export const Default: Story = {
           },
         },
 
+        windows: {
+          ...originalChrome?.windows,
+
+          getCurrent: async () => ({ id: 1 }),
+        },
+
+        sidePanel: {
+          ...originalChrome?.sidePanel,
+
+          open: async () => {
+            dispatchWorkspaceMode('sidebar')
+          },
+        },
+
         runtime: {
           ...originalChrome?.runtime,
 
@@ -100,11 +128,7 @@ export const Default: Story = {
             const response = mock.handle(message)
 
             if (message.type === 'OPEN_DETACHED_WORKSPACE' && response.success) {
-              window.dispatchEvent(
-                new CustomEvent<WorkspaceMode>(WORKSPACE_EVENT, {
-                  detail: 'detached',
-                }),
-              )
+              dispatchWorkspaceMode('detached')
             }
 
             return response
@@ -116,11 +140,12 @@ export const Default: Story = {
     Object.defineProperty(window, 'close', {
       configurable: true,
       value: () => {
-        window.dispatchEvent(
-          new CustomEvent<WorkspaceMode>(WORKSPACE_EVENT, {
-            detail: 'popup',
-          }),
-        )
+        if (pendingWorkspaceMode !== null) {
+          pendingWorkspaceMode = null
+          return
+        }
+
+        dispatchWorkspaceMode('popup')
       },
     })
 
@@ -162,16 +187,16 @@ export const Default: Story = {
 
           const url = new URL(window.location.href)
 
-          if (mode === 'detached') {
-            url.searchParams.set('workspace', 'detached')
-          } else {
+          if (mode === 'popup') {
             url.searchParams.delete('workspace')
+          } else {
+            url.searchParams.set('workspace', mode)
           }
 
           window.history.replaceState(null, '', url.toString())
 
-          // Remount App to simulate opening the other workspace.
-          // The mocked session storage survives this remount.
+          // Remount App to simulate opening the selected workspace.
+          // Mocked session storage survives this remount.
           workspaceKey.value += 1
         }
 
@@ -192,8 +217,12 @@ export const Default: Story = {
       template: `
         <div
           :style="{
-            width: workspaceMode === 'detached' ? '780px' : '380px',
-            height: workspaceMode === 'detached' ? '700px' : '480px',
+            width: workspaceMode === 'detached'
+              ? '780px'
+              : workspaceMode === 'sidebar'
+                ? '340px'
+                : '380px',
+            height: workspaceMode === 'popup' ? '480px' : '700px',
             maxWidth: '100%',
             border: '1px solid var(--border)',
             borderRadius: '10px',

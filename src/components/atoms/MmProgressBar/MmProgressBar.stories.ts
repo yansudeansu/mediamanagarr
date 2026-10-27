@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmProgressBar from './MmProgressBar.vue'
 
 const meta = {
-  title: 'Atoms/MmProgressBar',
+  title: 'Atoms/ProgressBar',
   component: MmProgressBar,
   tags: ['autodocs'],
   args: {

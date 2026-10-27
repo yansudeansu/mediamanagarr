@@ -23,6 +23,7 @@ const icons: IconName[] = [
   'refresh',
   'detach',
   'attach',
+  'sidebar',
 ]
 
 describe('MmIcon', () => {
@@ -103,6 +104,13 @@ describe('MmIcon', () => {
     expect(detach.get('svg').html()).not.toBe(attach.get('svg').html())
   })
 
+  it('renders different shapes for detach and sidebar', () => {
+    const detach = mountIcon('detach')
+    const sidebar = mountIcon('sidebar')
+
+    expect(detach.get('svg').html()).not.toBe(sidebar.get('svg').html())
+  })
+
   it.each(icons)('renders the %s icon', (name) => {
     const wrapper = mountIcon(name)
 
@@ -176,6 +184,30 @@ describe('MmIcon', () => {
 
   it('updates when switching from attach to detach', async () => {
     const wrapper = mountIcon('attach')
+    const originalSvg = wrapper.get('svg').html()
+
+    await wrapper.setProps({
+      name: 'detach',
+    })
+
+    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(wrapper.findAll('svg')).toHaveLength(1)
+  })
+
+  it('updates when switching from detach to sidebar', async () => {
+    const wrapper = mountIcon('detach')
+    const originalSvg = wrapper.get('svg').html()
+
+    await wrapper.setProps({
+      name: 'sidebar',
+    })
+
+    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(wrapper.findAll('svg')).toHaveLength(1)
+  })
+
+  it('updates when switching from sidebar to detach', async () => {
+    const wrapper = mountIcon('sidebar')
     const originalSvg = wrapper.get('svg').html()
 
     await wrapper.setProps({

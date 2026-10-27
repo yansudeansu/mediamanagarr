@@ -10,16 +10,23 @@ import MmCalendarView from './views/MmCalendarView.vue'
 import MmDownloadsView from './views/MmDownloadsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import { sendBackgroundMessage } from './utils/background-messaging'
+import { openWorkspaceSidebar } from './utils/workspace-sidebar'
 import { getAppVersion } from './utils/version'
 import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
+
+type WorkspaceMode = 'popup' | 'detached' | 'sidebar'
 
 const settingsOpen = ref(false)
 const activeView = ref<NavigationView>('requests')
 
-const windowMode = ref<'popup' | 'detached'>(
-  new URLSearchParams(window.location.search).get('workspace') === 'detached'
+const workspaceParameter = new URLSearchParams(window.location.search).get('workspace')
+
+const windowMode = ref<WorkspaceMode>(
+  workspaceParameter === 'detached'
     ? 'detached'
-    : 'popup',
+    : workspaceParameter === 'sidebar'
+      ? 'sidebar'
+      : 'popup',
 )
 
 const workspaceError = ref('')
@@ -97,13 +104,46 @@ async function detachWorkspace(): Promise<void> {
   }
 }
 
+async function openSidebar(): Promise<void> {
+  if (workspaceLoading.value) {
+    return
+  }
+
+  workspaceError.value = ''
+  workspaceLoading.value = true
+
+  try {
+    if (hasWorkspaceStorage()) {
+      await saveWorkspaceNavigationState({
+        activeView: activeView.value,
+        settingsOpen: settingsOpen.value,
+      })
+    }
+
+    await openWorkspaceSidebar()
+
+    window.close()
+  } catch (error) {
+    workspaceError.value =
+      error instanceof Error ? error.message : 'Unable to open the browser sidebar.'
+  } finally {
+    workspaceLoading.value = false
+  }
+}
+
 function attachWorkspace(): void {
   window.close()
 }
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'app-shell--detached': windowMode === 'detached' }">
+  <div
+    class="app-shell"
+    :class="{
+      'app-shell--detached': windowMode === 'detached',
+      'app-shell--sidebar': windowMode === 'sidebar',
+    }"
+  >
     <mm-header
       :mode="settingsOpen ? 'settings' : 'main'"
       :window-mode="windowMode"
@@ -111,6 +151,7 @@ function attachWorkspace(): void {
       @back="settingsOpen = false"
       @detach="detachWorkspace"
       @attach="attachWorkspace"
+      @sidebar="openSidebar"
     />
 
     <p v-if="workspaceError" class="workspace-error" role="alert">
@@ -142,7 +183,8 @@ function attachWorkspace(): void {
   height: 480px;
 }
 
-.app-shell--detached {
+.app-shell--detached,
+.app-shell--sidebar {
   height: 100vh;
 }
 
