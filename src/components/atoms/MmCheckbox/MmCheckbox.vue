@@ -64,8 +64,7 @@ function handleChange(event: Event) {
 .checkbox-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-
+  gap: var(--space-1);
   width: 100%;
   min-width: 0;
 }
@@ -73,26 +72,21 @@ function handleChange(event: Event) {
 .checkbox-field__row {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
+  gap: var(--space-2);
 }
 
 .checkbox-field__control {
+  position: relative;
   box-sizing: border-box;
-
   flex-shrink: 0;
-
   width: 16px;
   height: 16px;
   margin: 1px 0 0;
-
   border: 1px solid var(--border);
   border-radius: 4px;
-
   appearance: none;
   background: var(--background);
-
   cursor: pointer;
-
   transition:
     background-color var(--transition-fast),
     border-color var(--transition-fast),
@@ -100,31 +94,29 @@ function handleChange(event: Event) {
 }
 
 .checkbox-field__control:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--primary);
 }
 
 .checkbox-field__control:checked {
-  border-color: var(--accent);
-  background-color: var(--accent);
+  border-color: var(--primary);
+  background-color: var(--primary);
 }
 
 .checkbox-field__control:checked::after {
   content: '';
-
+  position: absolute;
+  top: 2px;
+  left: 5px;
   display: block;
-
   width: 4px;
   height: 8px;
-  margin: 1px 0 0 4px;
-
-  border: solid var(--background);
+  border: solid var(--primary-foreground);
   border-width: 0 2px 2px 0;
-
   transform: rotate(45deg);
 }
 
 .checkbox-field__control:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
 
@@ -135,18 +127,17 @@ function handleChange(event: Event) {
 }
 
 .checkbox-field__control:checked:disabled {
-  border-color: var(--accent);
-  background-color: var(--accent);
+  border-color: var(--primary);
+  background-color: var(--primary);
+  opacity: 0.65;
 }
 
 .checkbox-field__label {
   min-width: 0;
-
   color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   line-height: 1.5;
-
   cursor: pointer;
 }
 
@@ -156,15 +147,19 @@ function handleChange(event: Event) {
 }
 
 .checkbox-field__hint {
-  margin: 0 0 0 25px;
-
+  margin: 0 0 0 24px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
 .checkbox-field--disabled .checkbox-field__label {
+  color: var(--muted);
   cursor: not-allowed;
+}
+
+.checkbox-field--disabled .checkbox-field__required {
+  color: var(--muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

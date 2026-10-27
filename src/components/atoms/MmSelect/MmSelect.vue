@@ -102,7 +102,7 @@ function openDropdown(focus = false) {
   if (isDisabled.value || isOpen.value) return
 
   isOpen.value = true
-  activeIndex.value = getInitialIndex()
+  activeIndex.value = focus ? getInitialIndex() : -1
 
   if (focus && activeIndex.value >= 0) {
     focusOption(activeIndex.value)
@@ -244,7 +244,7 @@ watch(isDisabled, (disabled) => {
 watch(
   () => props.options,
   () => {
-    if (isOpen.value) {
+    if (isOpen.value && activeIndex.value >= 0) {
       activeIndex.value = getInitialIndex()
     }
   },
@@ -357,14 +357,14 @@ onBeforeUnmount(() => {
 .select-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   width: 100%;
 }
 
 .select-field__label {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   line-height: 1.4;
 }
 
@@ -382,23 +382,18 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   min-height: 38px;
-  padding: 10px 12px;
-
+  padding: 10px var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-
   background: var(--background);
   color: var(--text);
-
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   text-align: left;
-
   cursor: pointer;
-
   transition:
     border-color var(--transition-fast),
     box-shadow var(--transition-fast),
@@ -411,13 +406,19 @@ onBeforeUnmount(() => {
 
 .select-field__trigger:focus-visible,
 .select-field__trigger--open {
-  border-color: var(--accent);
-  outline: 2px solid var(--accent);
+  border-color: var(--primary);
+  outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
 
 .select-field__trigger--error {
   border-color: var(--danger);
+}
+
+.select-field__trigger--error:focus-visible,
+.select-field__trigger--error.select-field__trigger--open {
+  border-color: var(--danger);
+  outline-color: var(--danger);
 }
 
 .select-field__trigger:disabled {
@@ -447,57 +448,50 @@ onBeforeUnmount(() => {
 
 .select-field__spinner {
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--primary);
   animation: spin 1s linear infinite;
 }
 
 .select-field__dropdown {
   position: absolute;
   z-index: 20;
-  top: calc(100% + 6px);
+  top: calc(100% + var(--space-1));
   left: 0;
   right: 0;
-
   max-height: 220px;
   overflow-y: auto;
-  padding: 5px;
-
+  padding: var(--space-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-
   background: var(--background);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+  box-shadow: 0 12px 32px var(--shadow);
 }
 
 .select-field__option {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   min-height: 34px;
-  padding: 8px 10px;
-
+  padding: var(--space-2) 10px;
   border: none;
-  border-radius: 5px;
-
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
-
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   text-align: left;
-
   cursor: pointer;
 }
 
 .select-field__option:hover:not(:disabled),
 .select-field__option--active:not(:disabled) {
-  background: rgb(255 255 255 / 7%);
+  background: var(--overlay-hover);
 }
 
 .select-field__option--selected {
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .select-field__option:disabled {
@@ -510,7 +504,7 @@ onBeforeUnmount(() => {
 }
 
 .select-field__option:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
 
@@ -522,20 +516,20 @@ onBeforeUnmount(() => {
 
 .select-field__check {
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .select-field__empty {
   margin: 0;
-  padding: 12px 10px;
+  padding: var(--space-3) 10px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .select-field__hint,
 .select-field__error {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 

@@ -74,22 +74,17 @@ function handleClick(event: MouseEvent) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-
+  gap: var(--space-2);
   min-height: 34px;
-  padding: 8px 12px;
-
+  padding: var(--space-2) var(--space-3);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.2;
   white-space: nowrap;
-
   cursor: pointer;
-
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast),
@@ -98,7 +93,7 @@ function handleClick(event: MouseEvent) {
 }
 
 .button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -107,18 +102,14 @@ function handleClick(event: MouseEvent) {
   cursor: not-allowed;
 }
 
-/* Primary */
-
 .button--primary {
-  background: var(--accent);
-  color: #052e16;
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .button--primary:hover:not(:disabled) {
   filter: brightness(1.1);
 }
-
-/* Secondary */
 
 .button--secondary {
   border-color: var(--border);
@@ -130,20 +121,16 @@ function handleClick(event: MouseEvent) {
   background: var(--surface-hover);
 }
 
-/* Danger */
-
 .button--danger {
-  border-color: #a9444d;
-  background: #87343d;
-  color: #fff;
+  border-color: var(--button-danger-border);
+  background: var(--button-danger-bg);
+  color: var(--text);
 }
 
 .button--danger:hover:not(:disabled) {
-  border-color: #c75560;
-  background: #a23e49;
+  border-color: var(--button-danger-hover-border);
+  background: var(--button-danger-hover-bg);
 }
-
-/* Ghost */
 
 .button--ghost {
   background: transparent;
@@ -155,39 +142,33 @@ function handleClick(event: MouseEvent) {
   color: var(--text);
 }
 
-/* Pagination */
-
 .button--pagination {
   min-width: 30px;
   min-height: 30px;
   height: 30px;
   padding: 0 7px;
-
-  border-color: #343942;
-  border-radius: 8px;
-
-  background: #20242b;
-  color: #dce0e6;
-
-  font-size: 12px;
-  font-weight: 500;
-
+  border-color: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .button--pagination:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .button--pagination[aria-current='page'] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #101712;
-  font-weight: 700;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: var(--font-weight-bold);
   cursor: default;
 }
 
@@ -200,38 +181,30 @@ function handleClick(event: MouseEvent) {
   cursor: default;
 }
 
-/* Sizes */
-
 .button--small {
   min-height: 30px;
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
 }
 
 .button--medium {
   min-height: 34px;
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
 }
-
-/* Pagination sizing overrides the generic sizes */
 
 .button--pagination.button--small,
 .button--pagination.button--medium {
   min-height: 30px;
   height: 30px;
   padding: 0 7px;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
-
-/* Layout */
 
 .button--block {
   display: flex;
   width: 100%;
 }
-
-/* Icon-only */
 
 .button--icon-only {
   padding: 0;
@@ -240,16 +213,14 @@ function handleClick(event: MouseEvent) {
 .button--icon-only.button--small {
   width: 30px;
   height: 30px;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
 }
 
 .button--icon-only.button--medium {
   width: 34px;
   height: 34px;
-  font-size: 18px;
+  font-size: var(--font-size-lg);
 }
-
-/* Loading */
 
 .button--loading {
   cursor: wait;
@@ -266,11 +237,9 @@ function handleClick(event: MouseEvent) {
   width: 13px;
   height: 13px;
   flex-shrink: 0;
-
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: 50%;
-
   animation: button-spin 700ms linear infinite;
 }
 

@@ -41,7 +41,6 @@ const items: { id: NavigationView; label: string }[] = [
 .navigation {
   display: flex;
   align-items: stretch;
-
   background: var(--background);
   border-bottom: 1px solid var(--border);
 }
@@ -49,10 +48,8 @@ const items: { id: NavigationView; label: string }[] = [
 .navigation__item {
   flex: 1;
   min-width: 0;
-
   min-height: 42px;
-  padding: 10px 4px;
-
+  padding: 10px var(--space-1);
   border-radius: 0;
   background: var(--background);
 }
@@ -68,8 +65,8 @@ const items: { id: NavigationView; label: string }[] = [
 }
 
 .navigation__item[aria-current='page'] {
-  color: var(--accent);
-  font-weight: 650;
-  box-shadow: inset 0 -2px 0 var(--accent);
+  color: var(--primary);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: inset 0 -2px 0 var(--primary);
 }
 </style>

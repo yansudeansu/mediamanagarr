@@ -295,8 +295,8 @@ function confirmRemoval() {
 .service-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 16px;
+  gap: var(--space-4);
+  padding: var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--background);
@@ -305,40 +305,40 @@ function confirmRemoval() {
 .service-form__heading {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .service-form__title {
   margin: 0;
   color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
 }
 
 .service-form__description {
   margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
 .service-form__fields {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-3);
 }
 
 .service-form__jellyfin-user {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .service-form__error,
 .service-form__success,
 .service-form__user-feedback {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
@@ -347,18 +347,18 @@ function confirmRemoval() {
 }
 
 .service-form__success {
-  color: #86efac;
+  color: var(--status-success);
 }
 
 .service-form__user-feedback {
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 .service-form__confirmation {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  gap: var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--danger);
   border-radius: var(--radius-md);
 }
@@ -366,20 +366,20 @@ function confirmRemoval() {
 .service-form__confirmation-title {
   margin: 0;
   color: var(--text);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
 }
 
 .service-form__confirmation-description {
   margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
 .service-form__confirmation-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .service-form__confirmation-actions > * {

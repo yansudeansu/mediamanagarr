@@ -54,18 +54,18 @@ function selectFilter(value: string): void {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .filter-group__button {
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .filter-group__button--active {
-  border-color: var(--accent);
-  background: rgb(34 197 94 / 10%);
-  color: var(--accent);
+  border-color: var(--primary);
+  background: var(--primary-subtle);
+  color: var(--primary);
 }
 
 .filter-group__indicator {
@@ -74,7 +74,7 @@ function selectFilter(value: string): void {
   height: 7px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px rgb(34 197 94 / 30%);
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
 }
 </style>

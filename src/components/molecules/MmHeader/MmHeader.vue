@@ -76,10 +76,8 @@ const emit = defineEmits<{
 .header {
   display: flex;
   align-items: center;
-  gap: 12px;
-
-  padding: 16px 18px;
-
+  gap: var(--space-3);
+  padding: var(--space-4) 18px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -87,7 +85,7 @@ const emit = defineEmits<{
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -101,18 +99,17 @@ const emit = defineEmits<{
 .header__title {
   min-width: 0;
   margin: 0;
-
-  font-size: 15px;
-  font-weight: 650;
+  color: var(--text);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.4;
-
   overflow-wrap: anywhere;
 }
 
 .header__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex-shrink: 0;
 }
 </style>

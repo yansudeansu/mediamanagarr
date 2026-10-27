@@ -103,8 +103,7 @@ function pendingActionFor(hash: string) {
 .torrent-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-
+  gap: var(--space-3);
   width: 100%;
   min-width: 0;
 }
@@ -112,11 +111,9 @@ function pendingActionFor(hash: string) {
 .torrent-list__items {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
-
   list-style: none;
 }
 
@@ -128,30 +125,25 @@ function pendingActionFor(hash: string) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-
-  padding: 28px 16px;
-
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
   border: 1px dashed var(--border);
   border-radius: var(--radius-md);
-
   background: var(--surface);
   text-align: center;
 }
 
 .torrent-list__empty-title {
   margin: 0;
-
   color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
 }
 
 .torrent-list__empty-description {
   margin: 0;
-
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 </style>

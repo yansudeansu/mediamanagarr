@@ -94,26 +94,20 @@ function hidePreview(): void {
 
 <style scoped>
 .calendar-day {
+  position: relative;
   cursor: pointer;
-
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-
   width: 100%;
   min-width: 0;
   min-height: 48px;
   padding: 6px 2px;
-
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-
   color: var(--text);
   font-family: var(--font-family);
-
   transition:
     background-color var(--transition-fast),
     border-color var(--transition-fast);
@@ -124,21 +118,26 @@ function hidePreview(): void {
 }
 
 .calendar-day:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
 .calendar-day--today {
-  border-color: var(--accent);
+  border-color: var(--primary);
 }
 
 .calendar-day--selected {
-  border-color: var(--accent);
-  background: var(--surface-hover);
+  border-color: var(--info);
+  background: var(--info-subtle);
 }
 
 .calendar-day--selected:hover {
-  background: var(--surface-hover);
+  background: var(--info-hover);
+}
+
+.calendar-day--today.calendar-day--selected {
+  border-color: var(--info);
+  background: var(--info-subtle);
 }
 
 .calendar-day--outside {
@@ -146,33 +145,34 @@ function hidePreview(): void {
 }
 
 .calendar-day__number {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   line-height: 1;
 }
 
 .calendar-day__indicators {
+  position: absolute;
+  bottom: var(--space-2);
+  left: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-
-  min-height: 6px;
+  gap: var(--space-1);
+  transform: translateX(-50%);
 }
 
 .calendar-day__dot {
   width: 6px;
   height: 6px;
-
   border-radius: 50%;
 }
 
 .calendar-day__dot--tv {
-  background: var(--accent);
+  background: var(--primary);
 }
 
 .calendar-day__dot--movie {
-  background: #3b82f6;
+  background: var(--info);
 }
 
 @media (prefers-reduced-motion: reduce) {

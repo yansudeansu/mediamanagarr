@@ -45,27 +45,20 @@ function handleSelect() {
 <style scoped>
 .service-card {
   position: relative;
-
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-
+  gap: var(--space-3);
   width: 100%;
   min-height: 39px;
-  padding: 10px 12px;
-
+  padding: 10px var(--space-3);
   border: none;
   border-bottom: 1px solid var(--border);
-
   background: transparent;
   color: var(--text);
-
   font: inherit;
   text-align: left;
-
   cursor: pointer;
-
   transition: background var(--transition-fast);
 }
 
@@ -74,22 +67,22 @@ function handleSelect() {
 }
 
 .service-card:hover:not(:disabled) {
-  background: rgb(255 255 255 / 4%);
+  background: var(--overlay-subtle);
 }
 
 .service-card:focus-visible {
   z-index: 1;
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
 
 .service-card--selected {
-  background: rgb(34 197 94 / 9%);
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--primary-subtle);
+  box-shadow: inset 3px 0 0 var(--primary);
 }
 
 .service-card--selected:hover:not(:disabled) {
-  background: rgb(34 197 94 / 12%);
+  background: var(--primary-subtle);
 }
 
 .service-card:disabled {
@@ -99,12 +92,10 @@ function handleSelect() {
 
 .service-card__name {
   overflow: hidden;
-
   color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.4;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }

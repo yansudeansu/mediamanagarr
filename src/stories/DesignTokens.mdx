@@ -4,65 +4,171 @@ import { Meta } from '@storybook/addon-docs/blocks'
 
 # Design Tokens
 
-MediaManagarr uses a small set of shared CSS custom properties to maintain visual consistency across the application.
+The visual foundation of **MediaManagarr**.
 
-## Colors
+A shared design language for the browser popup, detached workspace, and future sidebar. All tokens are defined in `src/styles/tokens.css` and shared across application surfaces.
 
 <div
   style={{
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
-    margin: '24px 0',
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '8px',
+    margin: '20px 0 32px',
   }}
 >
   {[
-    ['Background', '--background', '#15171c'],
-    ['Surface', '--surface', '#1e2229'],
-    ['Surface Hover', '--surface-hover', '#272c35'],
-    ['Border', '--border', '#2f343e'],
-    ['Text', '--text', '#e5e7eb'],
-    ['Muted', '--muted', '#8b919e'],
-    ['Accent', '--accent', '#22c55e'],
-    ['Danger', '--danger', '#ef4444'],
-  ].map(([name, token, value]) => (
+    ['Theme', 'Dark'],
+    ['Color families', '6'],
+    ['Brand', 'Green'],
+    ['Source', 'tokens.css'],
+  ].map(([label, value]) => (
     <div
-      key={token}
+      key={label}
       style={{
-        overflow: 'hidden',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '7px 11px',
+        background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-md)',
+        fontSize: 'var(--font-size-sm)',
       }}
     >
+      <span style={{ color: 'var(--muted)' }}>{label}</span>
+      <span style={{ color: 'var(--text)', fontWeight: 'var(--font-weight-semibold)' }}>
+        {value}
+      </span>
+    </div>
+  ))}
+</div>
+
+---
+
+## Color Palette
+
+The palette contains six color families with consistent shade naming.
+
+Shades progress from **950 (darkest)** toward **100 or 300 (lightest)**. Neutral has additional light shades for text and supporting UI.
+
+<div style={{ margin: '22px 0 32px' }}>
+  {[
+    {
+      name: 'Neutral',
+      description: 'Foundations, surfaces, borders, and text',
+      shades: [950, 900, 800, 700, 600, 500, 400, 300, 200, 100],
+    },
+    {
+      name: 'Green',
+      description: 'Primary brand color and success states',
+      shades: [950, 900, 800, 700, 600, 500, 400, 300],
+      highlight: 500,
+    },
+    {
+      name: 'Blue',
+      description: 'Information, selection, and focus',
+      shades: [950, 900, 800, 700, 600, 500, 400, 300],
+      highlight: 500,
+    },
+    {
+      name: 'Red',
+      description: 'Errors and destructive actions',
+      shades: [950, 900, 800, 700, 600, 500, 400, 300],
+      highlight: 500,
+    },
+    {
+      name: 'Yellow',
+      description: 'Pending states and warnings',
+      shades: [950, 900, 800, 700, 600, 500, 400, 300],
+      highlight: 500,
+    },
+    {
+      name: 'Purple',
+      description: 'Partial availability',
+      shades: [950, 900, 800, 700, 600, 500, 400, 300],
+      highlight: 500,
+    },
+  ].map((family) => (
+    <div key={family.name} style={{ marginBottom: '24px' }}>
       <div
         style={{
-          height: '72px',
-          backgroundColor: `var(${token})`,
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '6px 14px',
+          marginBottom: '10px',
         }}
-      />
-
-      <div style={{ padding: '12px' }}>
-        <strong>{name}</strong>
-
+      >
         <div
           style={{
-            marginTop: '6px',
-            fontSize: '12px',
-            color: 'var(--muted)',
+            display: 'flex',
+            alignItems: 'baseline',
+            flexWrap: 'wrap',
+            gap: '10px',
           }}
         >
-          <code>{token}</code>
+          <strong style={{ fontSize: 'var(--font-size-md)', color: 'var(--text)' }}>
+            {family.name}
+          </strong>
+
+          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--muted)' }}>
+            {family.description}
+          </span>
         </div>
 
-        <div
-          style={{
-            marginTop: '4px',
-            fontSize: '12px',
-            color: 'var(--muted)',
-          }}
-        >
-          {value}
-        </div>
+        <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
+          {family.shades.length} shades
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${family.shades.length}, minmax(0, 1fr))`,
+          gap: '6px',
+        }}
+      >
+        {family.shades.map((shade) => {
+          const token = `--${family.name.toLowerCase()}-${shade}`
+
+          return (
+            <div key={token} style={{ minWidth: 0 }}>
+              <div
+                title={token}
+                style={{
+                  height: '52px',
+                  background: `var(${token})`,
+                  border:
+                    family.highlight === shade
+                      ? '2px solid var(--text)'
+                      : '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  boxSizing: 'border-box',
+                }}
+              />
+
+              <div
+                style={{
+                  marginTop: '7px',
+                  fontSize: '11px',
+                  fontWeight:
+                    family.highlight === shade
+                      ? 'var(--font-weight-bold)'
+                      : 'var(--font-weight-normal)',
+                  color:
+                    family.highlight === shade
+                      ? 'var(--text)'
+                      : 'var(--muted)',
+                  textAlign: 'center',
+                }}
+              >
+                {shade}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
 
@@ -70,49 +176,784 @@ MediaManagarr uses a small set of shared CSS custom properties to maintain visua
 
 </div>
 
-The swatches use CSS variables directly. The hexadecimal values document the current palette.
+<div
+  style={{
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-4)',
+    background: 'var(--primary-subtle)',
+    border: '1px solid var(--green-800)',
+    borderRadius: 'var(--radius-md)',
+    marginBottom: 'var(--space-8)',
+  }}
+>
+  <div
+    style={{
+      width: '10px',
+      height: '10px',
+      marginTop: '4px',
+      flexShrink: 0,
+      background: 'var(--primary)',
+      borderRadius: '50%',
+    }}
+  />
 
-## Typography
+  <div>
+    <div
+      style={{
+        fontSize: '13px',
+        fontWeight: 'var(--font-weight-bold)',
+        color: 'var(--text)',
+        marginBottom: '4px',
+      }}
+    >
+      Primary brand color
+    </div>
 
-MediaManagarr uses the system font stack:
+    <div
+      style={{
+        fontSize: 'var(--font-size-sm)',
+        color: 'var(--status-success)',
+        lineHeight: 1.6,
+      }}
+    >
+      <code>--green-500</code> is MediaManagarr's signature green (
+      <code>#22c55e</code>). Components should use the semantic token{' '}
+      <code>--primary</code> instead of referencing the palette directly.
+    </div>
 
-```css
---font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-```
+  </div>
+</div>
+
+---
+
+## Semantic Colors
+
+Semantic tokens describe **what a color does**, not which shade it uses.
+
+Components should prefer these tokens over palette values whenever possible.
 
 <div
   style={{
-    padding: '20px',
-    margin: '20px 0',
-    background: 'var(--background)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)',
-    fontFamily: 'var(--font-family)',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))',
+    gap: '10px',
+    margin: '20px 0 32px',
   }}
 >
-  <h2 style={{ margin: '0 0 12px', color: 'var(--text)' }}>
-    Section Heading
-  </h2>
+  {[
+    ['Background', '--background'],
+    ['Surface', '--surface'],
+    ['Surface Hover', '--surface-hover'],
+    ['Border', '--border'],
+    ['Text', '--text'],
+    ['Muted', '--muted'],
+    ['Primary', '--primary'],
+    ['Primary Foreground', '--primary-foreground'],
+    ['Info', '--info'],
+    ['Danger', '--danger'],
+  ].map(([name, token]) => (
+    <div
+      key={token}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '11px',
+        padding: '11px',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)',
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          width: '34px',
+          height: '34px',
+          flexShrink: 0,
+          background: `var(${token})`,
+          border: '1px solid var(--neutral-600)',
+          borderRadius: 'var(--radius-sm)',
+        }}
+      />
 
-<p style={{ margin: '0 0 12px', color: 'var(--text)' }}>
-  Primary body text for application content.
-</p>
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 'var(--font-size-sm)',
+            fontWeight: 'var(--font-weight-semibold)',
+            color: 'var(--text)',
+            marginBottom: '3px',
+          }}
+        >
+          {name}
+        </div>
 
-  <p style={{ margin: 0, color: 'var(--muted)' }}>
-    Muted text for supporting information and descriptions.
-  </p>
+        <code
+          style={{
+            fontSize: 'var(--font-size-xs)',
+            color: 'var(--muted)',
+            overflowWrap: 'anywhere',
+          }}
+        >
+          {token}
+        </code>
+      </div>
+    </div>
+
+))}
+
 </div>
 
-Typography sizes are currently defined by the components that use them. A separate typography scale can be introduced when needed.
+---
 
-## Border Radius
+## Status Colors
+
+Status colors use a consistent combination of **foreground, background, and border**.
+
+This allows badges, alerts, and service indicators to communicate state without relying on color alone.
+
+<div
+  style={{
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 'var(--space-2)',
+    margin: '20px 0 32px',
+  }}
+>
+  {[
+    ['Neutral', 'neutral'],
+    ['Info', 'info'],
+    ['Success', 'success'],
+    ['Danger', 'danger'],
+    ['Warning', 'warning'],
+    ['Partial', 'partial'],
+  ].map(([name, status]) => (
+    <div
+      key={status}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 'var(--space-3)',
+        padding: '12px 14px',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)',
+      }}
+    >
+      <div
+        style={{
+          width: '76px',
+          flexShrink: 0,
+          fontSize: 'var(--font-size-sm)',
+          fontWeight: 'var(--font-weight-semibold)',
+          color: 'var(--text)',
+        }}
+      >
+        {name}
+      </div>
+
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: '92px',
+          padding: '5px 10px',
+          color: `var(--status-${status})`,
+          background: `var(--status-${status}-bg)`,
+          border: `1px solid var(--status-${status}-border)`,
+          borderRadius: 'var(--radius-sm)',
+          fontSize: 'var(--font-size-sm)',
+          fontWeight: 'var(--font-weight-semibold)',
+        }}
+      >
+        {name}
+      </span>
+
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '6px 14px',
+          marginLeft: 'auto',
+          color: 'var(--muted)',
+          fontSize: '11px',
+        }}
+      >
+        <code>--status-{status}</code>
+        <code>--status-{status}-bg</code>
+        <code>--status-{status}-border</code>
+      </div>
+    </div>
+
+))}
+
+</div>
+
+---
+
+## Button Colors
+
+Buttons use semantic colors to communicate their action and importance.
+
+The variants below illustrate the visual hierarchy used throughout MediaManagarr.
+
+### Button Variants
 
 <div
   style={{
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '20px',
-    margin: '24px 0',
+    gap: 'var(--space-3)',
+    margin: '20px 0 28px',
+  }}
+>
+  {[
+    {
+      name: 'Primary',
+      background: 'var(--primary)',
+      border: 'var(--primary)',
+      color: 'var(--primary-foreground)',
+    },
+    {
+      name: 'Secondary',
+      background: 'var(--surface-hover)',
+      border: 'var(--border)',
+      color: 'var(--text)',
+    },
+    {
+      name: 'Danger',
+      background: 'var(--button-danger-bg)',
+      border: 'var(--button-danger-border)',
+      color: 'var(--text)',
+    },
+    {
+      name: 'Ghost',
+      background: 'transparent',
+      border: 'transparent',
+      color: 'var(--muted)',
+    },
+  ].map((button) => (
+    <div
+      key={button.name}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: '9px',
+      }}
+    >
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: '112px',
+          padding: '10px 16px',
+          background: button.background,
+          border: `1px solid ${button.border}`,
+          borderRadius: 'var(--radius-md)',
+          color: button.color,
+          fontSize: '13px',
+          fontWeight: 'var(--font-weight-semibold)',
+          boxSizing: 'border-box',
+        }}
+      >
+        {button.name}
+      </div>
+
+      <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
+        {button.name}
+      </span>
+    </div>
+
+))}
+
+</div>
+
+For interactive examples, including loading, disabled, sizing, and pagination states, see **Atoms / Button**.
+
+### Destructive Button States
+
+Danger buttons use muted red tones rather than the brighter error indicator color.
+
+<div
+  style={{
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 'var(--space-6)',
+    margin: '20px 0 32px',
+  }}
+>
+  {[
+    {
+      name: 'Default',
+      background: '--button-danger-bg',
+      border: '--button-danger-border',
+    },
+    {
+      name: 'Hover',
+      background: '--button-danger-hover-bg',
+      border: '--button-danger-hover-border',
+    },
+  ].map((state) => (
+    <div key={state.name}>
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: '120px',
+          padding: '10px 16px',
+          background: `var(${state.background})`,
+          border: `1px solid var(${state.border})`,
+          borderRadius: 'var(--radius-md)',
+          color: 'var(--text)',
+          fontSize: '13px',
+          fontWeight: 'var(--font-weight-semibold)',
+          marginBottom: 'var(--space-3)',
+          boxSizing: 'border-box',
+        }}
+      >
+        Danger
+      </div>
+
+      <div
+        style={{
+          fontSize: 'var(--font-size-sm)',
+          fontWeight: 'var(--font-weight-semibold)',
+          color: 'var(--text)',
+          marginBottom: '5px',
+        }}
+      >
+        {state.name}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+          color: 'var(--muted)',
+          fontSize: '11px',
+        }}
+      >
+        <code>{state.background}</code>
+        <code>{state.border}</code>
+      </div>
+    </div>
+
+))}
+
+</div>
+
+---
+
+## Effects & Transparency
+
+Transparent tokens provide subtle emphasis without introducing additional opaque colors.
+
+They are grouped by purpose rather than opacity percentage.
+
+<div
+  style={{
+    margin: '20px 0 32px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 'var(--space-5)',
+  }}
+>
+  {[
+    {
+      title: 'Primary Effects',
+      description: 'Brand highlights and emphasis',
+      tokens: [
+        ['Subtle', '--primary-subtle'],
+        ['Glow', '--primary-glow'],
+      ],
+    },
+    {
+      title: 'Information Effects',
+      description: 'Selection and information highlights',
+      tokens: [
+        ['Subtle', '--info-subtle'],
+        ['Hover', '--info-hover'],
+      ],
+    },
+    {
+      title: 'Surface Effects',
+      description: 'Light overlays on dark surfaces',
+      tokens: [
+        ['Subtle', '--overlay-subtle'],
+        ['Hover', '--overlay-hover'],
+      ],
+    },
+    {
+      title: 'Depth',
+      description: 'Shadow treatment for elevated UI',
+      tokens: [['Shadow', '--shadow']],
+    },
+  ].map((group) => (
+    <div key={group.title}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          flexWrap: 'wrap',
+          gap: '10px',
+          marginBottom: '10px',
+        }}
+      >
+        <strong
+          style={{
+            fontSize: '13px',
+            color: 'var(--text)',
+          }}
+        >
+          {group.title}
+        </strong>
+
+        <span
+          style={{
+            fontSize: 'var(--font-size-sm)',
+            color: 'var(--muted)',
+          }}
+        >
+          {group.description}
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))',
+          gap: '10px',
+        }}
+      >
+        {group.tokens.map(([name, token]) => (
+          <div
+            key={token}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-3)',
+              padding: 'var(--space-3)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+            }}
+          >
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--surface-hover)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+              }}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  background:
+                    token === '--shadow'
+                      ? 'var(--surface)'
+                      : `var(${token})`,
+                  boxShadow:
+                    token === '--shadow'
+                      ? '0 3px 9px var(--shadow)'
+                      : 'none',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              />
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  color: 'var(--text)',
+                  marginBottom: '4px',
+                }}
+              >
+                {name}
+              </div>
+
+              <code
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  color: 'var(--muted)',
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                {token}
+              </code>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+))}
+
+</div>
+
+---
+
+## Typography
+
+MediaManagarr uses the native system font stack for readability and consistency across platforms.
+
+```css
+--font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+```
+
+### Font Sizes
+
+Six shared sizes cover compact metadata, body text, controls, and headings.
+
+<div
+  style={{
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0',
+    margin: '20px 0 32px',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)',
+    overflow: 'hidden',
+    fontFamily: 'var(--font-family)',
+  }}
+>
+  {[
+    ['Extra Small', '--font-size-xs', '10px'],
+    ['Small', '--font-size-sm', '12px'],
+    ['Medium', '--font-size-md', '14px'],
+    ['Large', '--font-size-lg', '16px'],
+    ['Extra Large', '--font-size-xl', '20px'],
+    ['2X Large', '--font-size-2xl', '24px'],
+  ].map(([name, token, value], index) => (
+    <div
+      key={token}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '100px minmax(0, 1fr) 120px',
+        alignItems: 'center',
+        gap: 'var(--space-4)',
+        padding: '14px 18px',
+        borderBottom:
+          index === 5
+            ? 'none'
+            : '1px solid var(--border)',
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: 'var(--font-size-sm)',
+            fontWeight: 'var(--font-weight-semibold)',
+            color: 'var(--text)',
+          }}
+        >
+          {name}
+        </div>
+
+        <div
+          style={{
+            fontSize: 'var(--font-size-xs)',
+            color: 'var(--muted)',
+            marginTop: '3px',
+          }}
+        >
+          {value}
+        </div>
+      </div>
+
+      <div
+        style={{
+          minWidth: 0,
+          fontSize: `var(${token})`,
+          fontWeight: 'var(--font-weight-semibold)',
+          color: 'var(--text)',
+          lineHeight: 1.4,
+        }}
+      >
+        MediaManagarr
+      </div>
+
+      <code
+        style={{
+          fontSize: 'var(--font-size-xs)',
+          color: 'var(--muted)',
+          overflowWrap: 'anywhere',
+          textAlign: 'right',
+        }}
+      >
+        {token}
+      </code>
+    </div>
+
+))}
+
+</div>
+
+### Font Weights
+
+<div
+  style={{
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+    gap: 'var(--space-3)',
+    margin: '20px 0 32px',
+  }}
+>
+  {[
+    ['Normal', '--font-weight-normal', '400'],
+    ['Medium', '--font-weight-medium', '500'],
+    ['Semibold', '--font-weight-semibold', '600'],
+    ['Bold', '--font-weight-bold', '700'],
+  ].map(([name, token, value]) => (
+    <div
+      key={token}
+      style={{
+        padding: 'var(--space-4)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--font-family)',
+          fontSize: 'var(--font-size-xl)',
+          fontWeight: `var(${token})`,
+          color: 'var(--text)',
+          marginBottom: 'var(--space-3)',
+        }}
+      >
+        Aa
+      </div>
+
+      <div
+        style={{
+          fontSize: 'var(--font-size-sm)',
+          fontWeight: 'var(--font-weight-semibold)',
+          color: 'var(--text)',
+        }}
+      >
+        {name}
+        <span
+          style={{
+            marginLeft: '6px',
+            fontWeight: 'var(--font-weight-normal)',
+            color: 'var(--muted)',
+          }}
+        >
+          {value}
+        </span>
+      </div>
+
+      <code
+        style={{
+          display: 'block',
+          marginTop: '5px',
+          fontSize: 'var(--font-size-xs)',
+          color: 'var(--muted)',
+          overflowWrap: 'anywhere',
+        }}
+      >
+        {token}
+      </code>
+    </div>
+
+))}
+
+</div>
+
+### Type Specimen
+
+<div
+  style={{
+    padding: 'var(--space-6)',
+    margin: '20px 0 32px',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)',
+    fontFamily: 'var(--font-family)',
+  }}
+>
+  <div
+    style={{
+      fontSize: 'var(--font-size-xs)',
+      fontWeight: 'var(--font-weight-bold)',
+      letterSpacing: '0.1em',
+      textTransform: 'uppercase',
+      color: 'var(--muted)',
+      marginBottom: 'var(--space-5)',
+    }}
+  >
+    Type Specimen
+  </div>
+
+<h2
+  style={{
+    margin: '0 0 12px',
+    fontSize: 'var(--font-size-2xl)',
+    fontWeight: 'var(--font-weight-bold)',
+    lineHeight: 1.3,
+    color: 'var(--text)',
+  }}
+>
+  Section Heading
+</h2>
+
+<p
+  style={{
+    margin: '0 0 12px',
+    fontSize: 'var(--font-size-md)',
+    fontWeight: 'var(--font-weight-normal)',
+    lineHeight: 1.6,
+    color: 'var(--text)',
+  }}
+>
+  Primary body text provides clear, readable information throughout the interface.
+</p>
+
+  <p
+    style={{
+      margin: 0,
+      fontSize: 'var(--font-size-sm)',
+      fontWeight: 'var(--font-weight-normal)',
+      lineHeight: 1.6,
+      color: 'var(--muted)',
+    }}
+  >
+    Supporting text communicates secondary details without competing with
+    primary content.
+  </p>
+</div>
+
+---
+
+## Border Radius
+
+A compact radius scale keeps cards, buttons, and controls visually consistent.
+
+<div
+  style={{
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 'var(--space-6)',
+    margin: '20px 0 32px',
   }}
 >
   {[
@@ -120,61 +961,113 @@ Typography sizes are currently defined by the components that use them. A separa
     ['Medium', '--radius-md', '8px'],
     ['Large', '--radius-lg', '10px'],
   ].map(([name, token, value]) => (
-    <div key={token} style={{ textAlign: 'center' }}>
+    <div key={token} style={{ minWidth: '100px' }}>
       <div
         style={{
           width: '100px',
-          height: '72px',
+          height: '64px',
           background: 'var(--surface)',
-          border: '1px solid var(--accent)',
+          border: '1px solid var(--primary)',
           borderRadius: `var(${token})`,
-          marginBottom: '10px',
+          marginBottom: 'var(--space-3)',
+          boxSizing: 'border-box',
         }}
       />
 
-      <strong>{name}</strong>
-
-      <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
-        {value}
+      <div
+        style={{
+          fontSize: 'var(--font-size-sm)',
+          fontWeight: 'var(--font-weight-semibold)',
+          color: 'var(--text)',
+          marginBottom: '4px',
+        }}
+      >
+        {name}
+        <span
+          style={{
+            marginLeft: '6px',
+            fontWeight: 'var(--font-weight-normal)',
+            color: 'var(--muted)',
+          }}
+        >
+          {value}
+        </span>
       </div>
 
-      <code style={{ fontSize: '11px' }}>{token}</code>
+      <code
+        style={{
+          fontSize: 'var(--font-size-xs)',
+          color: 'var(--muted)',
+        }}
+      >
+        {token}
+      </code>
     </div>
 
 ))}
 
 </div>
 
+---
+
 ## Spacing
 
-The application currently uses component-level spacing values rather than a global spacing scale.
-
-The examples below illustrate commonly used spacing values.
+Spacing follows a **4px-based scale**, providing predictable gaps and padding throughout the interface.
 
 <div
   style={{
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
-    margin: '24px 0',
+    gap: 'var(--space-4)',
+    padding: 'var(--space-5)',
+    margin: '20px 0 32px',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-md)',
   }}
 >
-  {[4, 8, 12, 16, 20, 24].map((size) => (
+  {[
+    ['--space-1', 4],
+    ['--space-2', 8],
+    ['--space-3', 12],
+    ['--space-4', 16],
+    ['--space-5', 20],
+    ['--space-6', 24],
+    ['--space-8', 32],
+  ].map(([token, size]) => (
     <div
-      key={size}
+      key={token}
       style={{
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: '100px 40px minmax(0, 1fr)',
         alignItems: 'center',
-        gap: '16px',
+        gap: 'var(--space-4)',
       }}
     >
-      <code style={{ width: '40px' }}>{size}px</code>
+      <code
+        style={{
+          fontSize: 'var(--font-size-sm)',
+          color: 'var(--muted)',
+        }}
+      >
+        {token}
+      </code>
+
+      <span
+        style={{
+          fontSize: 'var(--font-size-sm)',
+          color: 'var(--muted)',
+          textAlign: 'right',
+        }}
+      >
+        {size}px
+      </span>
 
       <div
         style={{
-          width: `${size * 4}px`,
-          height: '16px',
-          background: 'var(--accent)',
+          width: `calc(var(${token}) * 4)`,
+          height: '12px',
+          background: 'var(--primary)',
           borderRadius: 'var(--radius-sm)',
         }}
       />
@@ -184,9 +1077,13 @@ The examples below illustrate commonly used spacing values.
 
 </div>
 
-These are reference examples, not formal spacing tokens.
+Use spacing tokens for repeated padding, gaps, and margins. Unique layout dimensions can remain component-specific.
+
+---
 
 ## Motion
+
+Motion should feel responsive and unobtrusive.
 
 The shared transition token is:
 
@@ -194,4 +1091,82 @@ The shared transition token is:
 --transition-fast: 150ms ease;
 ```
 
-It provides a consistent transition for lightweight interface interactions.
+<div
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 'var(--space-4)',
+    padding: 'var(--space-5)',
+    margin: '20px 0 32px',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-md)',
+  }}
+>
+  <div
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '10px 16px',
+      background: 'var(--primary)',
+      color: 'var(--primary-foreground)',
+      borderRadius: 'var(--radius-md)',
+      fontSize: 'var(--font-size-sm)',
+      fontWeight: 'var(--font-weight-bold)',
+      transition: 'transform var(--transition-fast)',
+    }}
+    onMouseEnter={(event) => {
+      event.currentTarget.style.transform = 'translateY(-2px)'
+    }}
+    onMouseLeave={(event) => {
+      event.currentTarget.style.transform = 'translateY(0)'
+    }}
+  >
+    Hover to Preview
+  </div>
+
+  <div>
+    <div
+      style={{
+        fontSize: 'var(--font-size-sm)',
+        fontWeight: 'var(--font-weight-semibold)',
+        color: 'var(--text)',
+        marginBottom: '4px',
+      }}
+    >
+      Fast Transition
+    </div>
+
+    <code
+      style={{
+        fontSize: '11px',
+        color: 'var(--muted)',
+      }}
+    >
+      150ms ease
+    </code>
+
+  </div>
+</div>
+
+Use this token for lightweight hover, focus, and state transitions.
+
+---
+
+<div
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-4) 0',
+    color: 'var(--muted)',
+    fontSize: 'var(--font-size-sm)',
+  }}
+>
+  <span>MediaManagarr Design System</span>
+  <code>src/styles/tokens.css</code>
+</div>

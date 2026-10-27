@@ -15,7 +15,7 @@ const baseTorrent: QBittorrentTorrent = {
 }
 
 const meta = {
-  title: 'Molecules/MmTorrentCard',
+  title: 'Molecules/TorrentCard',
   component: MmTorrentCard,
   tags: ['autodocs'],
   args: {

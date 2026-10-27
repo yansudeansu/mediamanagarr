@@ -47,12 +47,9 @@ function selectService(serviceId: ServiceId) {
 .service-selector__list {
   display: flex;
   flex-direction: column;
-
   overflow: hidden;
-
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-
   background: var(--background);
 }
 </style>

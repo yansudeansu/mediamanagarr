@@ -23,7 +23,7 @@ const anotherTorrent: QBittorrentTorrent = {
 }
 
 const meta = {
-  title: 'Molecules/MmTorrentConfirmation',
+  title: 'Molecules/TorrentConfirmation',
   component: MmTorrentConfirmation,
   tags: ['autodocs'],
 

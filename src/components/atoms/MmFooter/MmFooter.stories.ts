@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmFooter from './MmFooter.vue'
 
 const meta = {
-  title: 'Molecules/Footer',
+  title: 'Atoms/Footer',
   component: MmFooter,
   tags: ['autodocs'],
 

@@ -47,29 +47,23 @@ const placeholderIcon = computed(() => (props.type === 'movie' ? '🎬' : '📺'
 <style scoped>
 .media-poster {
   flex: 0 0 64px;
-
   width: 64px;
   height: 96px;
-
   overflow: hidden;
-
   border-radius: var(--radius-sm);
   background: var(--background);
 }
 
 .media-poster--small {
   flex-basis: 48px;
-
   width: 48px;
   height: 72px;
 }
 
 .media-poster__image {
   display: block;
-
   width: 100%;
   height: 100%;
-
   object-fit: cover;
 }
 
@@ -77,18 +71,15 @@ const placeholderIcon = computed(() => (props.type === 'movie' ? '🎬' : '📺'
   display: flex;
   align-items: center;
   justify-content: center;
-
   width: 100%;
   height: 100%;
-
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-
   color: var(--muted);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
 }
 
 .media-poster--small .media-poster__placeholder {
-  font-size: 20px;
+  font-size: var(--font-size-xl);
 }
 </style>

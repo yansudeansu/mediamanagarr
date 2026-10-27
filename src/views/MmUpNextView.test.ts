@@ -104,6 +104,21 @@ function findButton(wrapper: ReturnType<typeof mountView>, label: string) {
   return button
 }
 
+function findNextPageButton(wrapper: ReturnType<typeof mountView>) {
+  const pagination = wrapper.get('[aria-label="Arrival pagination"]')
+
+  const button = pagination.findAll('button').find((item) => {
+    const label = item.attributes('aria-label')?.toLowerCase() ?? ''
+    return label.includes('next')
+  })
+
+  if (!button) {
+    throw new Error('Next page button not found')
+  }
+
+  return button
+}
+
 async function settle() {
   await flushPromises()
 }
@@ -439,7 +454,8 @@ describe('MmUpNextView', () => {
     await settle()
 
     expect(wrapper.find('[aria-label="Arrival pagination"]').exists()).toBe(true)
-    expect(findButton(wrapper, '2').exists()).toBe(true)
+    expect(findNextPageButton(wrapper).exists()).toBe(true)
+    expect(findNextPageButton(wrapper).attributes('disabled')).toBeUndefined()
   })
 
   it('loads the second New page', async () => {
@@ -468,7 +484,7 @@ describe('MmUpNextView', () => {
     await findButton(wrapper, 'New').trigger('click')
     await settle()
 
-    await findButton(wrapper, '2').trigger('click')
+    await findNextPageButton(wrapper).trigger('click')
     await settle()
 
     expect(mockSendMessage).toHaveBeenCalledWith({
@@ -495,7 +511,7 @@ describe('MmUpNextView', () => {
     const wrapper = mountView()
     await settle()
 
-    await findButton(wrapper, '2').trigger('click')
+    await findNextPageButton(wrapper).trigger('click')
     await settle()
 
     await findButton(wrapper, 'New').trigger('click')
@@ -546,7 +562,7 @@ describe('MmUpNextView', () => {
     const wrapper = mountView()
     await settle()
 
-    await findButton(wrapper, '2').trigger('click')
+    await findNextPageButton(wrapper).trigger('click')
     await settle()
 
     expect(mockSendMessage).toHaveBeenCalledWith({
@@ -746,7 +762,7 @@ describe('MmUpNextView', () => {
     await findButton(wrapper, 'New').trigger('click')
     await settle()
 
-    await findButton(wrapper, '2').trigger('click')
+    await findNextPageButton(wrapper).trigger('click')
     await settle()
 
     expect(wrapper.text()).toContain('The Violet Sun')

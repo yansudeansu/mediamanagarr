@@ -59,7 +59,7 @@ describe('openDetachedWorkspace', () => {
     expect(createWindow).toHaveBeenCalledWith({
       url: 'chrome-extension://test/index.html?workspace=detached',
       type: 'popup',
-      width: 900,
+      width: 780,
       height: 700,
       focused: true,
     })

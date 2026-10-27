@@ -1,6 +1,6 @@
 const WORKSPACE_WINDOW_KEY = 'detachedWorkspaceWindowId'
 
-const WORKSPACE_WIDTH = 900
+const WORKSPACE_WIDTH = 780
 const WORKSPACE_HEIGHT = 700
 
 let pendingOpen: Promise<number> | null = null
