@@ -4,15 +4,19 @@ import mmLogo from '../../../assets/mm-logo.svg'
 
 interface Props {
   mode?: 'main' | 'settings'
+  windowMode?: 'popup' | 'detached'
 }
 
 withDefaults(defineProps<Props>(), {
   mode: 'main',
+  windowMode: 'popup',
 })
 
 const emit = defineEmits<{
   settings: []
   back: []
+  detach: []
+  attach: []
 }>()
 </script>
 
@@ -26,23 +30,45 @@ const emit = defineEmits<{
       </h1>
     </div>
 
-    <mm-button
-      v-if="mode === 'settings'"
-      variant="secondary"
-      icon="arrow-left"
-      icon-only
-      aria-label="Back to previous view"
-      @click="emit('back')"
-    />
+    <div class="header__actions">
+      <mm-button
+        v-if="windowMode === 'detached'"
+        variant="secondary"
+        icon="attach"
+        icon-only
+        aria-label="Attach workspace to toolbar"
+        title="Attach workspace to toolbar"
+        @click="emit('attach')"
+      />
 
-    <mm-button
-      v-else
-      variant="secondary"
-      icon="settings"
-      icon-only
-      aria-label="Open settings"
-      @click="emit('settings')"
-    />
+      <mm-button
+        v-else
+        variant="secondary"
+        icon="detach"
+        icon-only
+        aria-label="Detach workspace into a window"
+        title="Detach workspace into a window"
+        @click="emit('detach')"
+      />
+
+      <mm-button
+        v-if="mode === 'settings'"
+        variant="secondary"
+        icon="arrow-left"
+        icon-only
+        aria-label="Back to previous view"
+        @click="emit('back')"
+      />
+
+      <mm-button
+        v-else
+        variant="secondary"
+        icon="settings"
+        icon-only
+        aria-label="Open settings"
+        @click="emit('settings')"
+      />
+    </div>
   </header>
 </template>
 
@@ -81,5 +107,12 @@ const emit = defineEmits<{
   line-height: 1.4;
 
   overflow-wrap: anywhere;
+}
+
+.header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 </style>
