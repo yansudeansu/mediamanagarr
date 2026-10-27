@@ -24,7 +24,7 @@
     "release:check": "node scripts/verify-release.mts"
   },
   "dependencies": {
-    "lucide-vue-next": "^1.0.0",
+    "@lucide/vue": "^1.62.0",
     "vue": "^3.5.44"
   },
   "devDependencies": {

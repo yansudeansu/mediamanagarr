@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useAttrs, useId, watch } from 'vue'
-import { Check, ChevronDown, LoaderCircle } from 'lucide-vue-next'
+import { Check, ChevronDown, LoaderCircle } from '@lucide/vue'
 
 defineOptions({
   inheritAttrs: false,

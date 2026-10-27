@@ -11,7 +11,7 @@ import {
   PanelRightOpen,
   RefreshCw,
   Settings,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 
 export type IconName =
   | 'settings'
