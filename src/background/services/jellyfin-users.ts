@@ -60,18 +60,18 @@ export async function fetchJellyfinUsers(config: ServiceConfig): Promise<Jellyfi
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('Loading Jellyfin users timed out.')
+      throw new Error('Loading Jellyfin users timed out.', { cause: error })
     }
 
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach Jellyfin.')
+      throw new Error('Unable to reach Jellyfin.', { cause: error })
     }
 
     if (error instanceof Error) {
       throw error
     }
 
-    throw new Error('An unexpected error occurred while loading Jellyfin users.')
+    throw new Error('An unexpected error occurred while loading Jellyfin users.', { cause: error })
   } finally {
     clearTimeout(timeout)
   }

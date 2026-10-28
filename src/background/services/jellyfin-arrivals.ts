@@ -180,18 +180,20 @@ export async function fetchJellyfinArrivals(
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('Loading Jellyfin arrivals timed out.')
+      throw new Error('Loading Jellyfin arrivals timed out.', { cause: error })
     }
 
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach Jellyfin.')
+      throw new Error('Unable to reach Jellyfin.', { cause: error })
     }
 
     if (error instanceof Error) {
       throw error
     }
 
-    throw new Error('An unexpected error occurred while loading Jellyfin arrivals.')
+    throw new Error('An unexpected error occurred while loading Jellyfin arrivals.', {
+      cause: error,
+    })
   } finally {
     clearTimeout(timeout)
   }
