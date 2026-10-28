@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.1
+
+### Bug Fixes
+
+- correct native sidebar open and close behavior (9d26d55)
+- restrict GitHub Actions token permissions (206e1fd)
+
 ## v0.3.0
 
 ### Features
