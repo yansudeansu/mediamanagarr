@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ExternalLink,
   Minimize2,
+  PanelRightClose,
   PanelRightOpen,
   RefreshCw,
   Settings,
@@ -25,6 +26,7 @@ export type IconName =
   | 'detach'
   | 'attach'
   | 'sidebar'
+  | 'sidebar-close'
 
 withDefaults(defineProps<{ name: IconName; size?: number }>(), {
   size: 18,
@@ -114,6 +116,14 @@ withDefaults(defineProps<{ name: IconName; size?: number }>(), {
 
   <panel-right-open
     v-else-if="name === 'sidebar'"
+    :size="size"
+    :stroke-width="2"
+    aria-hidden="true"
+    focusable="false"
+  />
+
+  <panel-right-close
+    v-else-if="name === 'sidebar-close'"
     :size="size"
     :stroke-width="2"
     aria-hidden="true"

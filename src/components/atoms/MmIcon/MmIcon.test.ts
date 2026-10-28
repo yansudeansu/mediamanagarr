@@ -24,6 +24,7 @@ const icons: IconName[] = [
   'detach',
   'attach',
   'sidebar',
+  'sidebar-close',
 ]
 
 describe('MmIcon', () => {
@@ -109,6 +110,13 @@ describe('MmIcon', () => {
     const sidebar = mountIcon('sidebar')
 
     expect(detach.get('svg').html()).not.toBe(sidebar.get('svg').html())
+  })
+
+  it('renders different shapes for opening and closing the sidebar', () => {
+    const open = mountIcon('sidebar')
+    const close = mountIcon('sidebar-close')
+
+    expect(open.get('svg').html()).not.toBe(close.get('svg').html())
   })
 
   it.each(icons)('renders the %s icon', (name) => {
@@ -212,6 +220,30 @@ describe('MmIcon', () => {
 
     await wrapper.setProps({
       name: 'detach',
+    })
+
+    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(wrapper.findAll('svg')).toHaveLength(1)
+  })
+
+  it('updates when switching from sidebar to sidebar-close', async () => {
+    const wrapper = mountIcon('sidebar')
+    const originalSvg = wrapper.get('svg').html()
+
+    await wrapper.setProps({
+      name: 'sidebar-close',
+    })
+
+    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(wrapper.findAll('svg')).toHaveLength(1)
+  })
+
+  it('updates when switching from sidebar-close to sidebar', async () => {
+    const wrapper = mountIcon('sidebar-close')
+    const originalSvg = wrapper.get('svg').html()
+
+    await wrapper.setProps({
+      name: 'sidebar',
     })
 
     expect(wrapper.get('svg').html()).not.toBe(originalSvg)

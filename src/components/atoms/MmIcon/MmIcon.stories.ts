@@ -14,6 +14,7 @@ const icons: IconName[] = [
   'detach',
   'attach',
   'sidebar',
+  'sidebar-close',
 ]
 
 const meta = {
@@ -114,6 +115,12 @@ export const Attach: Story = {
 export const Sidebar: Story = {
   args: {
     name: 'sidebar',
+  },
+}
+
+export const SidebarClose: Story = {
+  args: {
+    name: 'sidebar-close',
   },
 }
 
