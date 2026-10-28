@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from './App.vue'
 import { sendBackgroundMessage } from './utils/background-messaging'
-import { openWorkspaceSidebar } from './utils/workspace-sidebar'
+import { openWorkspaceSidebar, closeWorkspaceSidebar } from './utils/workspace-sidebar'
 import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
 
 vi.mock('./utils/background-messaging', () => ({
@@ -11,6 +11,7 @@ vi.mock('./utils/background-messaging', () => ({
 
 vi.mock('./utils/workspace-sidebar', () => ({
   openWorkspaceSidebar: vi.fn(),
+  closeWorkspaceSidebar: vi.fn(),
 }))
 
 vi.mock('./utils/workspace-state', () => ({
@@ -48,6 +49,7 @@ vi.mock('./views/SettingsView.vue', () => ({
 
 const mockedSendMessage = vi.mocked(sendBackgroundMessage)
 const mockedOpenSidebar = vi.mocked(openWorkspaceSidebar)
+const mockedCloseSidebar = vi.mocked(closeWorkspaceSidebar)
 const mockedGetWorkspaceState = vi.mocked(getWorkspaceNavigationState)
 const mockedSaveWorkspaceState = vi.mocked(saveWorkspaceNavigationState)
 
@@ -111,6 +113,7 @@ describe('App', () => {
 
     mockedSaveWorkspaceState.mockResolvedValue(undefined)
     mockedOpenSidebar.mockResolvedValue(undefined)
+    mockedCloseSidebar.mockResolvedValue(undefined)
 
     mockBackgroundMessages()
   })
@@ -621,6 +624,24 @@ describe('App', () => {
       wrapper.unmount()
     })
 
+    it('shows the close sidebar button in sidebar mode', () => {
+      setWorkspaceMode('sidebar')
+
+      const wrapper = mount(App)
+
+      expect(wrapper.find('button[aria-label="Close browser sidebar"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('hides the close sidebar button in popup mode', () => {
+      const wrapper = mount(App)
+
+      expect(wrapper.find('button[aria-label="Close browser sidebar"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
     it('hides detach and attach buttons in sidebar mode', () => {
       setWorkspaceMode('sidebar')
 
@@ -681,7 +702,7 @@ describe('App', () => {
       wrapper.unmount()
     })
 
-    it('saves navigation state before opening the sidebar', async () => {
+    it('saves navigation state before closing the popup', async () => {
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
       const wrapper = mount(App)
@@ -702,6 +723,54 @@ describe('App', () => {
 
       expect(mockedOpenSidebar).toHaveBeenCalledOnce()
       expect(closeSpy).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('starts opening the sidebar before waiting for storage', async () => {
+      let resolveSave: (() => void) | undefined
+
+      mockedSaveWorkspaceState.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSave = resolve
+          }),
+      )
+
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open workspace in browser sidebar"]').trigger('click')
+
+      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
+      expect(closeSpy).not.toHaveBeenCalled()
+
+      resolveSave?.()
+      await flushPromises()
+
+      expect(closeSpy).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('continues opening the sidebar if saving navigation fails', async () => {
+      mockedSaveWorkspaceState.mockRejectedValue(new Error('Storage unavailable.'))
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Open workspace in browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
+      expect(closeSpy).toHaveBeenCalledOnce()
+      expect(warnSpy).toHaveBeenCalled()
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
 
       wrapper.unmount()
     })
@@ -811,6 +880,128 @@ describe('App', () => {
       expect(mockedOpenSidebar).toHaveBeenCalledTimes(2)
       expect(wrapper.find('[role="alert"]').exists()).toBe(false)
       expect(closeSpy).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('closes the native sidebar when Close is clicked', async () => {
+      setWorkspaceMode('sidebar')
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Close browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedCloseSidebar).toHaveBeenCalledOnce()
+      expect(mockedOpenSidebar).not.toHaveBeenCalled()
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('does not close the window when closing the sidebar succeeds', async () => {
+      setWorkspaceMode('sidebar')
+
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Close browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(mockedCloseSidebar).toHaveBeenCalledOnce()
+      expect(closeSpy).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('shows an error when closing the sidebar fails', async () => {
+      setWorkspaceMode('sidebar')
+
+      mockedCloseSidebar.mockRejectedValue(new Error('Unable to close sidebar.'))
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Close browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Unable to close sidebar.')
+      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('shows a fallback error when closing rejects with an unknown value', async () => {
+      setWorkspaceMode('sidebar')
+
+      mockedCloseSidebar.mockRejectedValue('Unknown failure')
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('button[aria-label="Close browser sidebar"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Unable to close the browser sidebar.')
+
+      wrapper.unmount()
+    })
+
+    it('does not start another close request while one is pending', async () => {
+      setWorkspaceMode('sidebar')
+
+      let resolveClose: (() => void) | undefined
+
+      mockedCloseSidebar.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveClose = resolve
+          }),
+      )
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      const button = wrapper.get('button[aria-label="Close browser sidebar"]')
+
+      await button.trigger('click')
+      await button.trigger('click')
+
+      expect(mockedCloseSidebar).toHaveBeenCalledOnce()
+
+      resolveClose?.()
+      await flushPromises()
+
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('allows another close request after a failed attempt', async () => {
+      setWorkspaceMode('sidebar')
+
+      mockedCloseSidebar
+        .mockRejectedValueOnce(new Error('Temporary close failure.'))
+        .mockResolvedValueOnce(undefined)
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      const button = wrapper.get('button[aria-label="Close browser sidebar"]')
+
+      await button.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Temporary close failure.')
+
+      await button.trigger('click')
+      await flushPromises()
+
+      expect(mockedCloseSidebar).toHaveBeenCalledTimes(2)
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
 
       wrapper.unmount()
     })

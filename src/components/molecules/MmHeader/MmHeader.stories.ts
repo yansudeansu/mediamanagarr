@@ -48,6 +48,12 @@ const meta = {
         category: 'events',
       },
     },
+    onSidebarClose: {
+      description: 'Emitted when the close browser sidebar button is clicked.',
+      table: {
+        category: 'events',
+      },
+    },
   },
 
   args: {
@@ -117,11 +123,11 @@ export const DetachedSettings: Story = {
 }
 
 /**
- * Native browser sidebar with the application title
- * and settings button.
+ * Native browser sidebar with the application title,
+ * close sidebar button, and settings button.
  *
- * Workspace actions are hidden because the application
- * is already running inside the sidebar.
+ * Opening and detaching actions are hidden because
+ * the application is already running inside the sidebar.
  */
 export const SidebarMain: Story = {
   args: {
@@ -131,10 +137,8 @@ export const SidebarMain: Story = {
 }
 
 /**
- * Native browser sidebar showing the settings title
- * and back button.
- *
- * Workspace actions remain hidden in sidebar mode.
+ * Native browser sidebar showing the settings title,
+ * close sidebar button, and back button.
  */
 export const SidebarSettings: Story = {
   args: {

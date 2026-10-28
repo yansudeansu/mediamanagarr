@@ -18,6 +18,7 @@ const emit = defineEmits<{
   detach: []
   attach: []
   sidebar: []
+  sidebarClose: []
 }>()
 </script>
 
@@ -32,7 +33,17 @@ const emit = defineEmits<{
     </div>
 
     <div class="header__actions">
-      <template v-if="windowMode !== 'sidebar'">
+      <mm-button
+        v-if="windowMode === 'sidebar'"
+        variant="secondary"
+        icon="sidebar-close"
+        icon-only
+        aria-label="Close browser sidebar"
+        title="Close browser sidebar"
+        @click="emit('sidebarClose')"
+      />
+
+      <template v-else>
         <mm-button
           variant="secondary"
           icon="sidebar"
@@ -107,7 +118,6 @@ const emit = defineEmits<{
   display: block;
   flex-shrink: 0;
   width: 28px;
-  height: 28px;
 }
 
 .header__title {

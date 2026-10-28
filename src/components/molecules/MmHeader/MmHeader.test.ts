@@ -74,18 +74,19 @@ describe('MmHeader', () => {
     expect(wrapper.findAll('button')).toHaveLength(3)
   })
 
-  it('renders only the settings button in sidebar main mode', () => {
+  it('renders the close sidebar and settings buttons in sidebar main mode', () => {
     const wrapper = mount(MmHeader, {
       props: {
         windowMode: 'sidebar',
       },
     })
 
-    expect(wrapper.findAll('button')).toHaveLength(1)
+    expect(wrapper.findAll('button')).toHaveLength(2)
+    expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="Open settings"]').exists()).toBe(true)
   })
 
-  it('renders only the back button in sidebar settings mode', () => {
+  it('renders the close sidebar and back buttons in sidebar settings mode', () => {
     const wrapper = mount(MmHeader, {
       props: {
         mode: 'settings',
@@ -93,7 +94,8 @@ describe('MmHeader', () => {
       },
     })
 
-    expect(wrapper.findAll('button')).toHaveLength(1)
+    expect(wrapper.findAll('button')).toHaveLength(2)
+    expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="Back to previous view"]').exists()).toBe(true)
   })
 
@@ -385,7 +387,22 @@ describe('MmHeader', () => {
       expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(true)
     })
 
-    it('hides the sidebar button in sidebar mode', () => {
+    it('renders the close sidebar button in sidebar mode', () => {
+      const wrapper = mount(MmHeader, {
+        props: {
+          windowMode: 'sidebar',
+        },
+      })
+
+      const button = wrapper.get('[aria-label="Close browser sidebar"]')
+
+      expect(button.attributes('title')).toBe('Close browser sidebar')
+      expect(button.classes()).toContain('button--icon-only')
+      expect(button.classes()).toContain('button--secondary')
+      expect(button.find('svg').exists()).toBe(true)
+    })
+
+    it('hides the open sidebar button in sidebar mode', () => {
       const wrapper = mount(MmHeader, {
         props: {
           windowMode: 'sidebar',
@@ -393,6 +410,18 @@ describe('MmHeader', () => {
       })
 
       expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(false)
+    })
+
+    it('hides the close sidebar button outside sidebar mode', () => {
+      const popup = mount(MmHeader)
+      const detached = mount(MmHeader, {
+        props: {
+          windowMode: 'detached',
+        },
+      })
+
+      expect(popup.find('[aria-label="Close browser sidebar"]').exists()).toBe(false)
+      expect(detached.find('[aria-label="Close browser sidebar"]').exists()).toBe(false)
     })
 
     it('hides detach and attach buttons in sidebar mode', () => {
@@ -412,6 +441,22 @@ describe('MmHeader', () => {
       await wrapper.get('[aria-label="Open workspace in browser sidebar"]').trigger('click')
 
       expect(wrapper.emitted('sidebar')).toHaveLength(1)
+      expect(wrapper.emitted('sidebarClose')).toBeUndefined()
+      expect(wrapper.emitted('detach')).toBeUndefined()
+      expect(wrapper.emitted('attach')).toBeUndefined()
+    })
+
+    it('emits sidebarClose when the close sidebar button is clicked', async () => {
+      const wrapper = mount(MmHeader, {
+        props: {
+          windowMode: 'sidebar',
+        },
+      })
+
+      await wrapper.get('[aria-label="Close browser sidebar"]').trigger('click')
+
+      expect(wrapper.emitted('sidebarClose')).toHaveLength(1)
+      expect(wrapper.emitted('sidebar')).toBeUndefined()
       expect(wrapper.emitted('detach')).toBeUndefined()
       expect(wrapper.emitted('attach')).toBeUndefined()
     })
@@ -424,11 +469,22 @@ describe('MmHeader', () => {
       })
 
       expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(true)
-
       expect(wrapper.find('[aria-label="Back to previous view"]').exists()).toBe(true)
     })
 
-    it('updates the workspace buttons when switching to sidebar mode', async () => {
+    it('keeps the close sidebar button available in sidebar settings mode', () => {
+      const wrapper = mount(MmHeader, {
+        props: {
+          mode: 'settings',
+          windowMode: 'sidebar',
+        },
+      })
+
+      expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(true)
+      expect(wrapper.find('[aria-label="Back to previous view"]').exists()).toBe(true)
+    })
+
+    it('updates workspace buttons when switching to sidebar mode', async () => {
       const wrapper = mount(MmHeader)
 
       expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(true)
@@ -440,7 +496,7 @@ describe('MmHeader', () => {
 
       expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(false)
       expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(false)
-
+      expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(true)
       expect(wrapper.find('[aria-label="Open settings"]').exists()).toBe(true)
     })
 
@@ -457,25 +513,48 @@ describe('MmHeader', () => {
 
       expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(true)
       expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(true)
+      expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(false)
     })
 
     it('renders a different icon for sidebar and detach', () => {
       const wrapper = mount(MmHeader)
 
       const detachIcon = wrapper.get('[aria-label="Detach workspace into a window"] svg').html()
-
       const sidebarIcon = wrapper.get('[aria-label="Open workspace in browser sidebar"] svg').html()
 
       expect(sidebarIcon).not.toBe(detachIcon)
     })
 
-    it('hides decorative sidebar icons from assistive technology', () => {
+    it('renders different icons for opening and closing the sidebar', async () => {
       const wrapper = mount(MmHeader)
 
-      const icon = wrapper.get('[aria-label="Open workspace in browser sidebar"] svg')
+      const openIcon = wrapper.get('[aria-label="Open workspace in browser sidebar"] svg').html()
 
-      expect(icon.attributes('aria-hidden')).toBe('true')
-      expect(icon.attributes('focusable')).toBe('false')
+      await wrapper.setProps({
+        windowMode: 'sidebar',
+      })
+
+      const closeIcon = wrapper.get('[aria-label="Close browser sidebar"] svg').html()
+
+      expect(closeIcon).not.toBe(openIcon)
+    })
+
+    it('hides decorative sidebar icons from assistive technology', async () => {
+      const wrapper = mount(MmHeader)
+
+      const openIcon = wrapper.get('[aria-label="Open workspace in browser sidebar"] svg')
+
+      expect(openIcon.attributes('aria-hidden')).toBe('true')
+      expect(openIcon.attributes('focusable')).toBe('false')
+
+      await wrapper.setProps({
+        windowMode: 'sidebar',
+      })
+
+      const closeIcon = wrapper.get('[aria-label="Close browser sidebar"] svg')
+
+      expect(closeIcon.attributes('aria-hidden')).toBe('true')
+      expect(closeIcon.attributes('focusable')).toBe('false')
     })
   })
 })

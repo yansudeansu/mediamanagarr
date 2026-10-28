@@ -10,7 +10,7 @@ import MmCalendarView from './views/MmCalendarView.vue'
 import MmDownloadsView from './views/MmDownloadsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import { sendBackgroundMessage } from './utils/background-messaging'
-import { openWorkspaceSidebar } from './utils/workspace-sidebar'
+import { openWorkspaceSidebar, closeWorkspaceSidebar } from './utils/workspace-sidebar'
 import { getAppVersion } from './utils/version'
 import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
 
@@ -113,19 +113,43 @@ async function openSidebar(): Promise<void> {
   workspaceLoading.value = true
 
   try {
+    // Start the browser operation while the user gesture is still active.
+    const sidebarPromise = openWorkspaceSidebar()
+
     if (hasWorkspaceStorage()) {
-      await saveWorkspaceNavigationState({
-        activeView: activeView.value,
-        settingsOpen: settingsOpen.value,
-      })
+      try {
+        await saveWorkspaceNavigationState({
+          activeView: activeView.value,
+          settingsOpen: settingsOpen.value,
+        })
+      } catch (error) {
+        console.warn('MediaManagarr: Unable to save workspace navigation:', error)
+      }
     }
 
-    await openWorkspaceSidebar()
-
+    await sidebarPromise
     window.close()
   } catch (error) {
     workspaceError.value =
       error instanceof Error ? error.message : 'Unable to open the browser sidebar.'
+  } finally {
+    workspaceLoading.value = false
+  }
+}
+
+async function closeSidebar(): Promise<void> {
+  if (workspaceLoading.value) {
+    return
+  }
+
+  workspaceError.value = ''
+  workspaceLoading.value = true
+
+  try {
+    await closeWorkspaceSidebar()
+  } catch (error) {
+    workspaceError.value =
+      error instanceof Error ? error.message : 'Unable to close the browser sidebar.'
   } finally {
     workspaceLoading.value = false
   }
@@ -152,6 +176,7 @@ function attachWorkspace(): void {
       @detach="detachWorkspace"
       @attach="attachWorkspace"
       @sidebar="openSidebar"
+      @sidebar-close="closeSidebar"
     />
 
     <p v-if="workspaceError" class="workspace-error" role="alert">

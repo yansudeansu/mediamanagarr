@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { openWorkspaceSidebar } from './workspace-sidebar'
+import { closeWorkspaceSidebar, openWorkspaceSidebar } from './workspace-sidebar'
 
-describe('openWorkspaceSidebar', () => {
+describe('workspace-sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal('browser', undefined)
@@ -17,9 +17,7 @@ describe('openWorkspaceSidebar', () => {
       const open = vi.fn().mockResolvedValue(undefined)
 
       vi.stubGlobal('browser', {
-        sidebarAction: {
-          open,
-        },
+        sidebarAction: { open },
       })
 
       await openWorkspaceSidebar()
@@ -28,24 +26,31 @@ describe('openWorkspaceSidebar', () => {
       expect(open).toHaveBeenCalledWith()
     })
 
+    it('closes the native sidebar using sidebarAction', async () => {
+      const close = vi.fn().mockResolvedValue(undefined)
+
+      vi.stubGlobal('browser', {
+        sidebarAction: { close },
+      })
+
+      await closeWorkspaceSidebar()
+
+      expect(close).toHaveBeenCalledOnce()
+      expect(close).toHaveBeenCalledWith()
+    })
+
     it('prefers the Firefox sidebar API when both browser APIs exist', async () => {
       const firefoxOpen = vi.fn().mockResolvedValue(undefined)
       const chromeOpen = vi.fn().mockResolvedValue(undefined)
       const getCurrent = vi.fn().mockResolvedValue({ id: 42 })
 
       vi.stubGlobal('browser', {
-        sidebarAction: {
-          open: firefoxOpen,
-        },
+        sidebarAction: { open: firefoxOpen },
       })
 
       vi.stubGlobal('chrome', {
-        windows: {
-          getCurrent,
-        },
-        sidePanel: {
-          open: chromeOpen,
-        },
+        windows: { getCurrent },
+        sidePanel: { open: chromeOpen },
       })
 
       await openWorkspaceSidebar()
@@ -66,6 +71,18 @@ describe('openWorkspaceSidebar', () => {
 
       await expect(openWorkspaceSidebar()).rejects.toThrow('Sidebar could not be opened.')
     })
+
+    it('propagates errors from sidebarAction.close', async () => {
+      const error = new Error('Sidebar could not be closed.')
+
+      vi.stubGlobal('browser', {
+        sidebarAction: {
+          close: vi.fn().mockRejectedValue(error),
+        },
+      })
+
+      await expect(closeWorkspaceSidebar()).rejects.toThrow('Sidebar could not be closed.')
+    })
   })
 
   describe('Chromium', () => {
@@ -74,21 +91,30 @@ describe('openWorkspaceSidebar', () => {
       const open = vi.fn().mockResolvedValue(undefined)
 
       vi.stubGlobal('chrome', {
-        windows: {
-          getCurrent,
-        },
-        sidePanel: {
-          open,
-        },
+        windows: { getCurrent },
+        sidePanel: { open },
       })
 
       await openWorkspaceSidebar()
 
       expect(getCurrent).toHaveBeenCalledOnce()
       expect(open).toHaveBeenCalledOnce()
-      expect(open).toHaveBeenCalledWith({
-        windowId: 42,
+      expect(open).toHaveBeenCalledWith({ windowId: 42 })
+    })
+
+    it('closes the side panel in the current browser window', async () => {
+      const getCurrent = vi.fn().mockResolvedValue({ id: 42 })
+      const close = vi.fn().mockResolvedValue(undefined)
+
+      vi.stubGlobal('chrome', {
+        windows: { getCurrent },
+        sidePanel: { close },
       })
+
+      await closeWorkspaceSidebar()
+
+      expect(close).toHaveBeenCalledOnce()
+      expect(close).toHaveBeenCalledWith({ windowId: 42 })
     })
 
     it('throws when the current window has no ID', async () => {
@@ -96,12 +122,8 @@ describe('openWorkspaceSidebar', () => {
       const open = vi.fn()
 
       vi.stubGlobal('chrome', {
-        windows: {
-          getCurrent,
-        },
-        sidePanel: {
-          open,
-        },
+        windows: { getCurrent },
+        sidePanel: { open },
       })
 
       await expect(openWorkspaceSidebar()).rejects.toThrow(
@@ -134,9 +156,7 @@ describe('openWorkspaceSidebar', () => {
         windows: {
           getCurrent: vi.fn().mockRejectedValue(error),
         },
-        sidePanel: {
-          open,
-        },
+        sidePanel: { open },
       })
 
       await expect(openWorkspaceSidebar()).rejects.toThrow('Unable to access browser windows.')
@@ -162,9 +182,7 @@ describe('openWorkspaceSidebar', () => {
 
     it('throws when Chromium has no sidePanel API', async () => {
       vi.stubGlobal('chrome', {
-        windows: {
-          getCurrent: vi.fn(),
-        },
+        windows: { getCurrent: vi.fn() },
       })
 
       await expect(openWorkspaceSidebar()).rejects.toThrow(
@@ -183,6 +201,12 @@ describe('openWorkspaceSidebar', () => {
 
       await expect(openWorkspaceSidebar()).rejects.toThrow(
         'Native sidebar support is unavailable in this browser.',
+      )
+    })
+
+    it('throws when closing is unsupported', async () => {
+      await expect(closeWorkspaceSidebar()).rejects.toThrow(
+        'Closing the sidebar programmatically is unavailable in this browser.',
       )
     })
   })

@@ -113,6 +113,10 @@ export const Default: Story = {
           open: async () => {
             dispatchWorkspaceMode('sidebar')
           },
+
+          close: async () => {
+            dispatchWorkspaceMode('popup')
+          },
         },
 
         runtime: {
