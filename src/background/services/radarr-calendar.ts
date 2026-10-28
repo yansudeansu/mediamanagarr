@@ -208,18 +208,18 @@ export async function fetchRadarrCalendar(
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('Loading Radarr calendar timed out.')
+      throw new Error('Loading Radarr calendar timed out.', { cause: error })
     }
 
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach Radarr.')
+      throw new Error('Unable to reach Radarr.', { cause: error })
     }
 
     if (error instanceof Error) {
       throw error
     }
 
-    throw new Error('An unexpected error occurred while loading Radarr calendar.')
+    throw new Error('An unexpected error occurred while loading Radarr calendar.', { cause: error })
   } finally {
     clearTimeout(timeout)
   }

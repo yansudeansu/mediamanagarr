@@ -93,18 +93,20 @@ export async function testServiceConnection(
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('Connection timed out. Check the server address.')
+      throw new Error('Connection timed out. Check the server address.', { cause: error })
     }
 
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach the server. Check its address and availability.')
+      throw new Error('Unable to reach the server. Check its address and availability.', {
+        cause: error,
+      })
     }
 
     if (error instanceof Error) {
       throw error
     }
 
-    throw new Error('An unexpected connection error occurred.')
+    throw new Error('An unexpected connection error occurred.', { cause: error })
   } finally {
     clearTimeout(timeout)
   }

@@ -188,11 +188,13 @@ async function seerrFetch(config: ServiceConfig, path: string): Promise<unknown>
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('Seerr request timed out.')
+      throw new Error('Seerr request timed out.', { cause: error })
     }
 
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach Seerr. Check the server address and availability.')
+      throw new Error('Unable to reach Seerr. Check the server address and availability.', {
+        cause: error,
+      })
     }
 
     throw error

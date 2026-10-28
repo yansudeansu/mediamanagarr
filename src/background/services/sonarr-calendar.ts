@@ -206,18 +206,18 @@ export async function fetchSonarrCalendar(
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('Loading Sonarr calendar timed out.')
+      throw new Error('Loading Sonarr calendar timed out.', { cause: error })
     }
 
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach Sonarr.')
+      throw new Error('Unable to reach Sonarr.', { cause: error })
     }
 
     if (error instanceof Error) {
       throw error
     }
 
-    throw new Error('An unexpected error occurred while loading Sonarr calendar.')
+    throw new Error('An unexpected error occurred while loading Sonarr calendar.', { cause: error })
   } finally {
     clearTimeout(timeout)
   }

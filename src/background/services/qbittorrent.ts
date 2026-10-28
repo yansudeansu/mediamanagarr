@@ -64,11 +64,13 @@ async function apiFetch(
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('qBittorrent request timed out.')
+      throw new Error('qBittorrent request timed out.', { cause: error })
     }
 
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach qBittorrent. Check its address and availability.')
+      throw new Error('Unable to reach qBittorrent. Check its address and availability.', {
+        cause: error,
+      })
     }
 
     throw error

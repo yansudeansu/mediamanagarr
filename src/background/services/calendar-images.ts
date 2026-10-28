@@ -166,11 +166,13 @@ export async function fetchCalendarImage(
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('Loading calendar poster timed out.')
+      throw new Error('Loading calendar poster timed out.', { cause: error })
     }
 
     if (error instanceof TypeError) {
-      throw new Error(`Unable to reach ${service === 'sonarr' ? 'Sonarr' : 'Radarr'}.`)
+      throw new Error(`Unable to reach ${service === 'sonarr' ? 'Sonarr' : 'Radarr'}.`, {
+        cause: error,
+      })
     }
 
     throw error

@@ -71,18 +71,18 @@ export async function fetchJellyfinImage(
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('Loading Jellyfin image timed out.')
+      throw new Error('Loading Jellyfin image timed out.', { cause: error })
     }
 
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach Jellyfin.')
+      throw new Error('Unable to reach Jellyfin.', { cause: error })
     }
 
     if (error instanceof Error) {
       throw error
     }
 
-    throw new Error('An unexpected error occurred while loading Jellyfin image.')
+    throw new Error('An unexpected error occurred while loading Jellyfin image.', { cause: error })
   } finally {
     clearTimeout(timeout)
   }
