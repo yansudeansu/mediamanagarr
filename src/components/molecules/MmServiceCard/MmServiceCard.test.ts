@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmServiceCard from './MmServiceCard.vue'
-import { SERVICE_INFO } from '../../../types/service'
+import { SERVICE_REGISTRY } from '../../../services/registry'
 import type { ServiceState } from '../../../types/service'
 
 describe('MmServiceCard', () => {
-  const jellyfin = SERVICE_INFO.jellyfin
+  const jellyfin = SERVICE_REGISTRY.jellyfin
 
   function createWrapper(props: Partial<InstanceType<typeof MmServiceCard>['$props']> = {}) {
     return mount(MmServiceCard, {
@@ -66,7 +66,7 @@ describe('MmServiceCard', () => {
       const wrapper = createWrapper()
 
       await wrapper.setProps({
-        service: SERVICE_INFO.sonarr,
+        service: SERVICE_REGISTRY.sonarr,
       })
 
       expect(wrapper.get('.service-card__name').text()).toBe('Sonarr')
@@ -220,7 +220,7 @@ describe('MmServiceCard', () => {
       const wrapper = createWrapper()
 
       await wrapper.setProps({
-        service: SERVICE_INFO.radarr,
+        service: SERVICE_REGISTRY.radarr,
       })
 
       expect(wrapper.text()).toContain('Radarr')

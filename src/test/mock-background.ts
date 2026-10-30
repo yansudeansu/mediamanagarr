@@ -3,16 +3,25 @@ import type { CalendarItem, CalendarResult } from '../types/calendar'
 import type { JellyfinArrival, JellyfinUser } from '../types/jellyfin'
 import type { QBittorrentTorrent } from '../types/qbittorrent'
 import type { SeerrRequest } from '../types/seerr'
-import { SERVICES, type SafeServiceConfigs } from '../types/service'
+import { SERVICES } from '../services/registry'
+import type {
+  SafeServiceConfigs,
+  ServiceHealth,
+  ServiceHealthStates,
+  ServiceId,
+} from '../types/service'
 
 export type MockDownloadsScenario = 'populated' | 'empty' | 'error'
+export type MockConnectionScenario = 'connected' | 'error'
 
 export interface MockBackgroundOptions {
   downloads?: MockDownloadsScenario
+  connections?: Partial<Record<ServiceId, MockConnectionScenario>>
 }
 
 export interface MockBackgroundAction {
   type: BackgroundMessage['type']
+  serviceId?: ServiceId
   hash?: string
   deleteFiles?: boolean
 }
@@ -155,13 +164,14 @@ function paginate<T>(items: T[], page = 1, pageSize = 10): { items: T[]; total: 
 }
 
 export function createMockBackground(options: MockBackgroundOptions = {}) {
-  const scenario = options.downloads ?? 'populated'
+  const downloadsScenario = options.downloads ?? 'populated'
+  const connectionScenarios = options.connections ?? {}
 
   const requests = createRequests()
   const calendarItems = createCalendarItems()
 
   let arrivals = createArrivals()
-  let torrents = scenario === 'empty' ? [] : createTorrents()
+  let torrents = downloadsScenario === 'empty' ? [] : createTorrents()
   let selectedUserId = 'mock-user-1'
 
   const users: JellyfinUser[] = [
@@ -178,6 +188,22 @@ export function createMockBackground(options: MockBackgroundOptions = {}) {
       },
     ]),
   ) as SafeServiceConfigs
+
+  const health: ServiceHealthStates = Object.fromEntries(
+    SERVICES.map((serviceId) => [
+      serviceId,
+      connectionScenarios[serviceId] === 'error'
+        ? {
+            status: 'failed',
+            lastCheckedAt: new Date().toISOString(),
+            error: 'Storybook: Service is unavailable.',
+          }
+        : {
+            status: 'connected',
+            lastCheckedAt: new Date().toISOString(),
+          },
+    ]),
+  ) as ServiceHealthStates
 
   const actions: MockBackgroundAction[] = []
 
@@ -196,6 +222,14 @@ export function createMockBackground(options: MockBackgroundOptions = {}) {
     }
   }
 
+  function setHealth(serviceId: ServiceId, status: ServiceHealth['status'], error?: string): void {
+    health[serviceId] = {
+      status,
+      lastCheckedAt: new Date().toISOString(),
+      ...(error ? { error } : {}),
+    }
+  }
+
   function handle(message: BackgroundMessage): BackgroundResponse<BackgroundMessage> {
     switch (message.type) {
       case 'OPEN_DETACHED_WORKSPACE':
@@ -210,19 +244,63 @@ export function createMockBackground(options: MockBackgroundOptions = {}) {
           configs: { ...configs },
         }
 
+      case 'GET_SERVICE_HEALTH':
+        return {
+          success: true,
+          health: Object.fromEntries(
+            Object.entries(health).map(([serviceId, state]) => [
+              serviceId,
+              state ? { ...state } : undefined,
+            ]),
+          ) as ServiceHealthStates,
+        }
+
       case 'CONNECT_SERVICE':
         configs[message.serviceId] = {
           url: message.config.url,
           configured: true,
         }
 
+        setHealth(message.serviceId, 'connected')
+
         return {
           success: true,
           serviceId: message.serviceId,
         }
 
+      case 'TEST_SERVICE_CONNECTION': {
+        actions.push({
+          type: message.type,
+          serviceId: message.serviceId,
+        })
+
+        if (!configs[message.serviceId]?.configured) {
+          return {
+            success: false,
+            error: `Configure ${message.serviceId} before testing its connection.`,
+          }
+        }
+
+        if (connectionScenarios[message.serviceId] === 'error') {
+          setHealth(message.serviceId, 'failed', 'Storybook: Service is unavailable.')
+
+          return {
+            success: false,
+            error: 'Storybook: Service is unavailable.',
+          }
+        }
+
+        setHealth(message.serviceId, 'connected')
+
+        return {
+          success: true,
+          serviceId: message.serviceId,
+        }
+      }
+
       case 'REMOVE_SERVICE':
         delete configs[message.serviceId]
+        delete health[message.serviceId]
 
         return {
           success: true,
@@ -325,7 +403,7 @@ export function createMockBackground(options: MockBackgroundOptions = {}) {
       }
 
       case 'GET_QBITTORRENT_DOWNLOADS':
-        if (scenario === 'error') {
+        if (downloadsScenario === 'error') {
           return {
             success: false,
             error: 'Storybook: qBittorrent is unavailable.',

@@ -1,10 +1,10 @@
-''
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ServiceState } from '../../../types/service'
 
 interface Props {
   status: ServiceState
+  customLabel?: string
 }
 
 const props = defineProps<Props>()
@@ -16,7 +16,7 @@ const statusLabels: Record<ServiceState, string> = {
   failed: 'Failed',
 }
 
-const label = computed(() => statusLabels[props.status])
+const label = computed(() => props.customLabel ?? statusLabels[props.status])
 </script>
 
 <template>

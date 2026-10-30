@@ -2,16 +2,30 @@ import type { CalendarResult, CalendarServiceId } from './calendar'
 import type { JellyfinArrivalsPage, JellyfinArrivalsQuery, JellyfinUser } from './jellyfin'
 import type { QBittorrentSnapshot } from './qbittorrent'
 import type { SeerrRequestsPage, SeerrRequestsQuery } from './seerr'
-import type { SafeServiceConfigs, ServiceConnectionInput, ServiceId } from './service'
+import type {
+  SafeServiceConfigs,
+  ServiceConnectionInput,
+  ServiceHealthStates,
+  ServiceId,
+} from './service'
 
 export interface GetServiceConfigsMessage {
   type: 'GET_SERVICE_CONFIGS'
+}
+
+export interface GetServiceHealthMessage {
+  type: 'GET_SERVICE_HEALTH'
 }
 
 export interface ConnectServiceMessage {
   type: 'CONNECT_SERVICE'
   serviceId: ServiceId
   config: ServiceConnectionInput
+}
+
+export interface TestServiceConnectionMessage {
+  type: 'TEST_SERVICE_CONNECTION'
+  serviceId: ServiceId
 }
 
 export interface RemoveServiceMessage {
@@ -90,7 +104,9 @@ export interface OpenDetachedWorkspaceMessage {
 
 export type BackgroundMessage =
   | GetServiceConfigsMessage
+  | GetServiceHealthMessage
   | ConnectServiceMessage
+  | TestServiceConnectionMessage
   | RemoveServiceMessage
   | GetJellyfinUsersMessage
   | SetJellyfinUserMessage
@@ -112,7 +128,17 @@ export interface GetServiceConfigsSuccess {
   configs: SafeServiceConfigs
 }
 
+export interface GetServiceHealthSuccess {
+  success: true
+  health: ServiceHealthStates
+}
+
 export interface ConnectServiceSuccess {
+  success: true
+  serviceId: ServiceId
+}
+
+export interface TestServiceConnectionSuccess {
   success: true
   serviceId: ServiceId
 }
@@ -190,7 +216,13 @@ export interface BackgroundMessageFailure {
 }
 
 export type GetServiceConfigsResponse = GetServiceConfigsSuccess | BackgroundMessageFailure
+
+export type GetServiceHealthResponse = GetServiceHealthSuccess | BackgroundMessageFailure
+
 export type ConnectServiceResponse = ConnectServiceSuccess | BackgroundMessageFailure
+
+export type TestServiceConnectionResponse = TestServiceConnectionSuccess | BackgroundMessageFailure
+
 export type RemoveServiceResponse = RemoveServiceSuccess | BackgroundMessageFailure
 export type GetJellyfinUsersResponse = GetJellyfinUsersSuccess | BackgroundMessageFailure
 export type SetJellyfinUserResponse = SetJellyfinUserSuccess | BackgroundMessageFailure
@@ -217,7 +249,9 @@ export type OpenDetachedWorkspaceResponse = OpenDetachedWorkspaceSuccess | Backg
 
 type BackgroundResponseMap = {
   GET_SERVICE_CONFIGS: GetServiceConfigsResponse
+  GET_SERVICE_HEALTH: GetServiceHealthResponse
   CONNECT_SERVICE: ConnectServiceResponse
+  TEST_SERVICE_CONNECTION: TestServiceConnectionResponse
   REMOVE_SERVICE: RemoveServiceResponse
   GET_JELLYFIN_USERS: GetJellyfinUsersResponse
   SET_JELLYFIN_USER: SetJellyfinUserResponse

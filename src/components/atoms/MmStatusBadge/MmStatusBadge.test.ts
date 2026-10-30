@@ -79,4 +79,63 @@ describe('MmStatusBadge', () => {
     expect(wrapper.find('button').exists()).toBe(false)
     expect(wrapper.find('a').exists()).toBe(false)
   })
+
+  it('uses a custom label when provided', () => {
+    const wrapper = mount(MmStatusBadge, {
+      props: {
+        status: 'configured',
+        customLabel: 'Not checked yet',
+      },
+    })
+
+    expect(wrapper.get('.status-badge__label').text()).toBe('Not checked yet')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--configured')
+  })
+
+  it('preserves the status styling when using a custom label', () => {
+    const wrapper = mount(MmStatusBadge, {
+      props: {
+        status: 'failed',
+        customLabel: 'Connection failed',
+      },
+    })
+
+    expect(wrapper.get('.status-badge__label').text()).toBe('Connection failed')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--failed')
+    expect(wrapper.get('.status-badge__dot').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('updates when the custom label changes', async () => {
+    const wrapper = mount(MmStatusBadge, {
+      props: {
+        status: 'configured',
+        customLabel: 'Not checked yet',
+      },
+    })
+
+    expect(wrapper.get('.status-badge__label').text()).toBe('Not checked yet')
+
+    await wrapper.setProps({
+      customLabel: 'Checking connection',
+    })
+
+    expect(wrapper.get('.status-badge__label').text()).toBe('Checking connection')
+  })
+
+  it('falls back to the default label when the custom label is removed', async () => {
+    const wrapper = mount(MmStatusBadge, {
+      props: {
+        status: 'configured',
+        customLabel: 'Not checked yet',
+      },
+    })
+
+    expect(wrapper.get('.status-badge__label').text()).toBe('Not checked yet')
+
+    await wrapper.setProps({
+      customLabel: undefined,
+    })
+
+    expect(wrapper.get('.status-badge__label').text()).toBe('Configured')
+  })
 })

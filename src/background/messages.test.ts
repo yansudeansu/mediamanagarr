@@ -6,6 +6,8 @@ import {
   removeServiceConfig,
   saveServiceConfig,
 } from '../utils/service-storage'
+import { getServiceHealthStates } from '../utils/service-health-storage'
+import { checkServiceHealth, invalidateServiceHealth } from './services/service-health'
 import { testServiceConnection } from './services/connection'
 import { fetchJellyfinUsers } from './services/jellyfin-users'
 import { refreshJellyfinNotifications } from './services/jellyfin-scanner'
@@ -16,7 +18,7 @@ import {
   getJellyfinUserSelection,
   saveJellyfinUserSelection,
 } from '../utils/jellyfin-storage'
-import type { ServiceConfig } from '../types/service'
+import type { ServiceConfig, ServiceHealth, ServiceHealthStates } from '../types/service'
 import type { SeerrRequestsPage } from '../types/seerr'
 import {
   deleteQBittorrentTorrent,
@@ -31,6 +33,15 @@ vi.mock('../utils/service-storage', () => ({
   getServiceConfig: vi.fn(),
   removeServiceConfig: vi.fn(),
   saveServiceConfig: vi.fn(),
+}))
+
+vi.mock('../utils/service-health-storage', () => ({
+  getServiceHealthStates: vi.fn(),
+}))
+
+vi.mock('./services/service-health', () => ({
+  checkServiceHealth: vi.fn(),
+  invalidateServiceHealth: vi.fn(),
 }))
 
 vi.mock('./services/connection', () => ({
@@ -101,6 +112,17 @@ const seerrRequestsPage: SeerrRequestsPage = {
   total: 1,
 }
 
+const connectedHealth: ServiceHealth = {
+  status: 'connected',
+  lastCheckedAt: '2026-10-31T12:00:00.000Z',
+}
+
+const failedHealth: ServiceHealth = {
+  status: 'failed',
+  lastCheckedAt: '2026-10-31T12:00:00.000Z',
+  error: 'Unable to reach the server.',
+}
+
 describe('handleBackgroundMessage', () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -114,6 +136,10 @@ describe('handleBackgroundMessage', () => {
     vi.mocked(getServiceConfig).mockResolvedValue(undefined)
     vi.mocked(fetchJellyfinUsers).mockResolvedValue(jellyfinUsers)
     vi.mocked(getJellyfinUserSelection).mockResolvedValue('')
+
+    vi.mocked(getServiceHealthStates).mockResolvedValue({})
+    vi.mocked(checkServiceHealth).mockResolvedValue(connectedHealth)
+    vi.mocked(invalidateServiceHealth).mockResolvedValue(undefined)
   })
 
   it('returns safe service configurations', async () => {
@@ -132,6 +158,58 @@ describe('handleBackgroundMessage', () => {
           configured: true,
         },
       },
+    })
+  })
+
+  describe('GET_SERVICE_HEALTH', () => {
+    it('returns persisted health without exposing credentials', async () => {
+      const health: ServiceHealthStates = {
+        jellyfin: connectedHealth,
+        seerr: failedHealth,
+      }
+
+      vi.mocked(getServiceHealthStates).mockResolvedValue(health)
+
+      const result = await handleBackgroundMessage({
+        type: 'GET_SERVICE_HEALTH',
+      })
+
+      expect(result).toEqual({
+        success: true,
+        health,
+      })
+
+      expect(getServiceHealthStates).toHaveBeenCalledOnce()
+      expect(testServiceConnection).not.toHaveBeenCalled()
+      expect(checkServiceHealth).not.toHaveBeenCalled()
+      expect(JSON.stringify(result)).not.toContain(jellyfinConfig.apiKey)
+      expect(JSON.stringify(result)).not.toContain(seerrConfig.apiKey)
+    })
+
+    it('returns empty health when no checks have been recorded', async () => {
+      await expect(
+        handleBackgroundMessage({
+          type: 'GET_SERVICE_HEALTH',
+        }),
+      ).resolves.toEqual({
+        success: true,
+        health: {},
+      })
+    })
+
+    it('returns a structured error when health storage fails', async () => {
+      vi.mocked(getServiceHealthStates).mockRejectedValue(
+        new Error('Unable to read service health.'),
+      )
+
+      await expect(
+        handleBackgroundMessage({
+          type: 'GET_SERVICE_HEALTH',
+        }),
+      ).resolves.toEqual({
+        success: false,
+        error: 'Unable to read service health.',
+      })
     })
   })
 
@@ -188,113 +266,385 @@ describe('handleBackgroundMessage', () => {
     })
   })
 
-  it('tests and saves a valid connection', async () => {
-    const result = await handleBackgroundMessage({
-      type: 'CONNECT_SERVICE',
-      serviceId: 'sonarr',
-      config: {
-        url: 'https://sonarr.example.com/',
-        apiKey: 'test-key',
-      },
-    })
+  describe('CONNECT_SERVICE', () => {
+    it('tests and saves a valid connection', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'sonarr',
+        config: {
+          url: 'https://sonarr.example.com/',
+          apiKey: 'test-key',
+        },
+      })
 
-    expect(chrome.permissions.contains).toHaveBeenCalledWith({
-      origins: ['https://sonarr.example.com/*'],
-    })
+      expect(chrome.permissions.contains).toHaveBeenCalledWith({
+        origins: ['https://sonarr.example.com/*'],
+      })
 
-    expect(testServiceConnection).toHaveBeenCalledWith('sonarr', {
-      url: 'https://sonarr.example.com',
-      apiKey: 'test-key',
-    })
-
-    expect(saveServiceConfig).toHaveBeenCalledWith('sonarr', {
-      url: 'https://sonarr.example.com',
-      apiKey: 'test-key',
-    })
-
-    expect(result).toEqual({
-      success: true,
-      serviceId: 'sonarr',
-    })
-  })
-
-  it('does not test or save when host permission is missing', async () => {
-    vi.stubGlobal('chrome', {
-      permissions: {
-        contains: vi.fn().mockResolvedValue(false),
-      },
-    })
-
-    const result = await handleBackgroundMessage({
-      type: 'CONNECT_SERVICE',
-      serviceId: 'radarr',
-      config: {
-        url: 'https://radarr.example.com',
-        apiKey: 'test-key',
-      },
-    })
-
-    expect(result).toEqual({
-      success: false,
-      error: 'Server access has not been granted. Please allow access and try again.',
-    })
-
-    expect(testServiceConnection).not.toHaveBeenCalled()
-    expect(saveServiceConfig).not.toHaveBeenCalled()
-  })
-
-  it('reuses the saved API key for the same URL', async () => {
-    vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
-
-    await handleBackgroundMessage({
-      type: 'CONNECT_SERVICE',
-      serviceId: 'jellyfin',
-      config: {
-        url: 'https://jellyfin.example.com/',
-        apiKey: '',
-      },
-    })
-
-    expect(testServiceConnection).toHaveBeenCalledWith('jellyfin', jellyfinConfig)
-    expect(refreshJellyfinNotifications).toHaveBeenCalledOnce()
-  })
-
-  it('does not save when the connection test fails', async () => {
-    vi.mocked(testServiceConnection).mockRejectedValue(new Error('Authentication failed.'))
-
-    const result = await handleBackgroundMessage({
-      type: 'CONNECT_SERVICE',
-      serviceId: 'seerr',
-      config: {
-        url: 'https://seerr.example.com',
-        apiKey: 'wrong-key',
-      },
-    })
-
-    expect(result).toEqual({
-      success: false,
-      error: 'Authentication failed.',
-    })
-
-    expect(saveServiceConfig).not.toHaveBeenCalled()
-  })
-
-  it('rejects an empty API key when no saved key is available', async () => {
-    const result = await handleBackgroundMessage({
-      type: 'CONNECT_SERVICE',
-      serviceId: 'sonarr',
-      config: {
+      expect(testServiceConnection).toHaveBeenCalledWith('sonarr', {
         url: 'https://sonarr.example.com',
-        apiKey: '',
-      },
+        apiKey: 'test-key',
+      })
+
+      expect(saveServiceConfig).toHaveBeenCalledWith('sonarr', {
+        url: 'https://sonarr.example.com',
+        apiKey: 'test-key',
+      })
+
+      expect(invalidateServiceHealth).toHaveBeenCalledWith('sonarr')
+      expect(checkServiceHealth).toHaveBeenCalledWith('sonarr', true)
+
+      expect(result).toEqual({
+        success: true,
+        serviceId: 'sonarr',
+      })
     })
 
-    expect(result).toEqual({
-      success: false,
-      error: 'Enter an API key.',
+    it('invalidates old health only after saving the new configuration', async () => {
+      await handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'sonarr',
+        config: {
+          url: 'https://sonarr.example.com',
+          apiKey: 'test-key',
+        },
+      })
+
+      const saveOrder = vi.mocked(saveServiceConfig).mock.invocationCallOrder[0]
+      const invalidateOrder = vi.mocked(invalidateServiceHealth).mock.invocationCallOrder[0]
+      const checkOrder = vi.mocked(checkServiceHealth).mock.invocationCallOrder[0]
+
+      expect(saveOrder).toBeLessThan(invalidateOrder)
+      expect(invalidateOrder).toBeLessThan(checkOrder)
     })
 
-    expect(testServiceConnection).not.toHaveBeenCalled()
+    it('does not test or save when host permission is missing', async () => {
+      vi.stubGlobal('chrome', {
+        permissions: {
+          contains: vi.fn().mockResolvedValue(false),
+        },
+      })
+
+      const result = await handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'radarr',
+        config: {
+          url: 'https://radarr.example.com',
+          apiKey: 'test-key',
+        },
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Server access has not been granted. Please allow access and try again.',
+      })
+
+      expect(testServiceConnection).not.toHaveBeenCalled()
+      expect(saveServiceConfig).not.toHaveBeenCalled()
+      expect(invalidateServiceHealth).not.toHaveBeenCalled()
+    })
+
+    it('reuses the saved API key for the same URL', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+
+      await handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'jellyfin',
+        config: {
+          url: 'https://jellyfin.example.com/',
+          apiKey: '',
+        },
+      })
+
+      expect(testServiceConnection).toHaveBeenCalledWith('jellyfin', jellyfinConfig)
+      expect(invalidateServiceHealth).toHaveBeenCalledWith('jellyfin')
+      expect(checkServiceHealth).toHaveBeenCalledWith('jellyfin', true)
+      expect(refreshJellyfinNotifications).toHaveBeenCalledOnce()
+    })
+
+    it('does not save or invalidate health when the connection test fails', async () => {
+      vi.mocked(testServiceConnection).mockRejectedValue(new Error('Authentication failed.'))
+
+      const result = await handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'seerr',
+        config: {
+          url: 'https://seerr.example.com',
+          apiKey: 'wrong-key',
+        },
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Authentication failed.',
+      })
+
+      expect(saveServiceConfig).not.toHaveBeenCalled()
+      expect(invalidateServiceHealth).not.toHaveBeenCalled()
+      expect(checkServiceHealth).not.toHaveBeenCalled()
+    })
+
+    it('preserves existing configuration and health when replacement fails', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+      vi.mocked(testServiceConnection).mockRejectedValue(
+        new Error('Replacement server is unavailable.'),
+      )
+
+      const result = await handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'jellyfin',
+        config: {
+          url: 'https://replacement.example.com',
+          apiKey: 'replacement-key',
+        },
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Replacement server is unavailable.',
+      })
+
+      expect(saveServiceConfig).not.toHaveBeenCalled()
+      expect(invalidateServiceHealth).not.toHaveBeenCalled()
+      expect(checkServiceHealth).not.toHaveBeenCalled()
+      expect(refreshJellyfinNotifications).not.toHaveBeenCalled()
+    })
+
+    it('rejects an empty API key when no saved key is available', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'sonarr',
+        config: {
+          url: 'https://sonarr.example.com',
+          apiKey: '',
+        },
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Enter an API key.',
+      })
+
+      expect(testServiceConnection).not.toHaveBeenCalled()
+      expect(invalidateServiceHealth).not.toHaveBeenCalled()
+    })
+
+    it('does not undo a saved connection if the follow-up health check fails', async () => {
+      vi.mocked(checkServiceHealth).mockRejectedValue(new Error('Health storage unavailable.'))
+
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+      const result = await handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'sonarr',
+        config: {
+          url: 'https://sonarr.example.com',
+          apiKey: 'test-key',
+        },
+      })
+
+      expect(saveServiceConfig).toHaveBeenCalledOnce()
+      expect(result).toEqual({
+        success: true,
+        serviceId: 'sonarr',
+      })
+
+      expect(warn).toHaveBeenCalledWith(
+        'MediaManagarr: Unable to refresh health for sonarr:',
+        expect.any(Error),
+      )
+
+      warn.mockRestore()
+    })
+
+    it('reports a health invalidation failure after saving the configuration', async () => {
+      vi.mocked(invalidateServiceHealth).mockRejectedValue(
+        new Error('Unable to clear previous health.'),
+      )
+
+      const result = await handleBackgroundMessage({
+        type: 'CONNECT_SERVICE',
+        serviceId: 'sonarr',
+        config: {
+          url: 'https://sonarr.example.com',
+          apiKey: 'test-key',
+        },
+      })
+
+      expect(saveServiceConfig).toHaveBeenCalledOnce()
+      expect(result).toEqual({
+        success: false,
+        error: 'Unable to clear previous health.',
+      })
+      expect(checkServiceHealth).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('TEST_SERVICE_CONNECTION', () => {
+    it('tests an existing configuration without saving it again', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+
+      const result = await handleBackgroundMessage({
+        type: 'TEST_SERVICE_CONNECTION',
+        serviceId: 'jellyfin',
+      })
+
+      expect(getServiceConfig).toHaveBeenCalledWith('jellyfin')
+
+      expect(chrome.permissions.contains).toHaveBeenCalledWith({
+        origins: ['https://jellyfin.example.com/*'],
+      })
+
+      expect(checkServiceHealth).toHaveBeenCalledWith('jellyfin', true)
+      expect(testServiceConnection).not.toHaveBeenCalled()
+      expect(saveServiceConfig).not.toHaveBeenCalled()
+      expect(removeServiceConfig).not.toHaveBeenCalled()
+      expect(refreshJellyfinNotifications).not.toHaveBeenCalled()
+
+      expect(result).toEqual({
+        success: true,
+        serviceId: 'jellyfin',
+      })
+    })
+
+    it('rejects testing an unconfigured service', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'TEST_SERVICE_CONNECTION',
+        serviceId: 'sonarr',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Configure sonarr before testing its connection.',
+      })
+
+      expect(chrome.permissions.contains).not.toHaveBeenCalled()
+      expect(checkServiceHealth).not.toHaveBeenCalled()
+      expect(saveServiceConfig).not.toHaveBeenCalled()
+    })
+
+    it('rejects testing without host permission', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+
+      vi.stubGlobal('chrome', {
+        permissions: {
+          contains: vi.fn().mockResolvedValue(false),
+        },
+      })
+
+      const result = await handleBackgroundMessage({
+        type: 'TEST_SERVICE_CONNECTION',
+        serviceId: 'jellyfin',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'jellyfin server access has not been granted.',
+      })
+
+      expect(checkServiceHealth).not.toHaveBeenCalled()
+      expect(saveServiceConfig).not.toHaveBeenCalled()
+    })
+
+    it('reports connection failures without modifying configuration', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+      vi.mocked(checkServiceHealth).mockResolvedValue({
+        ...failedHealth,
+        error: 'Unable to reach the server. Check its address and availability.',
+      })
+
+      const result = await handleBackgroundMessage({
+        type: 'TEST_SERVICE_CONNECTION',
+        serviceId: 'jellyfin',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unable to reach the server. Check its address and availability.',
+      })
+
+      expect(checkServiceHealth).toHaveBeenCalledWith('jellyfin', true)
+      expect(saveServiceConfig).not.toHaveBeenCalled()
+      expect(removeServiceConfig).not.toHaveBeenCalled()
+      expect(refreshJellyfinNotifications).not.toHaveBeenCalled()
+    })
+
+    it('recovers when a previously unavailable service becomes reachable', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+
+      vi.mocked(checkServiceHealth)
+        .mockResolvedValueOnce(failedHealth)
+        .mockResolvedValueOnce(connectedHealth)
+
+      const firstResult = await handleBackgroundMessage({
+        type: 'TEST_SERVICE_CONNECTION',
+        serviceId: 'jellyfin',
+      })
+
+      expect(firstResult).toEqual({
+        success: false,
+        error: 'Unable to reach the server.',
+      })
+
+      const secondResult = await handleBackgroundMessage({
+        type: 'TEST_SERVICE_CONNECTION',
+        serviceId: 'jellyfin',
+      })
+
+      expect(secondResult).toEqual({
+        success: true,
+        serviceId: 'jellyfin',
+      })
+
+      expect(checkServiceHealth).toHaveBeenCalledTimes(2)
+      expect(saveServiceConfig).not.toHaveBeenCalled()
+      expect(removeServiceConfig).not.toHaveBeenCalled()
+    })
+
+    it('rejects a result invalidated by a configuration or permission change', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+      vi.mocked(checkServiceHealth).mockResolvedValue(undefined)
+
+      const result = await handleBackgroundMessage({
+        type: 'TEST_SERVICE_CONNECTION',
+        serviceId: 'jellyfin',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'The service configuration or server permission changed during the test.',
+      })
+    })
+
+    it('returns unexpected health-check errors as structured failures', async () => {
+      vi.mocked(getServiceConfig).mockResolvedValue(jellyfinConfig)
+      vi.mocked(checkServiceHealth).mockRejectedValue(new Error('Health storage unavailable.'))
+
+      const result = await handleBackgroundMessage({
+        type: 'TEST_SERVICE_CONNECTION',
+        serviceId: 'jellyfin',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Health storage unavailable.',
+      })
+    })
+
+    it('rejects invalid service IDs', async () => {
+      const result = await handleBackgroundMessage({
+        type: 'TEST_SERVICE_CONNECTION',
+        serviceId: 'unknown',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid background message.',
+      })
+
+      expect(getServiceConfig).not.toHaveBeenCalled()
+      expect(checkServiceHealth).not.toHaveBeenCalled()
+    })
   })
 
   describe('qBittorrent messages', () => {
@@ -483,19 +833,32 @@ describe('handleBackgroundMessage', () => {
   })
 
   describe('REMOVE_SERVICE', () => {
-    it('removes a configured service', async () => {
+    it('removes a configured service and invalidates its health', async () => {
       const result = await handleBackgroundMessage({
         type: 'REMOVE_SERVICE',
         serviceId: 'sonarr',
       })
 
       expect(removeServiceConfig).toHaveBeenCalledWith('sonarr')
+      expect(invalidateServiceHealth).toHaveBeenCalledWith('sonarr')
       expect(clearJellyfinUserSelection).not.toHaveBeenCalled()
 
       expect(result).toEqual({
         success: true,
         serviceId: 'sonarr',
       })
+    })
+
+    it('invalidates health only after removing the saved configuration', async () => {
+      await handleBackgroundMessage({
+        type: 'REMOVE_SERVICE',
+        serviceId: 'sonarr',
+      })
+
+      const removeOrder = vi.mocked(removeServiceConfig).mock.invocationCallOrder[0]
+      const invalidateOrder = vi.mocked(invalidateServiceHealth).mock.invocationCallOrder[0]
+
+      expect(removeOrder).toBeLessThan(invalidateOrder)
     })
 
     it('clears the Jellyfin selection before removing Jellyfin', async () => {
@@ -506,6 +869,7 @@ describe('handleBackgroundMessage', () => {
 
       expect(clearJellyfinUserSelection).toHaveBeenCalledOnce()
       expect(removeServiceConfig).toHaveBeenCalledWith('jellyfin')
+      expect(invalidateServiceHealth).toHaveBeenCalledWith('jellyfin')
       expect(refreshJellyfinNotifications).toHaveBeenCalledOnce()
 
       const clearCallOrder = vi.mocked(clearJellyfinUserSelection).mock.invocationCallOrder[0]
@@ -533,6 +897,7 @@ describe('handleBackgroundMessage', () => {
       })
 
       expect(removeServiceConfig).not.toHaveBeenCalled()
+      expect(invalidateServiceHealth).not.toHaveBeenCalled()
       expect(clearJellyfinUserSelection).not.toHaveBeenCalled()
     })
 
@@ -552,6 +917,7 @@ describe('handleBackgroundMessage', () => {
       })
 
       expect(removeServiceConfig).not.toHaveBeenCalled()
+      expect(invalidateServiceHealth).not.toHaveBeenCalled()
     })
 
     it('reports a storage error when removal fails', async () => {
@@ -565,6 +931,25 @@ describe('handleBackgroundMessage', () => {
       expect(result).toEqual({
         success: false,
         error: 'Unable to remove service.',
+      })
+
+      expect(removeServiceConfig).toHaveBeenCalledWith('sonarr')
+      expect(invalidateServiceHealth).not.toHaveBeenCalled()
+    })
+
+    it('reports a health invalidation error after removing configuration', async () => {
+      vi.mocked(invalidateServiceHealth).mockRejectedValue(
+        new Error('Unable to clear service health.'),
+      )
+
+      const result = await handleBackgroundMessage({
+        type: 'REMOVE_SERVICE',
+        serviceId: 'sonarr',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unable to clear service health.',
       })
 
       expect(removeServiceConfig).toHaveBeenCalledWith('sonarr')

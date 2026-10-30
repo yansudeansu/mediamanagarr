@@ -2,7 +2,7 @@ import { defineComponent, onMounted, onUnmounted, ref } from 'vue'
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import { userEvent, within } from 'storybook/test'
 import App from './App.vue'
-import { createMockBackground } from './test/mock-background'
+import { createMockBackground, type MockBackgroundOptions } from './test/mock-background'
 import type { BackgroundMessage } from './types/messages'
 
 type WorkspaceMode = 'popup' | 'detached' | 'sidebar'
@@ -30,9 +30,9 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-export const Default: Story = {
-  beforeEach: () => {
-    const mock = createMockBackground()
+function createStorySetup(options: MockBackgroundOptions = {}) {
+  return () => {
+    const mock = createMockBackground(options)
 
     const originalChrome = globalThis.chrome
     const originalClose = window.close
@@ -65,6 +65,16 @@ export const Default: Story = {
       configurable: true,
       value: {
         ...originalChrome,
+
+        // Storybook runs outside the extension environment.
+        // Simulate granting host permissions without a browser prompt.
+        permissions: {
+          ...originalChrome?.permissions,
+
+          request: async () => true,
+
+          contains: async () => true,
+        },
 
         storage: {
           ...originalChrome?.storage,
@@ -166,78 +176,90 @@ export const Default: Story = {
         value: originalClose,
       })
     }
-  },
+  }
+}
 
-  render: () =>
-    defineComponent({
-      name: 'InteractiveWorkspaceStory',
+function renderWorkspace() {
+  return defineComponent({
+    name: 'InteractiveWorkspaceStory',
 
-      components: {
-        App,
-      },
+    components: {
+      App,
+    },
 
-      setup() {
-        const workspaceMode = ref<WorkspaceMode>('popup')
-        const workspaceKey = ref(0)
+    setup() {
+      const workspaceMode = ref<WorkspaceMode>('popup')
+      const workspaceKey = ref(0)
 
-        function changeWorkspaceMode(event: Event): void {
-          const mode = (event as CustomEvent<WorkspaceMode>).detail
+      function changeWorkspaceMode(event: Event): void {
+        const mode = (event as CustomEvent<WorkspaceMode>).detail
 
-          if (workspaceMode.value === mode) {
-            return
-          }
-
-          workspaceMode.value = mode
-
-          const url = new URL(window.location.href)
-
-          if (mode === 'popup') {
-            url.searchParams.delete('workspace')
-          } else {
-            url.searchParams.set('workspace', mode)
-          }
-
-          window.history.replaceState(null, '', url.toString())
-
-          // Remount App to simulate opening the selected workspace.
-          // Mocked session storage survives this remount.
-          workspaceKey.value += 1
+        if (workspaceMode.value === mode) {
+          return
         }
 
-        onMounted(() => {
-          window.addEventListener(WORKSPACE_EVENT, changeWorkspaceMode)
-        })
+        workspaceMode.value = mode
 
-        onUnmounted(() => {
-          window.removeEventListener(WORKSPACE_EVENT, changeWorkspaceMode)
-        })
+        const url = new URL(window.location.href)
 
-        return {
-          workspaceMode,
-          workspaceKey,
+        if (mode === 'popup') {
+          url.searchParams.delete('workspace')
+        } else {
+          url.searchParams.set('workspace', mode)
         }
-      },
 
-      template: `
-        <div
-          :style="{
-            width: workspaceMode === 'detached'
-              ? '780px'
-              : workspaceMode === 'sidebar'
-                ? '340px'
-                : '380px',
-            height: workspaceMode === 'popup' ? '480px' : '700px',
-            maxWidth: '100%',
-            border: '1px solid var(--border)',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            background: 'var(--background)'
-          }"
-        >
-          <App :key="workspaceKey" />
-        </div>
-      `,
-    }),
+        window.history.replaceState(null, '', url.toString())
+
+        // Remount App to simulate opening the selected workspace.
+        // Mocked session storage survives this remount.
+        workspaceKey.value += 1
+      }
+
+      onMounted(() => {
+        window.addEventListener(WORKSPACE_EVENT, changeWorkspaceMode)
+      })
+
+      onUnmounted(() => {
+        window.removeEventListener(WORKSPACE_EVENT, changeWorkspaceMode)
+      })
+
+      return {
+        workspaceMode,
+        workspaceKey,
+      }
+    },
+
+    template: `
+      <div
+        :style="{
+          width: workspaceMode === 'detached'
+            ? '780px'
+            : workspaceMode === 'sidebar'
+              ? '340px'
+              : '380px',
+          height: workspaceMode === 'popup' ? '480px' : '700px',
+          maxWidth: '100%',
+          border: '1px solid var(--border)',
+          borderRadius: '10px',
+          overflow: 'hidden',
+          background: 'var(--background)'
+        }"
+      >
+        <App :key="workspaceKey" />
+      </div>
+    `,
+  })
+}
+
+async function openSettings(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement)
+
+  await userEvent.click(canvas.getByRole('button', { name: 'Open settings' }))
+}
+
+export const Default: Story = {
+  beforeEach: createStorySetup(),
+  render: renderWorkspace,
 }
 
 export const UpNext: Story = {
@@ -274,8 +296,42 @@ export const Settings: Story = {
   ...Default,
 
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement)
+    await openSettings(canvasElement)
+  },
+}
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Open settings' }))
+export const SettingsConnected: Story = {
+  ...Default,
+
+  name: 'Settings — Connected',
+
+  beforeEach: createStorySetup({
+    connections: {
+      jellyfin: 'connected',
+      seerr: 'connected',
+      sonarr: 'connected',
+      radarr: 'connected',
+      qbittorrent: 'connected',
+    },
+  }),
+
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement)
+  },
+}
+
+export const SettingsConnectionFailed: Story = {
+  ...Default,
+
+  name: 'Settings — Connection Failed',
+
+  beforeEach: createStorySetup({
+    connections: {
+      jellyfin: 'error',
+    },
+  }),
+
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement)
   },
 }

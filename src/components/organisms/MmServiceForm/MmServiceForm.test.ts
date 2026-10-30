@@ -3,7 +3,8 @@ import { mount } from '@vue/test-utils'
 import MmServiceForm from './MmServiceForm.vue'
 import MmInput from '../../atoms/MmInput/MmInput.vue'
 import MmSelect from '../../atoms/MmSelect/MmSelect.vue'
-import type { ServiceId } from '../../../types/service'
+import MmServiceHealth from '../../molecules/MmServiceHealth/MmServiceHealth.vue'
+import type { ServiceHealth, ServiceId } from '../../../types/service'
 
 describe('MmServiceForm', () => {
   function createWrapper(
@@ -12,9 +13,11 @@ describe('MmServiceForm', () => {
       url?: string
       configured?: boolean
       loading?: boolean
+      testing?: boolean
       removing?: boolean
       error?: string
       success?: string
+      health?: ServiceHealth
       jellyfinUsers?: { id: string; name: string }[]
       jellyfinUserId?: string
       jellyfinUsersLoading?: boolean
@@ -29,6 +32,10 @@ describe('MmServiceForm', () => {
         ...props,
       },
     })
+  }
+
+  function findButton(wrapper: ReturnType<typeof createWrapper>, label: string) {
+    return wrapper.findAll('button').find((button) => button.text() === label)
   }
 
   it('renders the selected service name and description', () => {
@@ -218,6 +225,259 @@ describe('MmServiceForm', () => {
     expect(wrapper.emitted('edit')).toHaveLength(1)
   })
 
+  // Persisted connection health
+
+  it('hides connection health for unconfigured services', () => {
+    const wrapper = createWrapper({
+      configured: false,
+      health: {
+        status: 'connected',
+        lastCheckedAt: '2026-10-31T12:00:00.000Z',
+      },
+    })
+
+    expect(wrapper.findComponent(MmServiceHealth).exists()).toBe(false)
+  })
+
+  it('shows an unchecked state when no health has been recorded', () => {
+    const wrapper = createWrapper({
+      configured: true,
+    })
+
+    const health = wrapper.getComponent(MmServiceHealth)
+
+    expect(health.get('.status-badge__label').text()).toBe('Not checked yet')
+    expect(health.find('.service-health__time').exists()).toBe(false)
+  })
+
+  it('shows a successful connection health status', () => {
+    const wrapper = createWrapper({
+      configured: true,
+      health: {
+        status: 'connected',
+        lastCheckedAt: '2026-10-31T12:00:00.000Z',
+      },
+    })
+
+    const health = wrapper.getComponent(MmServiceHealth)
+
+    expect(health.get('.status-badge').classes()).toContain('status-badge--connected')
+    expect(health.get('.status-badge__label').text()).toBe('Connected')
+  })
+
+  it('shows failed health with its error', () => {
+    const wrapper = createWrapper({
+      configured: true,
+      health: {
+        status: 'failed',
+        lastCheckedAt: '2026-10-31T12:00:00.000Z',
+        error: 'Storybook: Service is unavailable.',
+      },
+    })
+
+    const health = wrapper.getComponent(MmServiceHealth)
+
+    expect(health.get('.status-badge').classes()).toContain('status-badge--failed')
+    expect(health.get('.status-badge__label').text()).toBe('Connection failed')
+    expect(health.get('.service-health__error').text()).toBe('Storybook: Service is unavailable.')
+    expect(health.get('[role="alert"]').text()).toBe('Storybook: Service is unavailable.')
+  })
+
+  it('shows the last health check timestamp', () => {
+    const timestamp = '2026-10-31T12:00:00.000Z'
+
+    const wrapper = createWrapper({
+      configured: true,
+      health: {
+        status: 'connected',
+        lastCheckedAt: timestamp,
+      },
+    })
+
+    expect(wrapper.getComponent(MmServiceHealth).get('.service-health__time').text()).toBe(
+      new Date(timestamp).toLocaleString(),
+    )
+  })
+
+  it('does not display an invalid health timestamp', () => {
+    const wrapper = createWrapper({
+      configured: true,
+      health: {
+        status: 'connected',
+        lastCheckedAt: 'invalid-date',
+      },
+    })
+
+    expect(wrapper.getComponent(MmServiceHealth).find('.service-health__time').exists()).toBe(false)
+  })
+
+  it('updates health when the selected service changes', async () => {
+    const wrapper = createWrapper({
+      serviceId: 'jellyfin',
+      configured: true,
+      health: {
+        status: 'connected',
+        lastCheckedAt: '2026-10-31T12:00:00.000Z',
+      },
+    })
+
+    expect(wrapper.getComponent(MmServiceHealth).get('.status-badge__label').text()).toBe(
+      'Connected',
+    )
+
+    await wrapper.setProps({
+      serviceId: 'sonarr',
+      health: {
+        status: 'failed',
+        lastCheckedAt: '2026-10-31T13:00:00.000Z',
+        error: 'Sonarr is unavailable.',
+      },
+    })
+
+    const health = wrapper.getComponent(MmServiceHealth)
+
+    expect(health.get('.status-badge__label').text()).toBe('Connection failed')
+    expect(health.get('.service-health__error').text()).toBe('Sonarr is unavailable.')
+  })
+
+  // Test saved connection
+
+  it('does not show Test Connection for an unconfigured service', () => {
+    const wrapper = createWrapper()
+
+    expect(findButton(wrapper, 'Test Connection')).toBeUndefined()
+  })
+
+  it('shows Test Connection for a configured service', () => {
+    const wrapper = createWrapper({
+      configured: true,
+      url: 'https://jellyfin.example.com',
+    })
+
+    const button = findButton(wrapper, 'Test Connection')
+
+    expect(button).toBeDefined()
+    expect(button!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('emits testConnection with the service ID without submitting the form', async () => {
+    const wrapper = createWrapper({
+      serviceId: 'sonarr',
+      configured: true,
+      url: 'https://sonarr.example.com',
+    })
+
+    const button = findButton(wrapper, 'Test Connection')
+
+    expect(button).toBeDefined()
+    await button!.trigger('click')
+
+    expect(wrapper.emitted('testConnection')?.[0]).toEqual(['sonarr'])
+    expect(wrapper.emitted('connect')).toBeUndefined()
+  })
+
+  it('disables Test Connection when the saved URL is changed', async () => {
+    const wrapper = createWrapper({
+      configured: true,
+      url: 'https://jellyfin.example.com',
+    })
+
+    await wrapper.get('input[type="url"]').setValue('https://other.example.com')
+
+    const button = findButton(wrapper, 'Test Connection')
+
+    expect(button).toBeDefined()
+    expect(button!.attributes('disabled')).toBeDefined()
+
+    await button!.trigger('click')
+
+    expect(wrapper.emitted('testConnection')).toBeUndefined()
+  })
+
+  it('disables Test Connection when an unsaved API key is entered', async () => {
+    const wrapper = createWrapper({
+      configured: true,
+      url: 'https://jellyfin.example.com',
+    })
+
+    await wrapper.get('input[type="password"]').setValue('new-unsaved-key')
+
+    const button = findButton(wrapper, 'Test Connection')
+
+    expect(button).toBeDefined()
+    expect(button!.attributes('disabled')).toBeDefined()
+
+    await button!.trigger('click')
+
+    expect(wrapper.emitted('testConnection')).toBeUndefined()
+  })
+
+  it('enables Test Connection again after reverting unsaved changes', async () => {
+    const wrapper = createWrapper({
+      configured: true,
+      url: 'https://jellyfin.example.com',
+    })
+
+    await wrapper.get('input[type="url"]').setValue('https://other.example.com')
+    await wrapper.get('input[type="password"]').setValue('new-unsaved-key')
+
+    expect(findButton(wrapper, 'Test Connection')!.attributes('disabled')).toBeDefined()
+
+    await wrapper.get('input[type="url"]').setValue('https://jellyfin.example.com')
+    await wrapper.get('input[type="password"]').setValue('')
+
+    expect(findButton(wrapper, 'Test Connection')!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('disables form actions while testing a saved connection', async () => {
+    const wrapper = createWrapper({
+      configured: true,
+      url: 'https://jellyfin.example.com',
+      testing: true,
+    })
+
+    expect(wrapper.get('input[type="url"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('input[type="password"]').attributes('disabled')).toBeDefined()
+
+    expect(findButton(wrapper, 'Connect & Test')!.attributes('disabled')).toBeDefined()
+    expect(findButton(wrapper, 'Test Connection')!.attributes('disabled')).toBeDefined()
+    expect(findButton(wrapper, 'Remove server')!.attributes('disabled')).toBeDefined()
+
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('connect')).toBeUndefined()
+    expect(wrapper.emitted('testConnection')).toBeUndefined()
+  })
+
+  it('does not display stale success feedback while testing', () => {
+    const wrapper = createWrapper({
+      configured: true,
+      url: 'https://jellyfin.example.com',
+      testing: true,
+      success: 'Previously connected successfully.',
+    })
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+  })
+
+  it('does not allow testing a configured service without a saved URL', async () => {
+    const wrapper = createWrapper({
+      configured: true,
+      url: '',
+    })
+
+    const button = findButton(wrapper, 'Test Connection')
+
+    expect(button).toBeDefined()
+    expect(button!.attributes('disabled')).toBeDefined()
+
+    await button!.trigger('click')
+
+    expect(wrapper.emitted('testConnection')).toBeUndefined()
+  })
+
+  // Jellyfin user selection
+
   it('shows the Jellyfin user dropdown when Jellyfin is configured', () => {
     const wrapper = createWrapper({
       url: 'https://jellyfin.example.com',
@@ -319,7 +579,14 @@ describe('MmServiceForm', () => {
       configured: true,
     })
 
-    await wrapper.get('button').trigger('click') // Replaced below with targeted lookup
+    const removeButton = findButton(wrapper, 'Remove server')
+
+    expect(removeButton).toBeDefined()
+    await removeButton!.trigger('click')
+
+    expect(wrapper.text()).toContain('Remove Jellyfin server?')
+    expect(wrapper.text()).toContain('Confirm removal')
+    expect(wrapper.emitted('remove')).toBeUndefined()
   })
 
   it('allows cancellation without emitting remove', async () => {
@@ -327,16 +594,14 @@ describe('MmServiceForm', () => {
       configured: true,
     })
 
-    const removeButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Remove server')
+    const removeButton = findButton(wrapper, 'Remove server')
 
     expect(removeButton).toBeDefined()
     await removeButton!.trigger('click')
 
     expect(wrapper.text()).toContain('Remove Jellyfin server?')
 
-    const cancelButton = wrapper.findAll('button').find((button) => button.text() === 'Cancel')
+    const cancelButton = findButton(wrapper, 'Cancel')
 
     expect(cancelButton).toBeDefined()
     await cancelButton!.trigger('click')
@@ -351,16 +616,12 @@ describe('MmServiceForm', () => {
       configured: true,
     })
 
-    const removeButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Remove server')
+    const removeButton = findButton(wrapper, 'Remove server')
 
     expect(removeButton).toBeDefined()
     await removeButton!.trigger('click')
 
-    const confirmButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Confirm removal')
+    const confirmButton = findButton(wrapper, 'Confirm removal')
 
     expect(confirmButton).toBeDefined()
     await confirmButton!.trigger('click')
@@ -373,18 +634,14 @@ describe('MmServiceForm', () => {
       configured: true,
     })
 
-    const removeButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Remove server')
+    const removeButton = findButton(wrapper, 'Remove server')
 
     expect(removeButton).toBeDefined()
     await removeButton!.trigger('click')
 
     await wrapper.setProps({ removing: true })
 
-    const confirmButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Confirm removal')
+    const confirmButton = findButton(wrapper, 'Confirm removal')
 
     expect(confirmButton).toBeDefined()
     await confirmButton!.trigger('click')
@@ -408,9 +665,7 @@ describe('MmServiceForm', () => {
       url: 'https://jellyfin.example.com',
     })
 
-    const removeButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Remove server')
+    const removeButton = findButton(wrapper, 'Remove server')
 
     expect(removeButton).toBeDefined()
     await removeButton!.trigger('click')
@@ -431,9 +686,7 @@ describe('MmServiceForm', () => {
       configured: true,
     })
 
-    const removeButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Remove server')
+    const removeButton = findButton(wrapper, 'Remove server')
 
     expect(removeButton).toBeDefined()
     await removeButton!.trigger('click')

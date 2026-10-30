@@ -4,7 +4,7 @@ import SettingsView from './SettingsView.vue'
 import MmServiceSelector from '../components/organisms/MmServiceSelector/MmServiceSelector.vue'
 import MmServiceForm from '../components/organisms/MmServiceForm/MmServiceForm.vue'
 import { sendBackgroundMessage } from '../utils/background-messaging'
-import type { SafeServiceConfigs } from '../types/service'
+import type { SafeServiceConfigs, ServiceHealthStates } from '../types/service'
 
 vi.mock('../utils/background-messaging', () => ({
   sendBackgroundMessage: vi.fn(),
@@ -28,13 +28,35 @@ const jellyfinUsers = [
   { id: 'user-2', name: 'Bob' },
 ]
 
-function mockConfigLoad(configs: SafeServiceConfigs = savedConfigs()) {
+const connectedHealth = {
+  status: 'connected' as const,
+  lastCheckedAt: '2026-10-31T12:00:00.000Z',
+}
+
+const failedHealth = {
+  status: 'failed' as const,
+  lastCheckedAt: '2026-10-31T11:00:00.000Z',
+  error: 'Unable to reach the server.',
+}
+
+function mockConfigLoad(
+  configs: SafeServiceConfigs = savedConfigs(),
+  initialHealth: ServiceHealthStates = {},
+) {
+  const health: ServiceHealthStates = { ...initialHealth }
+
   vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
     switch (message.type) {
       case 'GET_SERVICE_CONFIGS':
         return {
           success: true,
           configs,
+        }
+
+      case 'GET_SERVICE_HEALTH':
+        return {
+          success: true,
+          health: { ...health },
         }
 
       case 'GET_JELLYFIN_USERS':
@@ -45,12 +67,30 @@ function mockConfigLoad(configs: SafeServiceConfigs = savedConfigs()) {
         }
 
       case 'CONNECT_SERVICE':
+        health[message.serviceId] = {
+          status: 'connected',
+          lastCheckedAt: new Date().toISOString(),
+        }
+
+        return {
+          success: true,
+          serviceId: message.serviceId,
+        }
+
+      case 'TEST_SERVICE_CONNECTION':
+        health[message.serviceId] = {
+          status: 'connected',
+          lastCheckedAt: new Date().toISOString(),
+        }
+
         return {
           success: true,
           serviceId: message.serviceId,
         }
 
       case 'REMOVE_SERVICE':
+        delete health[message.serviceId]
+
         return {
           success: true,
           serviceId: message.serviceId,
@@ -118,11 +158,164 @@ describe('SettingsView', () => {
     expect(wrapper.getComponent(MmServiceForm).props('configured')).toBe(true)
   })
 
+  it('loads persisted service health when Settings opens', async () => {
+    mockConfigLoad(savedConfigs(), {
+      jellyfin: connectedHealth,
+      sonarr: failedHealth,
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    expect(sendBackgroundMessage).toHaveBeenCalledWith({
+      type: 'GET_SERVICE_HEALTH',
+    })
+
+    const selector = wrapper.getComponent(MmServiceSelector)
+
+    expect(selector.props('statuses')?.jellyfin).toBe('connected')
+    expect(selector.props('statuses')?.sonarr).toBe('failed')
+
+    const health = wrapper.get('.service-health')
+
+    expect(health.element.tagName).toBe('DIV')
+    expect(health.attributes('role')).toBeUndefined()
+    expect(health.get('.status-badge__label').text()).toBe('Connected')
+  })
+
+  it('shows configured status when no health check has been recorded', async () => {
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const selector = wrapper.getComponent(MmServiceSelector)
+
+    expect(selector.props('statuses')?.jellyfin).toBe('configured')
+    expect(wrapper.get('.service-health .status-badge__label').text()).toBe('Not checked yet')
+  })
+
+  it('shows persisted connection failures in the compact health indicator', async () => {
+    mockConfigLoad(savedConfigs(), {
+      jellyfin: failedHealth,
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const selector = wrapper.getComponent(MmServiceSelector)
+    const health = wrapper.get('.service-health')
+
+    expect(selector.props('statuses')?.jellyfin).toBe('failed')
+    expect(health.get('.status-badge__label').text()).toBe('Connection failed')
+    expect(health.text()).toContain('Unable to reach the server.')
+    expect(health.get('[role="alert"]').text()).toBe('Unable to reach the server.')
+    expect(health.text()).not.toContain('Use Test connection above')
+  })
+
+  it('shows the last successful health check time', async () => {
+    mockConfigLoad(savedConfigs(), {
+      jellyfin: connectedHealth,
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const health = wrapper.get('.service-health')
+
+    expect(health.get('.service-health__time').text()).toBe(
+      new Date(connectedHealth.lastCheckedAt).toLocaleString(),
+    )
+  })
+
+  it('does not display invalid health timestamps', async () => {
+    mockConfigLoad(savedConfigs(), {
+      jellyfin: {
+        status: 'connected',
+        lastCheckedAt: 'invalid-date',
+      },
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    expect(wrapper.find('.service-health__time').exists()).toBe(false)
+  })
+
+  it('does not show connection health for an unconfigured service', async () => {
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    wrapper.getComponent(MmServiceSelector).vm.$emit('update:modelValue', 'radarr')
+
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.service-health').exists()).toBe(false)
+  })
+
+  it('keeps service health scoped to the selected service', async () => {
+    mockConfigLoad(savedConfigs(), {
+      jellyfin: connectedHealth,
+      sonarr: failedHealth,
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const selector = wrapper.getComponent(MmServiceSelector)
+
+    expect(wrapper.get('.service-health .status-badge__label').text()).toBe('Connected')
+
+    selector.vm.$emit('update:modelValue', 'sonarr')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.service-health .status-badge__label').text()).toBe('Connection failed')
+    expect(wrapper.get('.service-health').text()).toContain('Unable to reach the server.')
+
+    selector.vm.$emit('update:modelValue', 'jellyfin')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.service-health .status-badge__label').text()).toBe('Connected')
+  })
+
+  it('keeps Settings usable when loading health fails', async () => {
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      if (message.type === 'GET_SERVICE_HEALTH') {
+        return {
+          success: false,
+          error: 'Health storage unavailable.',
+        }
+      }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
+    })
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    expect(wrapper.getComponent(MmServiceForm).props('configured')).toBe(true)
+    expect(wrapper.getComponent(MmServiceForm).props('url')).toBe('https://jellyfin.example.com')
+
+    expect(wrapper.getComponent(MmServiceSelector).props('statuses')?.jellyfin).toBe('configured')
+    expect(wrapper.get('.service-health .status-badge__label').text()).toBe('Not checked yet')
+
+    expect(warn).toHaveBeenCalled()
+
+    warn.mockRestore()
+  })
+
   it('updates the form when another service is selected', async () => {
     const wrapper = mount(SettingsView)
     await flushPromises()
 
     wrapper.getComponent(MmServiceSelector).vm.$emit('update:modelValue', 'sonarr')
+
     await wrapper.vm.$nextTick()
 
     expect(wrapper.getComponent(MmServiceForm).props('serviceId')).toBe('sonarr')
@@ -134,6 +327,7 @@ describe('SettingsView', () => {
     await flushPromises()
 
     wrapper.getComponent(MmServiceSelector).vm.$emit('update:modelValue', 'radarr')
+
     await wrapper.vm.$nextTick()
 
     expect(wrapper.getComponent(MmServiceForm).props('configured')).toBe(false)
@@ -183,6 +377,34 @@ describe('SettingsView', () => {
 
     expect(wrapper.getComponent(MmServiceForm).props('configured')).toBe(true)
     expect(wrapper.getComponent(MmServiceForm).props('url')).toBe('https://jellyfin.example.com')
+
+    expect(wrapper.getComponent(MmServiceSelector).props('statuses')?.jellyfin).toBe('connected')
+  })
+
+  it('refreshes persisted health after connecting', async () => {
+    mockConfigLoad({})
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const initialHealthRequests = vi
+      .mocked(sendBackgroundMessage)
+      .mock.calls.filter(([message]) => message.type === 'GET_SERVICE_HEALTH').length
+
+    wrapper.getComponent(MmServiceForm).vm.$emit('connect', {
+      serviceId: 'jellyfin',
+      url: 'https://jellyfin.example.com',
+      apiKey: 'secret',
+    })
+
+    await flushPromises()
+
+    const finalHealthRequests = vi
+      .mocked(sendBackgroundMessage)
+      .mock.calls.filter(([message]) => message.type === 'GET_SERVICE_HEALTH').length
+
+    expect(finalHealthRequests).toBe(initialHealthRequests + 1)
+    expect(wrapper.get('.service-health .status-badge__label').text()).toBe('Connected')
   })
 
   it('does not connect when permission is denied', async () => {
@@ -215,6 +437,8 @@ describe('SettingsView', () => {
   })
 
   it('does not overwrite saved configuration after a failed connection', async () => {
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
     vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
       if (message.type === 'CONNECT_SERVICE') {
         return {
@@ -223,26 +447,11 @@ describe('SettingsView', () => {
         }
       }
 
-      switch (message.type) {
-        case 'GET_SERVICE_CONFIGS':
-          return { success: true, configs: savedConfigs() }
-
-        case 'GET_JELLYFIN_USERS':
-          return {
-            success: true,
-            users: jellyfinUsers,
-            selectedUserId: 'user-1',
-          }
-
-        case 'REMOVE_SERVICE':
-          return { success: true, serviceId: message.serviceId }
-
-        case 'SET_JELLYFIN_USER':
-          return { success: true, userId: message.userId }
-
-        default:
-          throw new Error(`Unexpected background message: ${message.type}`)
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
       }
+
+      return originalImplementation(message)
     })
 
     const wrapper = mount(SettingsView)
@@ -261,34 +470,99 @@ describe('SettingsView', () => {
     expect(wrapper.getComponent(MmServiceForm).props('error')).toBe('Authentication failed.')
   })
 
-  it('keeps errors scoped to their service', async () => {
+  it('preserves persisted health after a failed connection edit', async () => {
+    mockConfigLoad(savedConfigs(), {
+      jellyfin: connectedHealth,
+    })
+
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
     vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
-      switch (message.type) {
-        case 'GET_SERVICE_CONFIGS':
-          return { success: true, configs: {} }
-
-        case 'GET_JELLYFIN_USERS':
-          return {
-            success: true,
-            users: jellyfinUsers,
-            selectedUserId: '',
-          }
-
-        case 'CONNECT_SERVICE':
-          return {
-            success: false,
-            error: 'Connection failed.',
-          }
-
-        case 'REMOVE_SERVICE':
-          return { success: true, serviceId: message.serviceId }
-
-        case 'SET_JELLYFIN_USER':
-          return { success: true, userId: message.userId }
-
-        default:
-          throw new Error(`Unexpected background message: ${message.type}`)
+      if (message.type === 'CONNECT_SERVICE') {
+        return {
+          success: false,
+          error: 'Replacement authentication failed.',
+        }
       }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    wrapper.getComponent(MmServiceForm).vm.$emit('connect', {
+      serviceId: 'jellyfin',
+      url: 'https://different.example.com',
+      apiKey: 'wrong-key',
+    })
+
+    await flushPromises()
+
+    expect(wrapper.getComponent(MmServiceSelector).props('statuses')?.jellyfin).toBe('connected')
+    expect(wrapper.get('.service-health .status-badge__label').text()).toBe('Connected')
+    expect(wrapper.getComponent(MmServiceForm).props('error')).toBe(
+      'Replacement authentication failed.',
+    )
+  })
+
+  it('keeps a saved service configured after a failed connection edit', async () => {
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      if (message.type === 'CONNECT_SERVICE') {
+        return {
+          success: false,
+          error: 'Authentication failed.',
+        }
+      }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    wrapper.getComponent(MmServiceForm).vm.$emit('connect', {
+      serviceId: 'sonarr',
+      url: 'https://different.example.com',
+      apiKey: 'wrong-key',
+    })
+
+    await flushPromises()
+
+    const selector = wrapper.getComponent(MmServiceSelector)
+
+    expect(selector.props('statuses')?.sonarr).toBe('configured')
+    expect(wrapper.getComponent(MmServiceForm).props('configured')).toBe(true)
+  })
+
+  it('keeps errors scoped to their service', async () => {
+    mockConfigLoad({})
+
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      if (message.type === 'CONNECT_SERVICE') {
+        return {
+          success: false,
+          error: 'Connection failed.',
+        }
+      }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
     })
 
     const wrapper = mount(SettingsView)
@@ -305,9 +579,268 @@ describe('SettingsView', () => {
     expect(wrapper.getComponent(MmServiceForm).props('error')).toBe('Connection failed.')
 
     wrapper.getComponent(MmServiceSelector).vm.$emit('update:modelValue', 'sonarr')
+
     await wrapper.vm.$nextTick()
 
     expect(wrapper.getComponent(MmServiceForm).props('error')).toBe('')
+  })
+
+  it('tests a configured service using its saved connection', async () => {
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const form = wrapper.getComponent(MmServiceForm)
+
+    form.vm.$emit('testConnection', 'jellyfin')
+    await flushPromises()
+
+    expect(sendBackgroundMessage).toHaveBeenCalledWith({
+      type: 'TEST_SERVICE_CONNECTION',
+      serviceId: 'jellyfin',
+    })
+
+    expect(sendBackgroundMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'CONNECT_SERVICE',
+      }),
+    )
+
+    expect(chrome.permissions.request).not.toHaveBeenCalled()
+    expect(form.props('configured')).toBe(true)
+    expect(form.props('url')).toBe('https://jellyfin.example.com')
+  })
+
+  it('updates the service status after a successful connection test', async () => {
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const form = wrapper.getComponent(MmServiceForm)
+    const selector = wrapper.getComponent(MmServiceSelector)
+
+    expect(selector.props('statuses')?.jellyfin).toBe('configured')
+
+    form.vm.$emit('testConnection', 'jellyfin')
+    await flushPromises()
+
+    expect(selector.props('statuses')?.jellyfin).toBe('connected')
+    expect(form.props('success')).toBe('Connected to Jellyfin successfully.')
+    expect(form.props('error')).toBe('')
+  })
+
+  it('refreshes health after a successful manual connection test', async () => {
+    mockConfigLoad(savedConfigs(), {
+      jellyfin: failedHealth,
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    expect(wrapper.getComponent(MmServiceSelector).props('statuses')?.jellyfin).toBe('failed')
+
+    wrapper.getComponent(MmServiceForm).vm.$emit('testConnection', 'jellyfin')
+
+    await flushPromises()
+
+    expect(wrapper.getComponent(MmServiceSelector).props('statuses')?.jellyfin).toBe('connected')
+
+    const health = wrapper.get('.service-health')
+
+    expect(health.get('.status-badge__label').text()).toBe('Connected')
+    expect(health.text()).not.toContain('Unable to reach the server.')
+    expect(health.text()).not.toContain('Use Test connection above')
+  })
+
+  it('reports a failed connection test without removing saved configuration', async () => {
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      if (message.type === 'TEST_SERVICE_CONNECTION') {
+        return {
+          success: false,
+          error: 'The service is receiving too many requests. Please try again later.',
+        }
+      }
+
+      if (message.type === 'GET_SERVICE_HEALTH') {
+        return {
+          success: true,
+          health: {
+            jellyfin: {
+              status: 'failed',
+              lastCheckedAt: '2026-10-31T12:00:00.000Z',
+              error: 'The service is receiving too many requests. Please try again later.',
+            },
+          },
+        }
+      }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const form = wrapper.getComponent(MmServiceForm)
+    const selector = wrapper.getComponent(MmServiceSelector)
+
+    form.vm.$emit('testConnection', 'jellyfin')
+    await flushPromises()
+
+    expect(selector.props('statuses')?.jellyfin).toBe('failed')
+    expect(form.props('error')).toBe(
+      'The service is receiving too many requests. Please try again later.',
+    )
+    expect(form.props('success')).toBe('')
+    expect(form.props('configured')).toBe(true)
+    expect(form.props('url')).toBe('https://jellyfin.example.com')
+  })
+
+  it('does not test a service without saved credentials', async () => {
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    wrapper.getComponent(MmServiceForm).vm.$emit('testConnection', 'radarr')
+
+    await flushPromises()
+
+    expect(sendBackgroundMessage).not.toHaveBeenCalledWith({
+      type: 'TEST_SERVICE_CONNECTION',
+      serviceId: 'radarr',
+    })
+  })
+
+  it('shows testing state and prevents duplicate test requests', async () => {
+    const pending = deferredResponse<{
+      success: true
+      serviceId: 'jellyfin'
+    }>()
+
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      if (message.type === 'TEST_SERVICE_CONNECTION') {
+        return pending.promise
+      }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const form = wrapper.getComponent(MmServiceForm)
+
+    form.vm.$emit('testConnection', 'jellyfin')
+    await wrapper.vm.$nextTick()
+
+    expect(form.props('testing')).toBe(true)
+
+    form.vm.$emit('testConnection', 'jellyfin')
+    await wrapper.vm.$nextTick()
+
+    const testRequests = vi
+      .mocked(sendBackgroundMessage)
+      .mock.calls.filter(([message]) => message.type === 'TEST_SERVICE_CONNECTION')
+
+    expect(testRequests).toHaveLength(1)
+
+    pending.resolve({
+      success: true,
+      serviceId: 'jellyfin',
+    })
+
+    await flushPromises()
+
+    expect(form.props('testing')).toBe(false)
+    expect(form.props('success')).toBe('Connected to Jellyfin successfully.')
+  })
+
+  it('prevents connection edits and removal while testing', async () => {
+    const pending = deferredResponse<{
+      success: true
+      serviceId: 'jellyfin'
+    }>()
+
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
+    vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
+      if (message.type === 'TEST_SERVICE_CONNECTION') {
+        return pending.promise
+      }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const form = wrapper.getComponent(MmServiceForm)
+
+    form.vm.$emit('testConnection', 'jellyfin')
+    await wrapper.vm.$nextTick()
+
+    form.vm.$emit('connect', {
+      serviceId: 'jellyfin',
+      url: 'https://different.example.com',
+      apiKey: 'new-key',
+    })
+
+    form.vm.$emit('remove', 'jellyfin')
+
+    await wrapper.vm.$nextTick()
+
+    expect(sendBackgroundMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'CONNECT_SERVICE' }),
+    )
+
+    expect(sendBackgroundMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'REMOVE_SERVICE' }),
+    )
+
+    pending.resolve({
+      success: true,
+      serviceId: 'jellyfin',
+    })
+
+    await flushPromises()
+
+    expect(form.props('testing')).toBe(false)
+    expect(form.props('configured')).toBe(true)
+  })
+
+  it('keeps connection feedback scoped to the tested service', async () => {
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const selector = wrapper.getComponent(MmServiceSelector)
+    const form = wrapper.getComponent(MmServiceForm)
+
+    form.vm.$emit('testConnection', 'jellyfin')
+    await flushPromises()
+
+    expect(form.props('success')).toBe('Connected to Jellyfin successfully.')
+
+    selector.vm.$emit('update:modelValue', 'sonarr')
+    await wrapper.vm.$nextTick()
+
+    expect(form.props('success')).toBe('')
+
+    selector.vm.$emit('update:modelValue', 'jellyfin')
+    await wrapper.vm.$nextTick()
+
+    expect(form.props('success')).toBe('Connected to Jellyfin successfully.')
   })
 
   it('loads Jellyfin users when a saved configuration exists', async () => {
@@ -329,6 +862,7 @@ describe('SettingsView', () => {
     await flushPromises()
 
     wrapper.getComponent(MmServiceForm).vm.$emit('selectJellyfinUser', 'user-2')
+
     await flushPromises()
 
     expect(sendBackgroundMessage).toHaveBeenCalledWith({
@@ -340,39 +874,28 @@ describe('SettingsView', () => {
   })
 
   it('keeps the previous selection when saving fails', async () => {
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
     vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
-      switch (message.type) {
-        case 'GET_SERVICE_CONFIGS':
-          return { success: true, configs: savedConfigs() }
-
-        case 'GET_JELLYFIN_USERS':
-          return {
-            success: true,
-            users: jellyfinUsers,
-            selectedUserId: 'user-1',
-          }
-
-        case 'CONNECT_SERVICE':
-          return { success: true, serviceId: message.serviceId }
-
-        case 'REMOVE_SERVICE':
-          return { success: true, serviceId: message.serviceId }
-
-        case 'SET_JELLYFIN_USER':
-          return {
-            success: false,
-            error: 'Unable to save Jellyfin user.',
-          }
-
-        default:
-          throw new Error(`Unexpected background message: ${message.type}`)
+      if (message.type === 'SET_JELLYFIN_USER') {
+        return {
+          success: false,
+          error: 'Unable to save Jellyfin user.',
+        }
       }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
     })
 
     const wrapper = mount(SettingsView)
     await flushPromises()
 
     wrapper.getComponent(MmServiceForm).vm.$emit('selectJellyfinUser', 'user-2')
+
     await flushPromises()
 
     const form = wrapper.getComponent(MmServiceForm)
@@ -382,29 +905,21 @@ describe('SettingsView', () => {
   })
 
   it('shows a Jellyfin user-loading error without failing the service connection', async () => {
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
     vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
-      switch (message.type) {
-        case 'GET_SERVICE_CONFIGS':
-          return { success: true, configs: savedConfigs() }
-
-        case 'GET_JELLYFIN_USERS':
-          return {
-            success: false,
-            error: 'Unable to reach Jellyfin.',
-          }
-
-        case 'CONNECT_SERVICE':
-          return { success: true, serviceId: message.serviceId }
-
-        case 'REMOVE_SERVICE':
-          return { success: true, serviceId: message.serviceId }
-
-        case 'SET_JELLYFIN_USER':
-          return { success: true, userId: message.userId }
-
-        default:
-          throw new Error(`Unexpected background message: ${message.type}`)
+      if (message.type === 'GET_JELLYFIN_USERS') {
+        return {
+          success: false,
+          error: 'Unable to reach Jellyfin.',
+        }
       }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
     })
 
     const wrapper = mount(SettingsView)
@@ -467,7 +982,7 @@ describe('SettingsView', () => {
       'Connected to Jellyfin successfully.',
     )
 
-    expect(wrapper.find('[role="status"]').text()).toBe('Connected to Jellyfin successfully.')
+    expect(wrapper.text()).toContain('Connected to Jellyfin successfully.')
   })
 
   it('clears success feedback when the configuration is edited', async () => {
@@ -493,33 +1008,21 @@ describe('SettingsView', () => {
   })
 
   it('does not show success feedback after a failed connection', async () => {
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
     vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
-      switch (message.type) {
-        case 'GET_SERVICE_CONFIGS':
-          return { success: true, configs: savedConfigs() }
-
-        case 'GET_JELLYFIN_USERS':
-          return {
-            success: true,
-            users: jellyfinUsers,
-            selectedUserId: 'user-1',
-          }
-
-        case 'CONNECT_SERVICE':
-          return {
-            success: false,
-            error: 'Authentication failed.',
-          }
-
-        case 'REMOVE_SERVICE':
-          return { success: true, serviceId: message.serviceId }
-
-        case 'SET_JELLYFIN_USER':
-          return { success: true, userId: message.userId }
-
-        default:
-          throw new Error(`Unexpected background message: ${message.type}`)
+      if (message.type === 'CONNECT_SERVICE') {
+        return {
+          success: false,
+          error: 'Authentication failed.',
+        }
       }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
     })
 
     const wrapper = mount(SettingsView)
@@ -539,8 +1042,6 @@ describe('SettingsView', () => {
     expect(form.props('error')).toBe('Authentication failed.')
   })
 
-  // Server removal
-
   it('removes a configured server after confirmation', async () => {
     const wrapper = mount(SettingsView)
     await flushPromises()
@@ -559,6 +1060,30 @@ describe('SettingsView', () => {
     expect(form.props('url')).toBe('')
     expect(form.props('success')).toBe('Jellyfin server removed successfully.')
     expect(form.props('error')).toBe('')
+
+    expect(wrapper.find('.service-health').exists()).toBe(false)
+  })
+
+  it('clears persisted health after removing a service', async () => {
+    mockConfigLoad(savedConfigs(), {
+      jellyfin: failedHealth,
+      sonarr: connectedHealth,
+    })
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    const selector = wrapper.getComponent(MmServiceSelector)
+
+    expect(selector.props('statuses')?.jellyfin).toBe('failed')
+    expect(selector.props('statuses')?.sonarr).toBe('connected')
+
+    wrapper.getComponent(MmServiceForm).vm.$emit('remove', 'jellyfin')
+    await flushPromises()
+
+    expect(selector.props('statuses')?.jellyfin).toBe('not-configured')
+    expect(selector.props('statuses')?.sonarr).toBe('connected')
+    expect(wrapper.find('.service-health').exists()).toBe(false)
   })
 
   it('clears Jellyfin users after removing Jellyfin', async () => {
@@ -580,33 +1105,21 @@ describe('SettingsView', () => {
   })
 
   it('preserves saved configuration when removal fails', async () => {
+    const originalImplementation = vi.mocked(sendBackgroundMessage).getMockImplementation()
+
     vi.mocked(sendBackgroundMessage).mockImplementation(async (message) => {
-      switch (message.type) {
-        case 'GET_SERVICE_CONFIGS':
-          return { success: true, configs: savedConfigs() }
-
-        case 'GET_JELLYFIN_USERS':
-          return {
-            success: true,
-            users: jellyfinUsers,
-            selectedUserId: 'user-1',
-          }
-
-        case 'CONNECT_SERVICE':
-          return { success: true, serviceId: message.serviceId }
-
-        case 'REMOVE_SERVICE':
-          return {
-            success: false,
-            error: 'Unable to remove server.',
-          }
-
-        case 'SET_JELLYFIN_USER':
-          return { success: true, userId: message.userId }
-
-        default:
-          throw new Error(`Unexpected background message: ${message.type}`)
+      if (message.type === 'REMOVE_SERVICE') {
+        return {
+          success: false,
+          error: 'Unable to remove server.',
+        }
       }
+
+      if (!originalImplementation) {
+        throw new Error('Missing background mock.')
+      }
+
+      return originalImplementation(message)
     })
 
     const wrapper = mount(SettingsView)
@@ -697,8 +1210,6 @@ describe('SettingsView', () => {
     expect(form.props('url')).toBe('https://jellyfin.example.com')
     expect(form.props('jellyfinUserId')).toBe('user-1')
   })
-
-  // Jellyfin save feedback
 
   it('shows saving feedback while a Jellyfin user selection is being stored', async () => {
     const pending = deferredResponse<{

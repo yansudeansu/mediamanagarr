@@ -11,9 +11,11 @@ const meta = {
     url: '',
     configured: false,
     loading: false,
+    testing: false,
     removing: false,
     error: '',
     success: '',
+    health: undefined,
     jellyfinUsers: [],
     jellyfinUserId: '',
     jellyfinUsersLoading: false,
@@ -36,6 +38,10 @@ const meta = {
     loading: {
       control: 'boolean',
     },
+    testing: {
+      control: 'boolean',
+      description: 'Whether the saved connection is currently being tested.',
+    },
     removing: {
       control: 'boolean',
     },
@@ -44,6 +50,11 @@ const meta = {
     },
     success: {
       control: 'text',
+    },
+    health: {
+      control: 'object',
+      description:
+        'Persisted connection health, including status, last check time, and optional error.',
     },
     jellyfinUserId: {
       control: 'text',
@@ -116,6 +127,47 @@ export const Sonarr: Story = {
   },
 }
 
+// Persisted connection health
+
+export const HealthConnected: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    health: {
+      status: 'connected',
+      lastCheckedAt: '2026-10-31T12:00:00.000Z',
+    },
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-1',
+  },
+}
+
+export const HealthFailed: Story = {
+  args: {
+    serviceId: 'sonarr',
+    url: 'https://sonarr.example.com',
+    configured: true,
+    health: {
+      status: 'failed',
+      lastCheckedAt: '2026-10-31T12:00:00.000Z',
+      error: 'Unable to reach the Sonarr server.',
+    },
+  },
+}
+
+export const HealthNotChecked: Story = {
+  args: {
+    serviceId: 'radarr',
+    url: 'https://radarr.example.com',
+    configured: true,
+    health: {
+      status: 'unknown',
+      lastCheckedAt: null,
+    },
+  },
+}
+
 // Connection feedback
 
 export const Loading: Story = {
@@ -146,6 +198,64 @@ export const ConnectionError: Story = {
     url: 'https://radarr.example.com',
     configured: true,
     error: 'Could not reach the server.',
+  },
+}
+
+// Saved connection testing
+
+export const ReadyToTest: Story = {
+  args: {
+    serviceId: 'sonarr',
+    url: 'https://sonarr.example.com',
+    configured: true,
+    testing: false,
+  },
+}
+
+export const TestingConnection: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    url: 'https://jellyfin.example.com',
+    configured: true,
+    testing: true,
+    jellyfinUsers: exampleUsers,
+    jellyfinUserId: 'user-1',
+  },
+}
+
+export const TestConnectionSuccess: Story = {
+  args: {
+    serviceId: 'sonarr',
+    url: 'https://sonarr.example.com',
+    configured: true,
+    success: 'Connected to Sonarr successfully.',
+  },
+}
+
+export const TestConnectionFailed: Story = {
+  args: {
+    serviceId: 'radarr',
+    url: 'https://radarr.example.com',
+    configured: true,
+    error: 'The server is temporarily unavailable (HTTP 503). Please try again later.',
+  },
+}
+
+export const TestConnectionRateLimited: Story = {
+  args: {
+    serviceId: 'seerr',
+    url: 'https://seerr.example.com',
+    configured: true,
+    error: 'The service is receiving too many requests. Please try again later.',
+  },
+}
+
+export const TestConnectionUnavailable: Story = {
+  args: {
+    serviceId: 'jellyfin',
+    configured: true,
+    url: '',
+    testing: false,
   },
 }
 

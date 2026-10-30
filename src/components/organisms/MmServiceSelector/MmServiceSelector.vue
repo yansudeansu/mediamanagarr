@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import MmServiceCard from '../../molecules/MmServiceCard/MmServiceCard.vue'
-import { SERVICES, SERVICE_INFO, type ServiceId, type ServiceState } from '../../../types/service'
+import { SERVICES, SERVICE_REGISTRY } from '../../../services/registry'
+import type { ServiceId, ServiceState } from '../../../types/service'
 
 interface Props {
   modelValue?: ServiceId | null
@@ -29,7 +30,7 @@ function selectService(serviceId: ServiceId) {
       <mm-service-card
         v-for="serviceId in SERVICES"
         :key="serviceId"
-        :service="SERVICE_INFO[serviceId]"
+        :service="SERVICE_REGISTRY[serviceId]"
         :status="statuses[serviceId] ?? 'not-configured'"
         :selected="modelValue === serviceId"
         :disabled="disabled"
