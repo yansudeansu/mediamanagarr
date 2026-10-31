@@ -1,10 +1,5 @@
-import {
-  SERVICES,
-  type SafeServiceConfigs,
-  type ServiceConfig,
-  type ServiceConfigs,
-  type ServiceId,
-} from '../types/service'
+import { SERVICES, isServiceConfigured } from '../services/registry'
+import type { SafeServiceConfigs, ServiceConfig, ServiceConfigs, ServiceId } from '../types/service'
 
 const STORAGE_KEY = 'mediaManagarrServices'
 
@@ -39,7 +34,7 @@ export async function getSafeServiceConfigs(): Promise<SafeServiceConfigs> {
   for (const serviceId of SERVICES) {
     const config = configs[serviceId]
 
-    if (!config) continue
+    if (!config || !isServiceConfigured(serviceId, config)) continue
 
     safeConfigs[serviceId] = {
       url: config.url,

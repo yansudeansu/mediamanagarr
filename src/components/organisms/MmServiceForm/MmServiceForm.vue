@@ -3,7 +3,9 @@ import { computed, ref, watch } from 'vue'
 import MmButton from '../../atoms/MmButton/MmButton.vue'
 import MmInput from '../../atoms/MmInput/MmInput.vue'
 import MmSelect from '../../atoms/MmSelect/MmSelect.vue'
-import { SERVICE_INFO, type ServiceId } from '../../../types/service'
+import MmServiceHealth from '../../molecules/MmServiceHealth/MmServiceHealth.vue'
+import { SERVICE_REGISTRY } from '../../../services/registry'
+import type { ServiceHealth, ServiceId } from '../../../types/service'
 import type { JellyfinUser } from '../../../types/jellyfin'
 import { normalizeServerUrl } from '../../../utils/service-config'
 
@@ -12,9 +14,11 @@ interface Props {
   url?: string
   configured?: boolean
   loading?: boolean
+  testing?: boolean
   removing?: boolean
   error?: string
   success?: string
+  health?: ServiceHealth
   jellyfinUsers?: JellyfinUser[]
   jellyfinUserId?: string
   jellyfinUsersLoading?: boolean
@@ -27,9 +31,11 @@ const props = withDefaults(defineProps<Props>(), {
   url: '',
   configured: false,
   loading: false,
+  testing: false,
   removing: false,
   error: '',
   success: '',
+  health: undefined,
   jellyfinUsers: () => [],
   jellyfinUserId: '',
   jellyfinUsersLoading: false,
@@ -40,19 +46,20 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   connect: [payload: { serviceId: ServiceId; url: string; apiKey: string }]
+  testConnection: [serviceId: ServiceId]
   remove: [serviceId: ServiceId]
   selectJellyfinUser: [userId: string]
   edit: []
 }>()
 
-const service = computed(() => SERVICE_INFO[props.serviceId])
+const service = computed(() => SERVICE_REGISTRY[props.serviceId])
 
 const serverUrl = ref(props.url)
 const apiKey = ref('')
 const validationError = ref('')
 const confirmingRemoval = ref(false)
 
-const busy = computed(() => props.loading || props.removing)
+const busy = computed(() => props.loading || props.testing || props.removing)
 
 function getNormalizedUrl(value: string): string {
   try {
@@ -70,6 +77,8 @@ const isSavedUrl = computed(() => {
 
   return savedUrl !== '' && draftUrl === savedUrl
 })
+
+const canTestSavedConnection = computed(() => isSavedUrl.value && apiKey.value.trim() === '')
 
 const showJellyfinUserSelect = computed(() => props.serviceId === 'jellyfin' && isSavedUrl.value)
 
@@ -148,6 +157,15 @@ function handleConnect() {
     url,
     apiKey: key,
   })
+}
+
+function handleTestConnection() {
+  if (busy.value || !canTestSavedConnection.value) return
+
+  validationError.value = ''
+  confirmingRemoval.value = false
+
+  emit('testConnection', props.serviceId)
 }
 
 function requestRemoval() {
@@ -234,12 +252,26 @@ function confirmRemoval() {
         {{ validationError || error }}
       </p>
 
-      <p v-if="showSuccess" class="service-form__success" role="status">
+      <p v-if="showSuccess" class="service-form__success" role="status" aria-live="polite">
         {{ success }}
       </p>
 
       <mm-button type="submit" variant="primary" block :loading="loading" :disabled="busy">
         Connect &amp; Test
+      </mm-button>
+
+      <mm-service-health v-if="configured" :health="health" />
+
+      <mm-button
+        v-if="configured"
+        type="button"
+        variant="secondary"
+        block
+        :loading="testing"
+        :disabled="busy || !canTestSavedConnection"
+        @click="handleTestConnection"
+      >
+        Test Connection
       </mm-button>
 
       <template v-if="configured">

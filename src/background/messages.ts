@@ -10,14 +10,17 @@ import type {
   GetQBittorrentDownloadsResponse,
   GetSeerrRequestsResponse,
   GetServiceConfigsResponse,
+  GetServiceHealthResponse,
   OpenDetachedWorkspaceResponse,
   QBittorrentTorrentActionResponse,
   RemoveServiceResponse,
   SetJellyfinArrivalUnreadResponse,
   SetJellyfinUserResponse,
+  TestServiceConnectionResponse,
 } from '../types/messages'
 import { SEERR_REQUEST_FILTERS, type SeerrRequestsQuery } from '../types/seerr'
-import { SERVICES, type ServiceConfig, type ServiceId } from '../types/service'
+import { isServiceId } from '../services/registry'
+import type { ServiceConfig, ServiceId } from '../types/service'
 import { parseCalendarDateKey } from '../utils/calendar-date'
 import { getHostPermission, resolveServiceConfig } from '../utils/service-config'
 import {
@@ -25,6 +28,7 @@ import {
   getJellyfinUserSelection,
   saveJellyfinUserSelection,
 } from '../utils/jellyfin-storage'
+import { getServiceHealthStates } from '../utils/service-health-storage'
 import {
   getSafeServiceConfigs,
   getServiceConfig,
@@ -34,6 +38,7 @@ import {
 import { fetchCalendarImage } from './services/calendar-images'
 import { loadCalendar } from './services/calendar'
 import { testServiceConnection } from './services/connection'
+import { checkServiceHealth, invalidateServiceHealth } from './services/service-health'
 import { updateJellyfinBadge } from './services/jellyfin-badge'
 import { fetchJellyfinImage } from './services/jellyfin-images'
 import {
@@ -54,7 +59,9 @@ import { openDetachedWorkspace } from './services/workspace-window'
 
 type MessageResponse =
   | ConnectServiceResponse
+  | TestServiceConnectionResponse
   | GetServiceConfigsResponse
+  | GetServiceHealthResponse
   | RemoveServiceResponse
   | GetJellyfinUsersResponse
   | SetJellyfinUserResponse
@@ -71,10 +78,6 @@ type MessageResponse =
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
-function isServiceId(value: unknown): value is ServiceId {
-  return typeof value === 'string' && SERVICES.some((service) => service === value)
 }
 
 function isConnectMessage(
@@ -96,6 +99,12 @@ function isRemoveMessage(
   value: unknown,
 ): value is Extract<BackgroundMessage, { type: 'REMOVE_SERVICE' }> {
   return isRecord(value) && value.type === 'REMOVE_SERVICE' && isServiceId(value.serviceId)
+}
+
+function isTestServiceConnectionMessage(
+  value: unknown,
+): value is Extract<BackgroundMessage, { type: 'TEST_SERVICE_CONNECTION' }> {
+  return isRecord(value) && value.type === 'TEST_SERVICE_CONNECTION' && isServiceId(value.serviceId)
 }
 
 function isSetJellyfinUserMessage(
@@ -323,6 +332,14 @@ async function updateJellyfinBadgeSafely(unreadCount: number): Promise<void> {
   }
 }
 
+async function refreshHealthAfterConnection(serviceId: ServiceId): Promise<void> {
+  try {
+    await checkServiceHealth(serviceId, true)
+  } catch (error) {
+    console.warn(`MediaManagarr: Unable to refresh health for ${serviceId}:`, error)
+  }
+}
+
 export async function handleBackgroundMessage(message: unknown): Promise<MessageResponse> {
   try {
     if (isRecord(message)) {
@@ -342,6 +359,46 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
         }
       }
 
+      if (message.type === 'GET_SERVICE_HEALTH') {
+        return {
+          success: true,
+          health: await getServiceHealthStates(),
+        }
+      }
+
+      if (message.type === 'TEST_SERVICE_CONNECTION') {
+        if (!isTestServiceConnectionMessage(message)) {
+          return { success: false, error: 'Invalid background message.' }
+        }
+
+        await getConfiguredService(
+          message.serviceId,
+          `Configure ${message.serviceId} before testing its connection.`,
+          `${message.serviceId} server access has not been granted.`,
+        )
+
+        const health = await checkServiceHealth(message.serviceId, true)
+
+        if (!health) {
+          return {
+            success: false,
+            error: 'The service configuration or server permission changed during the test.',
+          }
+        }
+
+        if (health.status === 'failed') {
+          return {
+            success: false,
+            error: health.error ?? 'Unable to connect to the service.',
+          }
+        }
+
+        return {
+          success: true,
+          serviceId: message.serviceId,
+        }
+      }
+
       if (message.type === 'REMOVE_SERVICE') {
         if (!isRemoveMessage(message)) {
           return { success: false, error: 'Invalid background message.' }
@@ -352,6 +409,7 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
         }
 
         await removeServiceConfig(message.serviceId)
+        await invalidateServiceHealth(message.serviceId)
 
         if (message.serviceId === 'jellyfin') {
           await refreshJellyfinAfterSettingsChange()
@@ -565,6 +623,9 @@ export async function handleBackgroundMessage(message: unknown): Promise<Message
 
     await testServiceConnection(message.serviceId, config)
     await saveServiceConfig(message.serviceId, config)
+
+    await invalidateServiceHealth(message.serviceId)
+    await refreshHealthAfterConnection(message.serviceId)
 
     if (message.serviceId === 'jellyfin') {
       await refreshJellyfinAfterSettingsChange()

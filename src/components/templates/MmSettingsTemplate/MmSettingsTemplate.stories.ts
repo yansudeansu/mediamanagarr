@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import MmSettingsTemplate from './MmSettingsTemplate.vue'
 import MmServiceSelector from '../../organisms/MmServiceSelector/MmServiceSelector.vue'
 import MmServiceForm from '../../organisms/MmServiceForm/MmServiceForm.vue'
-import type { ServiceId, ServiceState } from '../../../types/service'
+import type { ServiceHealthStates, ServiceId, ServiceState } from '../../../types/service'
 
 const meta = {
   title: 'Templates/Settings',
@@ -31,6 +31,37 @@ const connectedStatuses: Partial<Record<ServiceId, ServiceState>> = {
   qbittorrent: 'connected',
 }
 
+const connectedHealth: ServiceHealthStates = {
+  jellyfin: {
+    status: 'connected',
+    lastCheckedAt: '2026-10-31T12:00:00.000Z',
+  },
+  seerr: {
+    status: 'connected',
+    lastCheckedAt: '2026-10-31T12:00:00.000Z',
+  },
+  sonarr: {
+    status: 'connected',
+    lastCheckedAt: '2026-10-31T12:00:00.000Z',
+  },
+  radarr: {
+    status: 'connected',
+    lastCheckedAt: '2026-10-31T12:00:00.000Z',
+  },
+  qbittorrent: {
+    status: 'connected',
+    lastCheckedAt: '2026-10-31T12:00:00.000Z',
+  },
+}
+
+const failedHealth: ServiceHealthStates = {
+  radarr: {
+    status: 'failed',
+    lastCheckedAt: '2026-10-31T12:00:00.000Z',
+    error: 'Unable to reach the Radarr server.',
+  },
+}
+
 const exampleJellyfinUsers = [
   { id: 'user-1', name: 'Test User 1' },
   { id: 'user-2', name: 'Test User 2' },
@@ -40,6 +71,7 @@ const exampleJellyfinUsers = [
 function createStory(
   statuses: Partial<Record<ServiceId, ServiceState>>,
   initialService: ServiceId = 'jellyfin',
+  healthStates: ServiceHealthStates = {},
 ): Story['render'] {
   return () => ({
     components: {
@@ -66,10 +98,13 @@ function createStory(
         () => (statuses[selectedService.value] ?? 'not-configured') !== 'not-configured',
       )
 
+      const selectedHealth = computed(() => healthStates[selectedService.value])
+
       return {
         selectedService,
         statuses,
         selectedUrl,
+        selectedHealth,
         configured,
         jellyfinUsers: exampleJellyfinUsers,
         jellyfinUserId,
@@ -91,6 +126,7 @@ function createStory(
               :service-id="selectedService"
               :url="selectedUrl"
               :configured="configured"
+              :health="selectedHealth"
               :jellyfin-users="jellyfinUsers"
               :jellyfin-user-id="jellyfinUserId"
               @select-jellyfin-user="jellyfinUserId = $event"
@@ -103,7 +139,7 @@ function createStory(
 }
 
 /**
- * Original MediaManagarr Settings layout with configured services.
+ * Settings layout with configured services that have not been checked yet.
  */
 export const Playground: Story = {
   render: createStory(configuredStatuses),
@@ -117,14 +153,14 @@ export const FreshInstall: Story = {
 }
 
 /**
- * All services connected.
+ * All services connected with recorded health checks.
  */
 export const AllConnected: Story = {
-  render: createStory(connectedStatuses),
+  render: createStory(connectedStatuses, 'jellyfin', connectedHealth),
 }
 
 /**
- * Radarr selected with a failed connection.
+ * Radarr selected with a failed connection and an actionable error.
  */
 export const ConnectionFailed: Story = {
   render: createStory(
@@ -133,5 +169,6 @@ export const ConnectionFailed: Story = {
       radarr: 'failed',
     },
     'radarr',
+    failedHealth,
   ),
 }

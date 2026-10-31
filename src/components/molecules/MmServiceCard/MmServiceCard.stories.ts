@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmServiceCard from './MmServiceCard.vue'
-import { SERVICE_INFO } from '../../../types/service'
+import { SERVICE_REGISTRY } from '../../../services/registry'
 
 const meta = {
   title: 'Molecules/Service Card',
@@ -28,7 +28,7 @@ const meta = {
   },
 
   args: {
-    service: SERVICE_INFO.jellyfin,
+    service: SERVICE_REGISTRY.jellyfin,
     status: 'not-configured',
     selected: false,
     disabled: false,
@@ -71,7 +71,7 @@ export const Playground: Story = {}
  */
 export const Jellyfin: Story = {
   args: {
-    service: SERVICE_INFO.jellyfin,
+    service: SERVICE_REGISTRY.jellyfin,
     status: 'connected',
   },
 }
@@ -81,7 +81,7 @@ export const Jellyfin: Story = {
  */
 export const Seerr: Story = {
   args: {
-    service: SERVICE_INFO.seerr,
+    service: SERVICE_REGISTRY.seerr,
     status: 'configured',
   },
 }
@@ -91,7 +91,7 @@ export const Seerr: Story = {
  */
 export const Sonarr: Story = {
   args: {
-    service: SERVICE_INFO.sonarr,
+    service: SERVICE_REGISTRY.sonarr,
     status: 'not-configured',
   },
 }
@@ -101,7 +101,7 @@ export const Sonarr: Story = {
  */
 export const Radarr: Story = {
   args: {
-    service: SERVICE_INFO.radarr,
+    service: SERVICE_REGISTRY.radarr,
     status: 'failed',
   },
 }
@@ -111,7 +111,7 @@ export const Radarr: Story = {
  */
 export const QBittorrent: Story = {
   args: {
-    service: SERVICE_INFO.qbittorrent,
+    service: SERVICE_REGISTRY.qbittorrent,
     status: 'connected',
   },
 }
@@ -145,7 +145,7 @@ export const AllServices: Story = {
     components: { MmServiceCard },
 
     setup() {
-      return { SERVICE_INFO }
+      return { SERVICE_REGISTRY }
     },
 
     template: `
@@ -161,28 +161,28 @@ export const AllServices: Story = {
         "
       >
         <mm-service-card
-          :service="SERVICE_INFO.jellyfin"
+          :service="SERVICE_REGISTRY.jellyfin"
           status="connected"
           selected
         />
 
         <mm-service-card
-          :service="SERVICE_INFO.seerr"
+          :service="SERVICE_REGISTRY.seerr"
           status="configured"
         />
 
         <mm-service-card
-          :service="SERVICE_INFO.sonarr"
+          :service="SERVICE_REGISTRY.sonarr"
           status="not-configured"
         />
 
         <mm-service-card
-          :service="SERVICE_INFO.radarr"
+          :service="SERVICE_REGISTRY.radarr"
           status="failed"
         />
 
         <mm-service-card
-          :service="SERVICE_INFO.qbittorrent"
+          :service="SERVICE_REGISTRY.qbittorrent"
           status="not-configured"
         />
       </div>

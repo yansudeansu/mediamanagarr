@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmServiceSelector from './MmServiceSelector.vue'
 import MmServiceCard from '../../molecules/MmServiceCard/MmServiceCard.vue'
-import { SERVICES } from '../../../types/service'
+import { SERVICES } from '../../../services/registry'
 
 describe('MmServiceSelector', () => {
   function createWrapper(props: Partial<InstanceType<typeof MmServiceSelector>['$props']> = {}) {

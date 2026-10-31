@@ -3,10 +3,20 @@ import type { ServiceConfig, ServiceId } from '../../types/service'
 const DEFAULT_TIMEOUT_MS = 10_000
 const JELLYFIN_TIMEOUT_MS = 15_000
 
+const MAX_RETRIES = 2
+const RETRY_BASE_DELAY_MS = 250
+
 interface ConnectionRequest {
   path: string
   headers: Record<string, string>
   timeoutMs?: number
+}
+
+class RetryableConnectionError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = 'RetryableConnectionError'
+  }
 }
 
 function getConnectionRequest(serviceId: ServiceId, apiKey: string): ConnectionRequest {
@@ -54,10 +64,15 @@ export function buildServiceApiUrl(serverUrl: string, apiPath: string): string {
   return `${base}/${path}`
 }
 
-export async function testServiceConnection(
-  serviceId: ServiceId,
-  config: ServiceConfig,
-): Promise<void> {
+function waitForRetry(attempt: number): Promise<void> {
+  const delay = RETRY_BASE_DELAY_MS * 2 ** attempt
+
+  return new Promise((resolve) => {
+    setTimeout(resolve, delay)
+  })
+}
+
+async function attemptConnection(serviceId: ServiceId, config: ServiceConfig): Promise<void> {
   const request = getConnectionRequest(serviceId, config.apiKey)
 
   const controller = new AbortController()
@@ -82,24 +97,36 @@ export async function testServiceConnection(
         throw new Error('Service endpoint not found. Check the server URL and base path.')
       }
 
+      if (response.status === 429) {
+        throw new Error('The service is receiving too many requests. Please try again later.')
+      }
+
+      if (response.status === 502 || response.status === 503 || response.status === 504) {
+        throw new RetryableConnectionError(
+          `The server is temporarily unavailable (HTTP ${response.status}). Please try again later.`,
+        )
+      }
+
       throw new Error(`Connection failed: server returned HTTP ${response.status}.`)
     }
   } catch (error) {
     // DOMException may originate from a different JavaScript realm in jsdom.
-    // Checking its name avoids relying on instanceof Error.
     if (
       error !== null &&
       typeof error === 'object' &&
       'name' in error &&
       error.name === 'AbortError'
     ) {
-      throw new Error('Connection timed out. Check the server address.', { cause: error })
+      throw new RetryableConnectionError('Connection timed out. Check the server address.', {
+        cause: error,
+      })
     }
 
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach the server. Check its address and availability.', {
-        cause: error,
-      })
+      throw new RetryableConnectionError(
+        'Unable to reach the server. Check its address and availability.',
+        { cause: error },
+      )
     }
 
     if (error instanceof Error) {
@@ -109,5 +136,23 @@ export async function testServiceConnection(
     throw new Error('An unexpected connection error occurred.', { cause: error })
   } finally {
     clearTimeout(timeout)
+  }
+}
+
+export async function testServiceConnection(
+  serviceId: ServiceId,
+  config: ServiceConfig,
+): Promise<void> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await attemptConnection(serviceId, config)
+      return
+    } catch (error) {
+      if (!(error instanceof RetryableConnectionError) || attempt === MAX_RETRIES) {
+        throw error
+      }
+
+      await waitForRetry(attempt)
+    }
   }
 }
