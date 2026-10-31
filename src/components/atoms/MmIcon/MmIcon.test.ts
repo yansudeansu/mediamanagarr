@@ -14,6 +14,8 @@ function mountIcon(name: IconName, size?: number) {
 
 const icons: IconName[] = [
   'settings',
+  'menu',
+  'external-link',
   'arrow-left',
   'arrow-right',
   'arrow-up',
@@ -75,6 +77,20 @@ describe('MmIcon', () => {
     const refresh = mountIcon('refresh')
 
     expect(settings.get('svg').html()).not.toBe(refresh.get('svg').html())
+  })
+
+  it('renders different shapes for menu and settings', () => {
+    const menu = mountIcon('menu')
+    const settings = mountIcon('settings')
+
+    expect(menu.get('svg').html()).not.toBe(settings.get('svg').html())
+  })
+
+  it('renders different shapes for menu and external-link', () => {
+    const menu = mountIcon('menu')
+    const externalLink = mountIcon('external-link')
+
+    expect(menu.get('svg').html()).not.toBe(externalLink.get('svg').html())
   })
 
   it('renders different shapes for left and right arrows', () => {
@@ -143,6 +159,30 @@ describe('MmIcon', () => {
     })
 
     expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+  })
+
+  it('updates when switching from settings to menu', async () => {
+    const wrapper = mountIcon('settings')
+    const originalSvg = wrapper.get('svg').html()
+
+    await wrapper.setProps({
+      name: 'menu',
+    })
+
+    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(wrapper.findAll('svg')).toHaveLength(1)
+  })
+
+  it('updates when switching from menu to external-link', async () => {
+    const wrapper = mountIcon('menu')
+    const originalSvg = wrapper.get('svg').html()
+
+    await wrapper.setProps({
+      name: 'external-link',
+    })
+
+    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(wrapper.findAll('svg')).toHaveLength(1)
   })
 
   it('updates when switching between horizontal arrows', async () => {

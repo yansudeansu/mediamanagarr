@@ -4,10 +4,18 @@ import { userEvent, within } from 'storybook/test'
 import App from './App.vue'
 import { createMockBackground, type MockBackgroundOptions } from './test/mock-background'
 import type { BackgroundMessage } from './types/messages'
+import type { ServiceConfigs } from './types/service'
+import { SERVICES } from './services/registry'
 
 type WorkspaceMode = 'popup' | 'detached' | 'sidebar'
 
+type StorageChangeListener = (
+  changes: Record<string, chrome.storage.StorageChange>,
+  areaName: string,
+) => void
+
 const WORKSPACE_EVENT = 'mediamanagarr:storybook-workspace'
+const SERVICE_STORAGE_KEY = 'mediaManagarrServices'
 
 const meta = {
   title: 'App/MediaManagarr',
@@ -38,18 +46,44 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
     const originalClose = window.close
     const originalUrl = window.location.href
 
-    // Storybook-only replacement for chrome.storage.session.
-    // Values survive App remounts when switching workspaces.
     const sessionStorage = new Map<string, unknown>()
+    const localStorage = new Map<string, unknown>()
+    const storageChangeListeners = new Set<StorageChangeListener>()
 
-    // Tracks which workspace is being opened so window.close()
-    // does not immediately return the preview to popup mode.
     let pendingWorkspaceMode: WorkspaceMode | null = null
 
     const initialUrl = new URL(originalUrl)
     initialUrl.searchParams.delete('workspace')
 
     window.history.replaceState(null, '', initialUrl.toString())
+
+    function createMockServiceConfigs(): ServiceConfigs {
+      const safeConfigs = mock.getServiceConfigs()
+      const configs: ServiceConfigs = {}
+
+      for (const serviceId of SERVICES) {
+        const safeConfig = safeConfigs[serviceId]
+
+        if (!safeConfig?.configured) {
+          continue
+        }
+
+        const baseConfig = {
+          url: safeConfig.url,
+          apiKey: 'storybook-mock-api-key',
+          username: 'storybook',
+          password: 'storybook-mock-password',
+        }
+
+        configs[serviceId] = baseConfig
+      }
+
+      return configs
+    }
+
+    // Seed local storage with the same services that the mock
+    // background reports to Settings.
+    localStorage.set(SERVICE_STORAGE_KEY, createMockServiceConfigs())
 
     function dispatchWorkspaceMode(mode: WorkspaceMode): void {
       pendingWorkspaceMode = mode
@@ -61,13 +95,127 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
       )
     }
 
+    function getStoredValues(
+      storage: Map<string, unknown>,
+      keys: string | string[] | Record<string, unknown> | null,
+    ): Record<string, unknown> {
+      if (keys === null) {
+        return Object.fromEntries(storage)
+      }
+
+      if (typeof keys === 'string') {
+        return storage.has(keys) ? { [keys]: storage.get(keys) } : {}
+      }
+
+      if (Array.isArray(keys)) {
+        return Object.fromEntries(
+          keys.filter((key) => storage.has(key)).map((key) => [key, storage.get(key)]),
+        )
+      }
+
+      return Object.fromEntries(
+        Object.entries(keys).map(([key, defaultValue]) => [
+          key,
+          storage.has(key) ? storage.get(key) : defaultValue,
+        ]),
+      )
+    }
+
+    function notifyStorageChanged(
+      changes: Record<string, chrome.storage.StorageChange>,
+      areaName: string,
+    ): void {
+      if (Object.keys(changes).length === 0) {
+        return
+      }
+
+      for (const listener of storageChangeListeners) {
+        listener(changes, areaName)
+      }
+    }
+
+    function createStorageArea(storage: Map<string, unknown>, areaName: 'local' | 'session') {
+      return {
+        get: async (
+          keys: string | string[] | Record<string, unknown> | null = null,
+        ): Promise<Record<string, unknown>> => getStoredValues(storage, keys),
+
+        set: async (items: Record<string, unknown>): Promise<void> => {
+          const changes: Record<string, chrome.storage.StorageChange> = {}
+
+          for (const [key, newValue] of Object.entries(items)) {
+            const oldValue = storage.get(key)
+
+            storage.set(key, newValue)
+
+            changes[key] = {
+              oldValue,
+              newValue,
+            }
+          }
+
+          notifyStorageChanged(changes, areaName)
+        },
+
+        remove: async (keys: string | string[]): Promise<void> => {
+          const requestedKeys = typeof keys === 'string' ? [keys] : keys
+          const changes: Record<string, chrome.storage.StorageChange> = {}
+
+          for (const key of requestedKeys) {
+            if (!storage.has(key)) {
+              continue
+            }
+
+            changes[key] = {
+              oldValue: storage.get(key),
+              newValue: undefined,
+            }
+
+            storage.delete(key)
+          }
+
+          notifyStorageChanged(changes, areaName)
+        },
+
+        clear: async (): Promise<void> => {
+          const changes: Record<string, chrome.storage.StorageChange> = {}
+
+          for (const [key, oldValue] of storage) {
+            changes[key] = {
+              oldValue,
+              newValue: undefined,
+            }
+          }
+
+          storage.clear()
+
+          notifyStorageChanged(changes, areaName)
+        },
+      }
+    }
+
+    function synchronizeServiceStorage(): void {
+      const previousConfigs = localStorage.get(SERVICE_STORAGE_KEY)
+      const nextConfigs = createMockServiceConfigs()
+
+      localStorage.set(SERVICE_STORAGE_KEY, nextConfigs)
+
+      notifyStorageChanged(
+        {
+          [SERVICE_STORAGE_KEY]: {
+            oldValue: previousConfigs,
+            newValue: nextConfigs,
+          },
+        },
+        'local',
+      )
+    }
+
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
       value: {
         ...originalChrome,
 
-        // Storybook runs outside the extension environment.
-        // Simulate granting host permissions without a browser prompt.
         permissions: {
           ...originalChrome?.permissions,
 
@@ -79,35 +227,20 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
         storage: {
           ...originalChrome?.storage,
 
-          session: {
-            get: async (keys: string | string[] | null) => {
-              const requestedKeys =
-                keys === null
-                  ? Array.from(sessionStorage.keys())
-                  : typeof keys === 'string'
-                    ? [keys]
-                    : keys
+          local: createStorageArea(localStorage, 'local'),
 
-              return Object.fromEntries(
-                requestedKeys
-                  .filter((key) => sessionStorage.has(key))
-                  .map((key) => [key, sessionStorage.get(key)]),
-              )
+          session: createStorageArea(sessionStorage, 'session'),
+
+          onChanged: {
+            addListener: (listener: StorageChangeListener) => {
+              storageChangeListeners.add(listener)
             },
 
-            set: async (items: Record<string, unknown>) => {
-              for (const [key, value] of Object.entries(items)) {
-                sessionStorage.set(key, value)
-              }
+            removeListener: (listener: StorageChangeListener) => {
+              storageChangeListeners.delete(listener)
             },
 
-            remove: async (keys: string | string[]) => {
-              const requestedKeys = typeof keys === 'string' ? [keys] : keys
-
-              for (const key of requestedKeys) {
-                sessionStorage.delete(key)
-              }
-            },
+            hasListener: (listener: StorageChangeListener) => storageChangeListeners.has(listener),
           },
         },
 
@@ -145,6 +278,13 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
               dispatchWorkspaceMode('detached')
             }
 
+            if (
+              (message.type === 'CONNECT_SERVICE' || message.type === 'REMOVE_SERVICE') &&
+              response.success
+            ) {
+              synchronizeServiceStorage()
+            }
+
             return response
           },
         },
@@ -164,6 +304,8 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
     })
 
     return () => {
+      storageChangeListeners.clear()
+
       window.history.replaceState(null, '', originalUrl)
 
       Object.defineProperty(globalThis, 'chrome', {
@@ -210,8 +352,6 @@ function renderWorkspace() {
 
         window.history.replaceState(null, '', url.toString())
 
-        // Remount App to simulate opening the selected workspace.
-        // Mocked session storage survives this remount.
         workspaceKey.value += 1
       }
 
@@ -240,7 +380,7 @@ function renderWorkspace() {
           height: workspaceMode === 'popup' ? '480px' : '700px',
           maxWidth: '100%',
           border: '1px solid var(--border)',
-          borderRadius: '10px',
+          borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
           background: 'var(--background)'
         }"
@@ -254,6 +394,7 @@ function renderWorkspace() {
 async function openSettings(canvasElement: HTMLElement): Promise<void> {
   const canvas = within(canvasElement)
 
+  await userEvent.click(canvas.getByRole('button', { name: 'Open workspace menu' }))
   await userEvent.click(canvas.getByRole('button', { name: 'Open settings' }))
 }
 

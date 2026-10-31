@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import MmButton from '../../atoms/MmButton/MmButton.vue'
+import MmQuickAccess from '../MmQuickAccess/MmQuickAccess.vue'
 import mmLogo from '../../../assets/mm-logo.svg'
+import type { SafeServiceConfigs } from '../../../types/service'
 
 interface Props {
   mode?: 'main' | 'settings'
   windowMode?: 'popup' | 'detached' | 'sidebar'
+  services?: SafeServiceConfigs
 }
 
 withDefaults(defineProps<Props>(), {
   mode: 'main',
   windowMode: 'popup',
+  services: () => ({}),
 })
 
 const emit = defineEmits<{
@@ -84,15 +88,7 @@ const emit = defineEmits<{
         @click="emit('back')"
       />
 
-      <mm-button
-        v-else
-        variant="secondary"
-        icon="settings"
-        icon-only
-        aria-label="Open settings"
-        title="Open settings"
-        @click="emit('settings')"
-      />
+      <mm-quick-access v-else :services="services" @settings="emit('settings')" />
     </div>
   </header>
 </template>

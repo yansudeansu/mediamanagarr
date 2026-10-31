@@ -4,6 +4,8 @@ import type { IconName } from './MmIcon.vue'
 
 const icons: IconName[] = [
   'settings',
+  'menu',
+  'external-link',
   'arrow-left',
   'arrow-right',
   'arrow-up',
@@ -55,6 +57,18 @@ export const Playground: Story = {}
 export const Settings: Story = {
   args: {
     name: 'settings',
+  },
+}
+
+export const Menu: Story = {
+  args: {
+    name: 'menu',
+  },
+}
+
+export const ExternalLink: Story = {
+  args: {
+    name: 'external-link',
   },
 }
 

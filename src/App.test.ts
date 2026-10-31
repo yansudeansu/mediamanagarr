@@ -3,7 +3,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import App from './App.vue'
 import { sendBackgroundMessage } from './utils/background-messaging'
 import { openWorkspaceSidebar, closeWorkspaceSidebar } from './utils/workspace-sidebar'
+import { getSafeServiceConfigs } from './utils/service-storage'
 import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
+import type { SafeServiceConfigs } from './types/service'
 
 vi.mock('./utils/background-messaging', () => ({
   sendBackgroundMessage: vi.fn(),
@@ -12,6 +14,10 @@ vi.mock('./utils/background-messaging', () => ({
 vi.mock('./utils/workspace-sidebar', () => ({
   openWorkspaceSidebar: vi.fn(),
   closeWorkspaceSidebar: vi.fn(),
+}))
+
+vi.mock('./utils/service-storage', () => ({
+  getSafeServiceConfigs: vi.fn(),
 }))
 
 vi.mock('./utils/workspace-state', () => ({
@@ -50,6 +56,7 @@ vi.mock('./views/SettingsView.vue', () => ({
 const mockedSendMessage = vi.mocked(sendBackgroundMessage)
 const mockedOpenSidebar = vi.mocked(openWorkspaceSidebar)
 const mockedCloseSidebar = vi.mocked(closeWorkspaceSidebar)
+const mockedGetSafeServices = vi.mocked(getSafeServiceConfigs)
 const mockedGetWorkspaceState = vi.mocked(getWorkspaceNavigationState)
 const mockedSaveWorkspaceState = vi.mocked(saveWorkspaceNavigationState)
 
@@ -59,6 +66,17 @@ const emptyDownloads = {
     torrents: [],
     downloadSpeed: 0,
     uploadSpeed: 0,
+  },
+}
+
+const configuredServices: SafeServiceConfigs = {
+  jellyfin: {
+    url: 'https://media.example.com/jellyfin',
+    configured: true,
+  },
+  sonarr: {
+    url: 'https://home.example.com:8989/sonarr',
+    configured: true,
   },
 }
 
@@ -78,6 +96,15 @@ function getNavigationButton(wrapper: ReturnType<typeof mount>, label: string) {
   return button
 }
 
+async function openQuickAccess(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await wrapper.get('button[aria-label="Open workspace menu"]').trigger('click')
+}
+
+async function openSettings(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await openQuickAccess(wrapper)
+  await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+}
+
 function setWorkspaceMode(mode: 'popup' | 'detached' | 'sidebar'): void {
   const url = new URL(window.location.href)
 
@@ -91,17 +118,55 @@ function setWorkspaceMode(mode: 'popup' | 'detached' | 'sidebar'): void {
 }
 
 describe('App', () => {
+  const storageChangeListeners = new Set<
+    (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => void
+  >()
+
+  const addStorageListener = vi.fn(
+    (
+      listener: (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => void,
+    ) => {
+      storageChangeListeners.add(listener)
+    },
+  )
+
+  const removeStorageListener = vi.fn(
+    (
+      listener: (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => void,
+    ) => {
+      storageChangeListeners.delete(listener)
+    },
+  )
+
+  function emitStorageChange(
+    changes: Record<string, chrome.storage.StorageChange>,
+    areaName = 'local',
+  ): void {
+    for (const listener of [...storageChangeListeners]) {
+      listener(changes, areaName)
+    }
+  }
+
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
+    storageChangeListeners.clear()
 
     window.history.replaceState(null, '', window.location.pathname)
 
     vi.stubGlobal('chrome', {
       storage: {
+        local: {
+          get: vi.fn(),
+          set: vi.fn(),
+        },
         session: {
           get: vi.fn(),
           set: vi.fn(),
+        },
+        onChanged: {
+          addListener: addStorageListener,
+          removeListener: removeStorageListener,
         },
       },
     })
@@ -111,6 +176,7 @@ describe('App', () => {
       settingsOpen: false,
     })
 
+    mockedGetSafeServices.mockResolvedValue({})
     mockedSaveWorkspaceState.mockResolvedValue(undefined)
     mockedOpenSidebar.mockResolvedValue(undefined)
     mockedCloseSidebar.mockResolvedValue(undefined)
@@ -124,6 +190,7 @@ describe('App', () => {
     vi.useRealTimers()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    storageChangeListeners.clear()
   })
 
   it('renders the application header', () => {
@@ -219,11 +286,294 @@ describe('App', () => {
     wrapper.unmount()
   })
 
+  describe('Quick Access service integration', () => {
+    it('loads safe service configurations when the app mounts', async () => {
+      mockedGetSafeServices.mockResolvedValue(configuredServices)
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(mockedGetSafeServices).toHaveBeenCalledOnce()
+
+      await openQuickAccess(wrapper)
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
+      expect(wrapper.get('#quick-access-menu').text()).toContain('Sonarr')
+
+      wrapper.unmount()
+    })
+
+    it('preserves custom ports and reverse-proxy paths in service links', async () => {
+      mockedGetSafeServices.mockResolvedValue(configuredServices)
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await openQuickAccess(wrapper)
+
+      const links = wrapper.findAll('#quick-access-menu a')
+
+      expect(links).toHaveLength(2)
+
+      expect(links.map((link) => link.attributes('href'))).toContain(
+        'https://media.example.com/jellyfin',
+      )
+
+      expect(links.map((link) => link.attributes('href'))).toContain(
+        'https://home.example.com:8989/sonarr',
+      )
+
+      for (const link of links) {
+        expect(link.attributes('target')).toBe('_blank')
+        expect(link.attributes('rel')).toContain('noopener')
+        expect(link.attributes('rel')).toContain('noreferrer')
+      }
+
+      wrapper.unmount()
+    })
+
+    it('shows an empty state when no services are configured', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await openQuickAccess(wrapper)
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
+      expect(wrapper.findAll('#quick-access-menu a')).toHaveLength(0)
+      expect(wrapper.find('button[aria-label="Open settings"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('refreshes configured services when local service storage changes', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await openQuickAccess(wrapper)
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
+
+      mockedGetSafeServices.mockResolvedValue(configuredServices)
+
+      emitStorageChange({
+        mediaManagarrServices: {
+          newValue: configuredServices,
+        },
+      })
+
+      await flushPromises()
+
+      expect(mockedGetSafeServices).toHaveBeenCalledTimes(2)
+      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
+      expect(wrapper.get('#quick-access-menu').text()).toContain('Sonarr')
+      expect(wrapper.get('#quick-access-menu').text()).not.toContain('No services configured')
+
+      wrapper.unmount()
+    })
+
+    it('removes services from Quick Access when their configuration is removed', async () => {
+      mockedGetSafeServices.mockResolvedValue(configuredServices)
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await openQuickAccess(wrapper)
+
+      expect(wrapper.findAll('#quick-access-menu a')).toHaveLength(2)
+
+      mockedGetSafeServices.mockResolvedValue({})
+
+      emitStorageChange({
+        mediaManagarrServices: {
+          oldValue: configuredServices,
+          newValue: {},
+        },
+      })
+
+      await flushPromises()
+
+      expect(wrapper.findAll('#quick-access-menu a')).toHaveLength(0)
+      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
+
+      wrapper.unmount()
+    })
+
+    it('ignores unrelated local storage changes', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(mockedGetSafeServices).toHaveBeenCalledOnce()
+
+      emitStorageChange({
+        unrelatedSetting: {
+          newValue: true,
+        },
+      })
+
+      await flushPromises()
+
+      expect(mockedGetSafeServices).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('ignores service storage changes outside local storage', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      emitStorageChange(
+        {
+          mediaManagarrServices: {
+            newValue: configuredServices,
+          },
+        },
+        'session',
+      )
+
+      await flushPromises()
+
+      expect(mockedGetSafeServices).toHaveBeenCalledOnce()
+
+      wrapper.unmount()
+    })
+
+    it('handles service configuration loading errors gracefully', async () => {
+      mockedGetSafeServices.mockRejectedValue(new Error('Service storage unavailable.'))
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'MediaManagarr: Unable to load safe service configurations:',
+        expect.any(Error),
+      )
+
+      await openQuickAccess(wrapper)
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
+      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('does not overwrite newer configurations with stale asynchronous results', async () => {
+      let resolveInitialLoad: ((configs: SafeServiceConfigs) => void) | undefined
+
+      mockedGetSafeServices
+        .mockImplementationOnce(
+          () =>
+            new Promise<SafeServiceConfigs>((resolve) => {
+              resolveInitialLoad = resolve
+            }),
+        )
+        .mockResolvedValueOnce(configuredServices)
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      emitStorageChange({
+        mediaManagarrServices: {
+          newValue: configuredServices,
+        },
+      })
+
+      await flushPromises()
+
+      await openQuickAccess(wrapper)
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
+
+      resolveInitialLoad?.({})
+      await flushPromises()
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
+      expect(wrapper.get('#quick-access-menu').text()).not.toContain('No services configured')
+
+      wrapper.unmount()
+    })
+
+    it('registers and removes the storage listener with the component lifecycle', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(addStorageListener).toHaveBeenCalledOnce()
+      expect(storageChangeListeners.size).toBe(1)
+
+      wrapper.unmount()
+
+      expect(removeStorageListener).toHaveBeenCalledOnce()
+      expect(removeStorageListener).toHaveBeenCalledWith(addStorageListener.mock.calls[0]?.[0])
+      expect(storageChangeListeners.size).toBe(0)
+    })
+
+    it('does not apply service configurations after the app unmounts', async () => {
+      let resolveLoad: ((configs: SafeServiceConfigs) => void) | undefined
+
+      mockedGetSafeServices.mockImplementation(
+        () =>
+          new Promise<SafeServiceConfigs>((resolve) => {
+            resolveLoad = resolve
+          }),
+      )
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      wrapper.unmount()
+
+      resolveLoad?.(configuredServices)
+      await flushPromises()
+
+      expect(removeStorageListener).toHaveBeenCalledOnce()
+      expect(storageChangeListeners.size).toBe(0)
+    })
+
+    it('keeps the app functional when Chrome storage is unavailable', async () => {
+      vi.stubGlobal('chrome', undefined)
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(mockedGetSafeServices).not.toHaveBeenCalled()
+      expect(addStorageListener).not.toHaveBeenCalled()
+
+      await openQuickAccess(wrapper)
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
+      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+  })
+
+  it('opens Settings through the workspace menu', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const menuButton = wrapper.get('button[aria-label="Open workspace menu"]')
+
+    expect(menuButton.attributes('aria-expanded')).toBe('false')
+
+    await menuButton.trigger('click')
+
+    expect(menuButton.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.find('button[aria-label="Open settings"]').exists()).toBe(true)
+
+    await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+
+    expect(wrapper.get('h1').text()).toBe('Settings')
+    expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
   it('opens settings and hides the active view and navigation', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+    await openSettings(wrapper)
 
     expect(wrapper.get('h1').text()).toBe('Settings')
     expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
@@ -238,7 +588,7 @@ describe('App', () => {
     await flushPromises()
 
     await getNavigationButton(wrapper, 'Calendar').trigger('click')
-    await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+    await openSettings(wrapper)
 
     expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(false)
 
@@ -303,7 +653,7 @@ describe('App', () => {
 
     expect(mockedSendMessage).toHaveBeenCalledTimes(1)
 
-    await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+    await openSettings(wrapper)
     await vi.advanceTimersByTimeAsync(10000)
 
     expect(mockedSendMessage).toHaveBeenCalledTimes(1)
@@ -375,7 +725,7 @@ describe('App', () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+      await openSettings(wrapper)
       await flushPromises()
 
       expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
@@ -390,7 +740,7 @@ describe('App', () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+      await openSettings(wrapper)
       await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
       await flushPromises()
 
@@ -1026,7 +1376,7 @@ describe('App', () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+      await openSettings(wrapper)
 
       expect(wrapper.get('h1').text()).toBe('Settings')
       expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)

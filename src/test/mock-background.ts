@@ -358,7 +358,7 @@ export function createMockBackground(options: MockBackgroundOptions = {}) {
 
         return {
           success: true,
-          unreadCount: 0,
+          unreadCount: unreadCount(),
         }
 
       case 'GET_SEERR_REQUESTS': {
@@ -484,5 +484,12 @@ export function createMockBackground(options: MockBackgroundOptions = {}) {
     actions,
     getTorrents: () => torrents.map((torrent) => ({ ...torrent })),
     getUnreadCount: unreadCount,
+    getServiceConfigs: (): SafeServiceConfigs =>
+      Object.fromEntries(
+        Object.entries(configs).map(([serviceId, config]) => [
+          serviceId,
+          config ? { ...config } : undefined,
+        ]),
+      ) as SafeServiceConfigs,
   }
 }

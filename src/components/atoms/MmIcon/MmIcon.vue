@@ -6,6 +6,7 @@ import {
   ArrowUp,
   ChevronLeft,
   ChevronRight,
+  EllipsisVertical,
   ExternalLink,
   Minimize2,
   PanelRightClose,
@@ -16,6 +17,8 @@ import {
 
 export type IconName =
   | 'settings'
+  | 'menu'
+  | 'external-link'
   | 'arrow-left'
   | 'arrow-right'
   | 'arrow-up'
@@ -36,6 +39,22 @@ withDefaults(defineProps<{ name: IconName; size?: number }>(), {
 <template>
   <settings
     v-if="name === 'settings'"
+    :size="size"
+    :stroke-width="2"
+    aria-hidden="true"
+    focusable="false"
+  />
+
+  <ellipsis-vertical
+    v-else-if="name === 'menu'"
+    :size="size"
+    :stroke-width="2"
+    aria-hidden="true"
+    focusable="false"
+  />
+
+  <external-link
+    v-else-if="name === 'external-link'"
     :size="size"
     :stroke-width="2"
     aria-hidden="true"
