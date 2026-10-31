@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import MmHeader from './components/molecules/MmHeader/MmHeader.vue'
 import MmNavigation from './components/molecules/MmNavigation/MmNavigation.vue'
 import type { NavigationView } from './components/molecules/MmNavigation/MmNavigation.vue'
@@ -11,13 +11,16 @@ import MmDownloadsView from './views/MmDownloadsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import { sendBackgroundMessage } from './utils/background-messaging'
 import { openWorkspaceSidebar, closeWorkspaceSidebar } from './utils/workspace-sidebar'
+import { getSafeServiceConfigs } from './utils/service-storage'
 import { getAppVersion } from './utils/version'
 import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
+import type { SafeServiceConfigs } from './types/service'
 
 type WorkspaceMode = 'popup' | 'detached' | 'sidebar'
 
 const settingsOpen = ref(false)
 const activeView = ref<NavigationView>('requests')
+const safeServices = ref<SafeServiceConfigs>({})
 
 const workspaceParameter = new URLSearchParams(window.location.search).get('workspace')
 
@@ -35,6 +38,9 @@ const workspaceStateReady = ref(false)
 
 const version = getAppVersion()
 
+let serviceLoadVersion = 0
+let isUnmounted = false
+
 function hasWorkspaceStorage(): boolean {
   return (
     typeof chrome !== 'undefined' &&
@@ -43,7 +49,51 @@ function hasWorkspaceStorage(): boolean {
   )
 }
 
+function hasServiceStorage(): boolean {
+  return typeof chrome !== 'undefined' && !!chrome.storage?.local
+}
+
+async function refreshSafeServices(): Promise<void> {
+  const loadVersion = ++serviceLoadVersion
+
+  if (!hasServiceStorage()) {
+    safeServices.value = {}
+    return
+  }
+
+  try {
+    const configs = await getSafeServiceConfigs()
+
+    if (!isUnmounted && loadVersion === serviceLoadVersion) {
+      safeServices.value = configs
+    }
+  } catch (error) {
+    console.warn('MediaManagarr: Unable to load safe service configurations:', error)
+
+    if (!isUnmounted && loadVersion === serviceLoadVersion) {
+      safeServices.value = {}
+    }
+  }
+}
+
+function handleStorageChange(
+  changes: Record<string, chrome.storage.StorageChange>,
+  areaName: string,
+): void {
+  if (areaName !== 'local' || !changes.mediaManagarrServices) {
+    return
+  }
+
+  void refreshSafeServices()
+}
+
 onMounted(async () => {
+  if (hasServiceStorage()) {
+    void refreshSafeServices()
+
+    chrome.storage.onChanged?.addListener(handleStorageChange)
+  }
+
   try {
     if (hasWorkspaceStorage()) {
       const state = await getWorkspaceNavigationState()
@@ -55,6 +105,15 @@ onMounted(async () => {
     console.warn('MediaManagarr: Unable to restore workspace navigation:', error)
   } finally {
     workspaceStateReady.value = true
+  }
+})
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+  serviceLoadVersion += 1
+
+  if (typeof chrome !== 'undefined') {
+    chrome.storage?.onChanged?.removeListener(handleStorageChange)
   }
 })
 
@@ -171,6 +230,7 @@ function attachWorkspace(): void {
     <mm-header
       :mode="settingsOpen ? 'settings' : 'main'"
       :window-mode="windowMode"
+      :services="safeServices"
       @settings="settingsOpen = true"
       @back="settingsOpen = false"
       @detach="detachWorkspace"
