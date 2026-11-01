@@ -263,7 +263,10 @@ async function openSidebar(): Promise<void> {
       <template v-else-if="navigationReady">
         <mm-request-view v-if="availableActiveView === 'requests'" />
 
-        <mm-up-next-view v-else-if="availableActiveView === 'up-next'" />
+        <mm-up-next-view
+          v-else-if="availableActiveView === 'up-next'"
+          :jellyfin-url="safeServices.jellyfin?.url"
+        />
 
         <mm-calendar-view v-else-if="availableActiveView === 'calendar'" />
 

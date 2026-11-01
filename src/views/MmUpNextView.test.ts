@@ -11,6 +11,11 @@ vi.mock('../utils/background-messaging', () => ({
 
 const mockSendMessage = vi.mocked(sendBackgroundMessage)
 
+const MOVIE_ID = '0123456789abcdef0123456789abcdef'
+const EPISODE_ID = 'abcdef0123456789abcdef0123456789'
+const SERIES_ID = '11111111111111111111111111111111'
+const JELLYFIN_URL = 'https://media.example.com/jellyfin'
+
 const movieArrival: JellyfinArrival = {
   id: 'movie-1',
   type: 'Movie',
@@ -90,8 +95,10 @@ function mockSuccessfulMessages() {
   })
 }
 
-function mountView() {
-  return mount(MmUpNextView)
+function mountView(jellyfinUrl?: string | null) {
+  return mount(MmUpNextView, {
+    props: { jellyfinUrl },
+  })
 }
 
 function findButton(wrapper: ReturnType<typeof mountView>, label: string) {
@@ -129,6 +136,31 @@ function arrivalRequests() {
     .filter((message) => message.type === 'GET_JELLYFIN_ARRIVALS')
 }
 
+function mockLinkableArrivals() {
+  const movie = createArrival({
+    id: MOVIE_ID,
+    imageId: MOVIE_ID,
+  })
+
+  const episode: JellyfinArrival = {
+    ...episodeArrival,
+    id: EPISODE_ID,
+    imageId: SERIES_ID,
+  }
+
+  mockSendMessage.mockImplementation(async (message) => {
+    if (message.type === 'GET_JELLYFIN_ARRIVALS') {
+      return arrivalsResponse([movie, episode])
+    }
+
+    if (message.type === 'GET_JELLYFIN_IMAGE') {
+      return { success: true, image: null }
+    }
+
+    throw new Error(`Unexpected message: ${message.type}`)
+  })
+}
+
 describe('MmUpNextView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -163,7 +195,6 @@ describe('MmUpNextView', () => {
     })
 
     const wrapper = mountView()
-
     await nextTick()
 
     expect(wrapper.get('[role="status"]').text()).toBe('Loading arrivals…')
@@ -184,6 +215,162 @@ describe('MmUpNextView', () => {
     expect(wrapper.text()).toContain('The Emerald Horizon')
     expect(wrapper.text()).toContain('The First Signal')
     expect(wrapper.text()).toContain('Signals from Tomorrow · S01E01')
+  })
+
+  describe('direct Jellyfin media links', () => {
+    it('does not render links without a configured Jellyfin URL', async () => {
+      mockLinkableArrivals()
+
+      const wrapper = mountView()
+      await settle()
+
+      expect(wrapper.findAll('.arrival-card')).toHaveLength(2)
+      expect(wrapper.findAll('.arrival-card__link')).toHaveLength(0)
+    })
+
+    it('links directly to movies and episodes in Jellyfin', async () => {
+      mockLinkableArrivals()
+
+      const wrapper = mountView(JELLYFIN_URL)
+      await settle()
+
+      const links = wrapper.findAll('.arrival-card__link')
+
+      expect(links).toHaveLength(2)
+
+      expect(links[0]?.text()).toBe('The Emerald Horizon')
+      expect(links[0]?.attributes('href')).toBe(`${JELLYFIN_URL}/web/#/details?id=${MOVIE_ID}`)
+
+      expect(links[1]?.text()).toBe('The First Signal')
+      expect(links[1]?.attributes('href')).toBe(`${JELLYFIN_URL}/web/#/details?id=${EPISODE_ID}`)
+    })
+
+    it('uses the episode item ID rather than the series artwork ID', async () => {
+      mockLinkableArrivals()
+
+      const wrapper = mountView(JELLYFIN_URL)
+      await settle()
+
+      const episodeLink = wrapper.findAll('.arrival-card__link')[1]
+
+      expect(episodeLink?.attributes('href')).toContain(EPISODE_ID)
+      expect(episodeLink?.attributes('href')).not.toContain(SERIES_ID)
+
+      expect(mockSendMessage).toHaveBeenCalledWith({
+        type: 'GET_JELLYFIN_IMAGE',
+        itemId: SERIES_ID,
+        imageTag: null,
+      })
+    })
+
+    it('opens media links in a new tab securely', async () => {
+      mockLinkableArrivals()
+
+      const wrapper = mountView(JELLYFIN_URL)
+      await settle()
+
+      for (const link of wrapper.findAll('.arrival-card__link')) {
+        expect(link.attributes('target')).toBe('_blank')
+        expect(link.attributes('rel')).toContain('noopener')
+        expect(link.attributes('rel')).toContain('noreferrer')
+      }
+    })
+
+    it('preserves reverse-proxy paths', async () => {
+      mockLinkableArrivals()
+
+      const wrapper = mountView(' https://media.example.com/jellyfin/ ')
+      await settle()
+
+      expect(wrapper.get('.arrival-card__link').attributes('href')).toBe(
+        `${JELLYFIN_URL}/web/#/details?id=${MOVIE_ID}`,
+      )
+    })
+
+    it('does not render links for an invalid server URL', async () => {
+      mockLinkableArrivals()
+
+      const wrapper = mountView('ftp://media.example.com')
+      await settle()
+
+      expect(wrapper.findAll('.arrival-card')).toHaveLength(2)
+      expect(wrapper.findAll('.arrival-card__link')).toHaveLength(0)
+    })
+
+    it('does not render links for invalid item IDs', async () => {
+      const invalidArrival = createArrival({
+        id: 'movie-1',
+      })
+
+      mockSendMessage.mockImplementation(async (message) => {
+        if (message.type === 'GET_JELLYFIN_ARRIVALS') {
+          return arrivalsResponse([invalidArrival])
+        }
+
+        if (message.type === 'GET_JELLYFIN_IMAGE') {
+          return { success: true, image: null }
+        }
+
+        throw new Error(`Unexpected message: ${message.type}`)
+      })
+
+      const wrapper = mountView(JELLYFIN_URL)
+      await settle()
+
+      expect(wrapper.findAll('.arrival-card')).toHaveLength(1)
+      expect(wrapper.find('.arrival-card__link').exists()).toBe(false)
+    })
+
+    it('updates links reactively when the Jellyfin URL changes', async () => {
+      mockLinkableArrivals()
+
+      const wrapper = mountView()
+      await settle()
+
+      expect(wrapper.findAll('.arrival-card__link')).toHaveLength(0)
+
+      await wrapper.setProps({ jellyfinUrl: JELLYFIN_URL })
+
+      expect(wrapper.findAll('.arrival-card__link')).toHaveLength(2)
+      expect(wrapper.get('.arrival-card__link').attributes('href')).toBe(
+        `${JELLYFIN_URL}/web/#/details?id=${MOVIE_ID}`,
+      )
+
+      await wrapper.setProps({ jellyfinUrl: 'http://localhost:8096' })
+
+      expect(wrapper.get('.arrival-card__link').attributes('href')).toBe(
+        `http://localhost:8096/web/#/details?id=${MOVIE_ID}`,
+      )
+
+      await wrapper.setProps({ jellyfinUrl: null })
+
+      expect(wrapper.findAll('.arrival-card__link')).toHaveLength(0)
+    })
+
+    it('does not refetch arrivals or artwork when the URL changes', async () => {
+      mockLinkableArrivals()
+
+      const wrapper = mountView()
+      await settle()
+
+      const requestCount = mockSendMessage.mock.calls.length
+
+      await wrapper.setProps({ jellyfinUrl: JELLYFIN_URL })
+      await wrapper.setProps({ jellyfinUrl: null })
+
+      expect(mockSendMessage.mock.calls.length).toBe(requestCount)
+    })
+
+    it('keeps notification controls separate from media links', async () => {
+      mockLinkableArrivals()
+
+      const wrapper = mountView(JELLYFIN_URL)
+      await settle()
+
+      expect(wrapper.findAll('.arrival-card__link')).toHaveLength(2)
+      expect(wrapper.findAll('.arrival-card button')).toHaveLength(2)
+      expect(wrapper.findAll('.arrival-card__link button')).toHaveLength(0)
+    })
   })
 
   it('shows the unread count and total', async () => {

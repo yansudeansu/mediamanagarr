@@ -80,6 +80,14 @@ vi.mock('./views/SettingsView.vue', () => ({
   },
 }))
 
+vi.mock('./views/MmUpNextView.vue', () => ({
+  default: {
+    name: 'MockUpNextView',
+    props: ['jellyfinUrl'],
+    template: '<div data-testid="up-next-view">Up Next content</div>',
+  },
+}))
+
 const mockedSendMessage = vi.mocked(sendBackgroundMessage)
 const mockedOpenSidebar = vi.mocked(openWorkspaceSidebar)
 const mockedGetSafeServices = vi.mocked(getSafeServiceConfigs)
@@ -1254,6 +1262,89 @@ describe('App', () => {
         activeView: 'calendar',
         settingsOpen: true,
       })
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('Up Next direct media link configuration', () => {
+    it('passes the configured Jellyfin URL to Up Next', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Up Next').trigger('click')
+
+      expect(wrapper.getComponent({ name: 'MockUpNextView' }).props('jellyfinUrl')).toBe(
+        'https://media.example.com/jellyfin',
+      )
+
+      wrapper.unmount()
+    })
+
+    it('passes the Jellyfin URL when Up Next is the only available view', async () => {
+      mockedGetSafeServices.mockResolvedValue({
+        jellyfin: {
+          url: 'https://jellyfin.example.com',
+          configured: true,
+        },
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.getComponent({ name: 'MockUpNextView' }).props('jellyfinUrl')).toBe(
+        'https://jellyfin.example.com',
+      )
+
+      wrapper.unmount()
+    })
+
+    it('updates the Jellyfin URL when service settings change', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Up Next').trigger('click')
+
+      const upNext = wrapper.getComponent({ name: 'MockUpNextView' })
+
+      expect(upNext.props('jellyfinUrl')).toBe('https://media.example.com/jellyfin')
+
+      const updatedServices: SafeServiceConfigs = {
+        ...configuredServices,
+        jellyfin: {
+          url: 'https://new-media.example.com/jellyfin',
+          configured: true,
+        },
+      }
+
+      mockedGetSafeServices.mockResolvedValue(updatedServices)
+
+      emitStorageChange({
+        mediaManagarrServices: {
+          oldValue: configuredServices,
+          newValue: updatedServices,
+        },
+      })
+
+      await flushPromises()
+
+      expect(upNext.props('jellyfinUrl')).toBe('https://new-media.example.com/jellyfin')
+
+      wrapper.unmount()
+    })
+
+    it('does not pass a Jellyfin URL when Jellyfin is not configured', async () => {
+      mockedGetSafeServices.mockResolvedValue({
+        sonarr: {
+          url: 'https://sonarr.example.com',
+          configured: true,
+        },
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'MockUpNextView' }).exists()).toBe(false)
 
       wrapper.unmount()
     })

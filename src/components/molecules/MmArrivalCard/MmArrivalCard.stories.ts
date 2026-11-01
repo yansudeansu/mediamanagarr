@@ -22,6 +22,7 @@ const meta = {
     arrival: baseArrival,
     image: null,
     busy: false,
+    mediaUrl: null,
     onToggleUnread: fn(),
   },
 } satisfies Meta<typeof MmArrivalCard>
@@ -116,5 +117,31 @@ export const InvalidDate: Story = {
       ...baseArrival,
       dateAdded: 'invalid-date',
     },
+  },
+}
+
+export const LinkedMovie: Story = {
+  args: {
+    arrival: {
+      ...baseArrival,
+      id: '0123456789abcdef0123456789abcdef',
+    },
+    mediaUrl:
+      'https://media.example.com/jellyfin/web/#/details?id=0123456789abcdef0123456789abcdef',
+  },
+}
+
+export const LinkedEpisode: Story = {
+  args: {
+    arrival: {
+      ...baseArrival,
+      id: 'abcdef0123456789abcdef0123456789',
+      type: 'Episode',
+      title: 'Episode 1',
+      subtitle: 'TV Show 1 · S01E01',
+      imageId: 'tv-show-1',
+    },
+    mediaUrl:
+      'https://media.example.com/jellyfin/web/#/details?id=abcdef0123456789abcdef0123456789',
   },
 }
