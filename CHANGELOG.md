@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.0
+
+### Features
+
+- add centralized service registry and improve connection reliability (7079af8)
+- add quick access menu for configured services (b45c286)
+- add workspace preferences and simplify header (d625541)
+
 ## v0.3.1
 
 ### Bug Fixes
