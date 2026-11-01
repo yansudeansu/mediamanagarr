@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.5.0
+
+### Features
+
+- add dynamic navigation based on configured services (a86c765)
+- add scrollable navigation tabs (a58c6cc)
+- add direct Jellyfin media links (6946c1c)
+
+### Bug Fixes
+
+- override vulnerable minimatch and glob versions (d0338cf)
+
 ## v0.4.0
 
 ### Features
