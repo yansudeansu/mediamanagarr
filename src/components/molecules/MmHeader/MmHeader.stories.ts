@@ -60,12 +60,6 @@ const meta = {
       description:
         'Determines whether the header displays the application title and Quick Access menu or the Settings title and back button.',
     },
-    windowMode: {
-      control: 'radio',
-      options: ['popup', 'detached', 'sidebar'],
-      description:
-        'Determines whether the workspace is displayed as a popup, detached window, or native browser sidebar.',
-    },
     services: {
       control: 'object',
       description:
@@ -83,35 +77,10 @@ const meta = {
         category: 'events',
       },
     },
-    onDetach: {
-      description: 'Emitted when the detach button is clicked.',
-      table: {
-        category: 'events',
-      },
-    },
-    onAttach: {
-      description: 'Emitted when the attach button is clicked.',
-      table: {
-        category: 'events',
-      },
-    },
-    onSidebar: {
-      description: 'Emitted when the native browser sidebar button is clicked.',
-      table: {
-        category: 'events',
-      },
-    },
-    onSidebarClose: {
-      description: 'Emitted when the close browser sidebar button is clicked.',
-      table: {
-        category: 'events',
-      },
-    },
   },
 
   args: {
     mode: 'main',
-    windowMode: 'popup',
     services: configuredServices,
   },
 
@@ -135,96 +104,35 @@ type Story = StoryObj<typeof meta>
 /**
  * Interactive playground.
  *
- * Switch between main/settings and popup/detached/sidebar.
- * Edit the service configurations using Storybook Controls.
+ * Switch between main and settings modes.
+ * Edit service configurations using Storybook Controls.
  *
  * In main mode, click the three-dot button to open Quick Access.
  */
 export const Playground: Story = {}
 
 /**
- * Default popup header.
+ * Default application header.
  *
- * Shows the application title, sidebar button, detach button,
- * and Quick Access menu containing all configured services.
+ * Shows the application title and Quick Access menu
+ * containing all configured services.
  */
 export const Main: Story = {
   args: {
     mode: 'main',
-    windowMode: 'popup',
     services: configuredServices,
   },
 }
 
 /**
- * Popup settings header.
+ * Settings header.
  *
- * Shows the Settings title, sidebar button, detach button,
- * and back button.
- *
+ * Shows the Settings title and back button.
  * Quick Access is hidden while Settings is open.
  */
 export const Settings: Story = {
   args: {
     mode: 'settings',
-    windowMode: 'popup',
-  },
-}
-
-/**
- * Detached workspace.
- *
- * Shows the application title, sidebar button, attach button,
- * and Quick Access menu.
- */
-export const DetachedMain: Story = {
-  args: {
-    mode: 'main',
-    windowMode: 'detached',
-    services: configuredServices,
-  },
-}
-
-/**
- * Detached workspace showing Settings.
- *
- * Shows the Settings title, sidebar button, attach button,
- * and back button.
- */
-export const DetachedSettings: Story = {
-  args: {
-    mode: 'settings',
-    windowMode: 'detached',
-  },
-}
-
-/**
- * Native browser sidebar.
- *
- * Shows the application title, close sidebar button,
- * and Quick Access menu.
- *
- * Opening and detaching actions are hidden because
- * the application is already running inside the sidebar.
- */
-export const SidebarMain: Story = {
-  args: {
-    mode: 'main',
-    windowMode: 'sidebar',
-    services: configuredServices,
-  },
-}
-
-/**
- * Native browser sidebar showing Settings.
- *
- * Shows the Settings title, close sidebar button,
- * and back button.
- */
-export const SidebarSettings: Story = {
-  args: {
-    mode: 'settings',
-    windowMode: 'sidebar',
   },
 }
 
@@ -236,7 +144,6 @@ export const SidebarSettings: Story = {
 export const PartiallyConfigured: Story = {
   args: {
     mode: 'main',
-    windowMode: 'popup',
     services: partiallyConfiguredServices,
   },
 }
@@ -250,7 +157,6 @@ export const PartiallyConfigured: Story = {
 export const NoServices: Story = {
   args: {
     mode: 'main',
-    windowMode: 'popup',
     services: {},
   },
 }
@@ -263,7 +169,6 @@ export const NoServices: Story = {
 export const ReverseProxyUrls: Story = {
   args: {
     mode: 'main',
-    windowMode: 'popup',
     services: {
       jellyfin: {
         url: 'https://home.example.com/jellyfin',

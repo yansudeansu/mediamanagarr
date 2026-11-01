@@ -1,4 +1,4 @@
-import type { NavigationView } from '../components/molecules/MmNavigation/MmNavigation.vue'
+export type NavigationView = 'requests' | 'up-next' | 'calendar' | 'downloads'
 
 export interface WorkspaceNavigationState {
   activeView: NavigationView

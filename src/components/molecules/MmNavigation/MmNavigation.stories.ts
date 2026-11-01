@@ -1,6 +1,21 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
+import { ref, watch } from 'vue'
 import { fn } from 'storybook/test'
 import MmNavigation from './MmNavigation.vue'
+import type { TabItem } from '../MmTabs/MmTabs.vue'
+
+const defaultItems: TabItem[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'library', label: 'Library' },
+]
+
+const extendedItems: TabItem[] = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'reports', label: 'Reports' },
+  { id: 'settings', label: 'Settings' },
+]
 
 const meta = {
   title: 'Molecules/Navigation',
@@ -9,13 +24,22 @@ const meta = {
 
   argTypes: {
     activeView: {
-      control: 'select',
-      options: ['requests', 'up-next', 'calendar', 'downloads'],
-      description: 'Currently active application view.',
+      control: 'text',
+      description: 'ID of the currently active navigation item.',
+    },
+
+    items: {
+      control: 'object',
+      description: 'Navigation items supplied by the parent.',
+    },
+
+    label: {
+      control: 'text',
+      description: 'Accessible label for the navigation landmark.',
     },
 
     onNavigate: {
-      description: 'Emitted when a navigation item is selected.',
+      description: 'Emitted with the selected navigation item ID.',
       table: {
         category: 'events',
       },
@@ -23,7 +47,9 @@ const meta = {
   },
 
   args: {
-    activeView: 'requests',
+    activeView: 'overview',
+    items: defaultItems,
+    label: 'Main navigation',
     onNavigate: fn(),
   },
 
@@ -38,28 +64,77 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-export const Playground: Story = {}
+export const Playground: Story = {
+  render: (args) => ({
+    components: { MmNavigation },
 
-export const Requests: Story = {
+    setup() {
+      const activeView = ref(args.activeView)
+
+      watch(
+        () => args.activeView,
+        (value) => {
+          activeView.value = value
+        },
+      )
+
+      function handleNavigate(view: string): void {
+        activeView.value = view
+        args.onNavigate?.(view)
+      }
+
+      return {
+        args,
+        activeView,
+        handleNavigate,
+      }
+    },
+
+    template: `
+      <mm-navigation
+        :active-view="activeView"
+        :items="args.items"
+        :label="args.label"
+        @navigate="handleNavigate"
+      />
+    `,
+  }),
+}
+
+export const Overview: Story = {}
+
+export const Activity: Story = {
   args: {
-    activeView: 'requests',
+    activeView: 'activity',
   },
 }
 
-export const UpNext: Story = {
+export const Library: Story = {
   args: {
-    activeView: 'up-next',
+    activeView: 'library',
   },
 }
 
-export const Calendar: Story = {
+export const ExtendedNavigation: Story = {
   args: {
-    activeView: 'calendar',
+    activeView: 'dashboard',
+    items: extendedItems,
   },
 }
 
-export const Downloads: Story = {
+export const DisabledItem: Story = {
   args: {
-    activeView: 'downloads',
+    activeView: 'overview',
+    items: [
+      { id: 'overview', label: 'Overview' },
+      { id: 'activity', label: 'Activity', disabled: true },
+      { id: 'library', label: 'Library' },
+    ],
+  },
+}
+
+export const CustomLabel: Story = {
+  args: {
+    label: 'Library sections',
   },
 }

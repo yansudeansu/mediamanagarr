@@ -6,23 +6,17 @@ import type { SafeServiceConfigs } from '../../../types/service'
 
 interface Props {
   mode?: 'main' | 'settings'
-  windowMode?: 'popup' | 'detached' | 'sidebar'
   services?: SafeServiceConfigs
 }
 
 withDefaults(defineProps<Props>(), {
   mode: 'main',
-  windowMode: 'popup',
   services: () => ({}),
 })
 
 const emit = defineEmits<{
   settings: []
   back: []
-  detach: []
-  attach: []
-  sidebar: []
-  sidebarClose: []
 }>()
 </script>
 
@@ -37,47 +31,6 @@ const emit = defineEmits<{
     </div>
 
     <div class="header__actions">
-      <mm-button
-        v-if="windowMode === 'sidebar'"
-        variant="secondary"
-        icon="sidebar-close"
-        icon-only
-        aria-label="Close browser sidebar"
-        title="Close browser sidebar"
-        @click="emit('sidebarClose')"
-      />
-
-      <template v-else>
-        <mm-button
-          variant="secondary"
-          icon="sidebar"
-          icon-only
-          aria-label="Open workspace in browser sidebar"
-          title="Open workspace in browser sidebar"
-          @click="emit('sidebar')"
-        />
-
-        <mm-button
-          v-if="windowMode === 'detached'"
-          variant="secondary"
-          icon="attach"
-          icon-only
-          aria-label="Attach workspace to toolbar"
-          title="Attach workspace to toolbar"
-          @click="emit('attach')"
-        />
-
-        <mm-button
-          v-else
-          variant="secondary"
-          icon="detach"
-          icon-only
-          aria-label="Detach workspace into a window"
-          title="Detach workspace into a window"
-          @click="emit('detach')"
-        />
-      </template>
-
       <mm-button
         v-if="mode === 'settings'"
         variant="secondary"

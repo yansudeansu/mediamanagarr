@@ -1,174 +1,212 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import MmSettingsTemplate from './MmSettingsTemplate.vue'
-import MmServiceSelector from '../../organisms/MmServiceSelector/MmServiceSelector.vue'
-import MmServiceForm from '../../organisms/MmServiceForm/MmServiceForm.vue'
-import type { ServiceHealthStates, ServiceId, ServiceState } from '../../../types/service'
+import MmTabs from '../../molecules/MmTabs/MmTabs.vue'
+import type { TabItem } from '../../molecules/MmTabs/MmTabs.vue'
+import MmCard from '../../atoms/MmCard/MmCard.vue'
+import MmSelect from '../../atoms/MmSelect/MmSelect.vue'
+import MmButton from '../../atoms/MmButton/MmButton.vue'
+
+const settingsTabs: TabItem[] = [
+  { id: 'connections', label: 'Connections' },
+  { id: 'workspace', label: 'Workspace' },
+]
+
+const workspaceOptions = [
+  { label: 'Popup', value: 'popup' },
+  { label: 'Sidebar', value: 'sidebar' },
+  { label: 'Detached window', value: 'detached' },
+]
 
 const meta = {
   title: 'Templates/Settings',
   component: MmSettingsTemplate,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'A generic Settings layout with a navigation slot and a default content slot. ' +
+          'The parent owns navigation state, content, and settings behavior.',
+      },
+    },
+  },
 } satisfies Meta<typeof MmSettingsTemplate>
 
 export default meta
 
 type Story = StoryObj<typeof meta>
 
-const configuredStatuses: Partial<Record<ServiceId, ServiceState>> = {
-  jellyfin: 'configured',
-  seerr: 'configured',
-  sonarr: 'not-configured',
-  radarr: 'not-configured',
-  qbittorrent: 'not-configured',
-}
-
-const connectedStatuses: Partial<Record<ServiceId, ServiceState>> = {
-  jellyfin: 'connected',
-  seerr: 'connected',
-  sonarr: 'connected',
-  radarr: 'connected',
-  qbittorrent: 'connected',
-}
-
-const connectedHealth: ServiceHealthStates = {
-  jellyfin: {
-    status: 'connected',
-    lastCheckedAt: '2026-10-31T12:00:00.000Z',
-  },
-  seerr: {
-    status: 'connected',
-    lastCheckedAt: '2026-10-31T12:00:00.000Z',
-  },
-  sonarr: {
-    status: 'connected',
-    lastCheckedAt: '2026-10-31T12:00:00.000Z',
-  },
-  radarr: {
-    status: 'connected',
-    lastCheckedAt: '2026-10-31T12:00:00.000Z',
-  },
-  qbittorrent: {
-    status: 'connected',
-    lastCheckedAt: '2026-10-31T12:00:00.000Z',
-  },
-}
-
-const failedHealth: ServiceHealthStates = {
-  radarr: {
-    status: 'failed',
-    lastCheckedAt: '2026-10-31T12:00:00.000Z',
-    error: 'Unable to reach the Radarr server.',
-  },
-}
-
-const exampleJellyfinUsers = [
-  { id: 'user-1', name: 'Test User 1' },
-  { id: 'user-2', name: 'Test User 2' },
-  { id: 'user-3', name: 'Test User 3' },
-]
-
-function createStory(
-  statuses: Partial<Record<ServiceId, ServiceState>>,
-  initialService: ServiceId = 'jellyfin',
-  healthStates: ServiceHealthStates = {},
-): Story['render'] {
-  return () => ({
+/**
+ * Interactive example demonstrating how a parent composes
+ * Settings navigation and content.
+ *
+ * All state is local to Storybook.
+ */
+export const Playground: Story = {
+  render: () => ({
     components: {
       MmSettingsTemplate,
-      MmServiceSelector,
-      MmServiceForm,
+      MmTabs,
+      MmCard,
+      MmSelect,
+      MmButton,
     },
 
     setup() {
-      const selectedService = ref<ServiceId>(initialService)
-      const jellyfinUserId = ref('user-1')
-
-      const urls: Partial<Record<ServiceId, string>> = {
-        jellyfin: 'https://jellyfin.example.com',
-        seerr: 'https://seerr.example.com',
-        sonarr: 'https://sonarr.example.com',
-        radarr: 'https://radarr.example.com',
-        qbittorrent: 'https://qbittorrent.example.com',
-      }
-
-      const selectedUrl = computed(() => urls[selectedService.value] ?? '')
-
-      const configured = computed(
-        () => (statuses[selectedService.value] ?? 'not-configured') !== 'not-configured',
-      )
-
-      const selectedHealth = computed(() => healthStates[selectedService.value])
+      const activeTab = ref('connections')
+      const workspaceMode = ref('popup')
 
       return {
-        selectedService,
-        statuses,
-        selectedUrl,
-        selectedHealth,
-        configured,
-        jellyfinUsers: exampleJellyfinUsers,
-        jellyfinUserId,
+        activeTab,
+        settingsTabs,
+        workspaceMode,
+        workspaceOptions,
       }
     },
 
     template: `
-      <div style="width: 340px">
+      <div style="width: 360px">
         <mm-settings-template>
-          <template #selector>
-            <mm-service-selector
-              v-model="selectedService"
-              :statuses="statuses"
+          <template #navigation>
+            <mm-tabs
+              v-model="activeTab"
+              :items="settingsTabs"
+              label="Settings sections"
             />
           </template>
 
-          <template #configuration>
-            <mm-service-form
-              :service-id="selectedService"
-              :url="selectedUrl"
-              :configured="configured"
-              :health="selectedHealth"
-              :jellyfin-users="jellyfinUsers"
-              :jellyfin-user-id="jellyfinUserId"
-              @select-jellyfin-user="jellyfinUserId = $event"
+          <section
+            v-if="activeTab === 'connections'"
+            aria-labelledby="connections-title"
+          >
+            <mm-card>
+              <h2 id="connections-title">Connections</h2>
+
+              <p>
+                Configure the services MediaManagarr connects to.
+              </p>
+
+              <mm-button variant="secondary" block>
+                Add connection
+              </mm-button>
+            </mm-card>
+          </section>
+
+          <section
+            v-else
+            aria-labelledby="workspace-title"
+          >
+            <mm-card>
+              <h2 id="workspace-title">Workspace</h2>
+
+              <p>
+                Choose how MediaManagarr opens from your browser toolbar.
+              </p>
+
+              <mm-select
+                v-model="workspaceMode"
+                label="Default workspace"
+                :options="workspaceOptions"
+              />
+            </mm-card>
+          </section>
+        </mm-settings-template>
+      </div>
+    `,
+  }),
+}
+
+/**
+ * A Settings layout containing only navigation.
+ */
+export const NavigationOnly: Story = {
+  render: () => ({
+    components: {
+      MmSettingsTemplate,
+      MmTabs,
+    },
+
+    setup() {
+      const activeTab = ref('connections')
+
+      return {
+        activeTab,
+        settingsTabs,
+      }
+    },
+
+    template: `
+      <div style="width: 360px">
+        <mm-settings-template>
+          <template #navigation>
+            <mm-tabs
+              v-model="activeTab"
+              :items="settingsTabs"
+              label="Settings sections"
             />
           </template>
         </mm-settings-template>
       </div>
     `,
-  })
+  }),
 }
 
 /**
- * Settings layout with configured services that have not been checked yet.
+ * A Settings layout without navigation.
  */
-export const Playground: Story = {
-  render: createStory(configuredStatuses),
-}
-
-/**
- * No services configured.
- */
-export const FreshInstall: Story = {
-  render: createStory({}),
-}
-
-/**
- * All services connected with recorded health checks.
- */
-export const AllConnected: Story = {
-  render: createStory(connectedStatuses, 'jellyfin', connectedHealth),
-}
-
-/**
- * Radarr selected with a failed connection and an actionable error.
- */
-export const ConnectionFailed: Story = {
-  render: createStory(
-    {
-      ...configuredStatuses,
-      radarr: 'failed',
+export const ContentOnly: Story = {
+  render: () => ({
+    components: {
+      MmSettingsTemplate,
+      MmCard,
     },
-    'radarr',
-    failedHealth,
-  ),
+
+    template: `
+      <div style="width: 360px">
+        <mm-settings-template>
+          <mm-card>
+            <h2>General Settings</h2>
+
+            <p>
+              Settings content can be rendered without navigation.
+            </p>
+          </mm-card>
+        </mm-settings-template>
+      </div>
+    `,
+  }),
+}
+
+/**
+ * Demonstrates that the template can render arbitrary content.
+ */
+export const CustomContent: Story = {
+  render: () => ({
+    components: {
+      MmSettingsTemplate,
+      MmCard,
+    },
+
+    template: `
+      <div style="width: 360px">
+        <mm-settings-template>
+          <template #navigation>
+            <nav aria-label="Example navigation">
+              Custom navigation
+            </nav>
+          </template>
+
+          <mm-card>
+            <h2>Custom Settings</h2>
+
+            <p>
+              The template does not require a specific form,
+              service selector, or settings component.
+            </p>
+          </mm-card>
+        </mm-settings-template>
+      </div>
+    `,
+  }),
 }

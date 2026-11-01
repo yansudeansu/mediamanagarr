@@ -6,8 +6,18 @@ describe('MmSettingsTemplate', () => {
   function createWrapper() {
     return mount(MmSettingsTemplate, {
       slots: {
-        selector: '<div data-testid="selector">Service selector</div>',
-        configuration: '<div data-testid="configuration">Service configuration</div>',
+        navigation: `
+          <nav data-testid="navigation" aria-label="Settings navigation">
+            <button type="button">Connections</button>
+            <button type="button">Workspace</button>
+          </nav>
+        `,
+        default: `
+          <section data-testid="content" aria-label="Settings content">
+            <h2>Service Connections</h2>
+            <p>Configure your services here.</p>
+          </section>
+        `,
       },
     })
   }
@@ -16,51 +26,100 @@ describe('MmSettingsTemplate', () => {
     const wrapper = createWrapper()
 
     expect(wrapper.find('.settings-template').exists()).toBe(true)
+    expect(wrapper.find('.settings-template__content').exists()).toBe(true)
   })
 
-  it('renders the Service Connections heading', () => {
+  it('renders the navigation slot', () => {
     const wrapper = createWrapper()
 
-    expect(wrapper.get('h2').text()).toBe('Service Connections')
+    const navigation = wrapper.get('[data-testid="navigation"]')
+
+    expect(navigation.text()).toContain('Connections')
+    expect(navigation.text()).toContain('Workspace')
   })
 
-  it('renders the selector slot', () => {
+  it('renders the default content slot', () => {
     const wrapper = createWrapper()
 
-    expect(wrapper.get('[data-testid="selector"]').text()).toBe('Service selector')
+    const content = wrapper.get('[data-testid="content"]')
+
+    expect(content.get('h2').text()).toBe('Service Connections')
+    expect(content.text()).toContain('Configure your services here.')
   })
 
-  it('renders the configuration slot', () => {
+  it('places navigation above the content', () => {
     const wrapper = createWrapper()
 
-    expect(wrapper.get('[data-testid="configuration"]').text()).toBe('Service configuration')
-  })
-
-  it('places the selector above the configuration panel', () => {
-    const wrapper = createWrapper()
-
-    const selector = wrapper.get('[data-testid="selector"]').element
-    const configuration = wrapper.get('[data-testid="configuration"]').element
+    const navigation = wrapper.get('[data-testid="navigation"]').element
+    const content = wrapper.get('[data-testid="content"]').element
 
     expect(
-      selector.compareDocumentPosition(configuration) & Node.DOCUMENT_POSITION_FOLLOWING,
+      navigation.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
   })
 
-  it('groups the selector under the Service Connections heading', () => {
+  it('renders navigation outside the content container', () => {
     const wrapper = createWrapper()
 
-    const section = wrapper.get('section')
+    const contentContainer = wrapper.get('.settings-template__content')
 
-    expect(section.attributes('aria-labelledby')).toBe('service-connections-title')
-    expect(section.find('[data-testid="selector"]').exists()).toBe(true)
+    expect(contentContainer.find('[data-testid="navigation"]').exists()).toBe(false)
+    expect(contentContainer.find('[data-testid="content"]').exists()).toBe(true)
   })
 
-  it('renders without optional slot content', () => {
+  it('supports arbitrary content', () => {
+    const wrapper = mount(MmSettingsTemplate, {
+      slots: {
+        default: `
+          <div data-testid="custom-content">
+            <label for="example">Example setting</label>
+            <input id="example" type="text" />
+          </div>
+        `,
+      },
+    })
+
+    expect(wrapper.find('[data-testid="custom-content"]').exists()).toBe(true)
+    expect(wrapper.get('label').text()).toBe('Example setting')
+    expect(wrapper.get('input').attributes('type')).toBe('text')
+  })
+
+  it('renders content without a navigation slot', () => {
+    const wrapper = mount(MmSettingsTemplate, {
+      slots: {
+        default: '<p data-testid="content-only">Content without navigation</p>',
+      },
+    })
+
+    expect(wrapper.get('[data-testid="content-only"]').text()).toBe('Content without navigation')
+
+    expect(wrapper.find('nav').exists()).toBe(false)
+  })
+
+  it('renders navigation without content', () => {
+    const wrapper = mount(MmSettingsTemplate, {
+      slots: {
+        navigation: '<nav aria-label="Settings navigation">Navigation only</nav>',
+      },
+    })
+
+    expect(wrapper.get('nav').text()).toBe('Navigation only')
+    expect(wrapper.get('.settings-template__content').text()).toBe('')
+  })
+
+  it('renders without any slots', () => {
     const wrapper = mount(MmSettingsTemplate)
 
-    expect(wrapper.get('h2').text()).toBe('Service Connections')
-    expect(wrapper.find('[data-testid="selector"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="configuration"]').exists()).toBe(false)
+    expect(wrapper.find('.settings-template').exists()).toBe(true)
+    expect(wrapper.find('.settings-template__content').exists()).toBe(true)
+    expect(wrapper.text()).toBe('')
+  })
+
+  it('does not introduce application-specific headings', () => {
+    const wrapper = mount(MmSettingsTemplate)
+
+    expect(wrapper.find('h1, h2, h3').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Service Connections')
+    expect(wrapper.text()).not.toContain('Workspace')
   })
 })

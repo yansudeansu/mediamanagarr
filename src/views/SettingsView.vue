@@ -3,6 +3,11 @@ import { computed, onMounted, ref } from 'vue'
 import MmSettingsTemplate from '../components/templates/MmSettingsTemplate/MmSettingsTemplate.vue'
 import MmServiceSelector from '../components/organisms/MmServiceSelector/MmServiceSelector.vue'
 import MmServiceForm from '../components/organisms/MmServiceForm/MmServiceForm.vue'
+import MmTabs from '../components/molecules/MmTabs/MmTabs.vue'
+import type { TabItem } from '../components/molecules/MmTabs/MmTabs.vue'
+import MmSelect from '../components/atoms/MmSelect/MmSelect.vue'
+import MmButton from '../components/atoms/MmButton/MmButton.vue'
+import MmPanel from '../components/atoms/MmPanel/MmPanel.vue'
 import {
   type SafeServiceConfigs,
   type ServiceHealthStates,
@@ -11,14 +16,43 @@ import {
 } from '../types/service'
 import { SERVICES, SERVICE_REGISTRY } from '../services/registry'
 import type { JellyfinUser } from '../types/jellyfin'
+import type { WorkspaceMode } from '../types/workspace'
+import { DEFAULT_WORKSPACE_PREFERENCES, isWorkspaceMode } from '../types/workspace'
 import { sendBackgroundMessage } from '../utils/background-messaging'
 import { getHostPermission, normalizeServerUrl } from '../utils/service-config'
+import { getWorkspacePreferences, saveWorkspacePreferences } from '../utils/workspace-storage'
 
 interface ConnectPayload {
   serviceId: ServiceId
   url: string
   apiKey: string
 }
+
+type SettingsSection = 'connections' | 'workspace'
+
+const emit = defineEmits<{
+  'open-sidebar': []
+  'open-detached': []
+}>()
+
+const activeSection = ref<SettingsSection>('connections')
+
+const settingsTabs: TabItem[] = [
+  { id: 'connections', label: 'Connections' },
+  { id: 'workspace', label: 'Workspace' },
+]
+
+const workspaceOptions = [
+  { label: 'Popup', value: 'popup' },
+  { label: 'Sidebar', value: 'sidebar' },
+  { label: 'Detached window', value: 'detached' },
+]
+
+const workspaceMode = ref<WorkspaceMode>(DEFAULT_WORKSPACE_PREFERENCES.defaultMode)
+const workspaceLoading = ref(true)
+const workspaceSaving = ref(false)
+const workspaceError = ref('')
+const workspaceSuccess = ref('')
 
 const selectedService = ref<ServiceId>('jellyfin')
 
@@ -47,8 +81,66 @@ const error = computed(() => serviceErrors.value[selectedService.value] ?? '')
 const success = computed(() => serviceSuccesses.value[selectedService.value] ?? '')
 const selectedHealth = computed(() => healthStates.value[selectedService.value])
 
+function selectSection(value: string): void {
+  if (value === 'connections' || value === 'workspace') {
+    activeSection.value = value
+  }
+}
+
 function getErrorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : 'An unexpected error occurred.'
+}
+
+async function loadWorkspacePreferences(): Promise<void> {
+  workspaceLoading.value = true
+  workspaceError.value = ''
+
+  try {
+    const preferences = await getWorkspacePreferences()
+    workspaceMode.value = preferences.defaultMode
+  } catch (caught) {
+    workspaceError.value = getErrorMessage(caught)
+  } finally {
+    workspaceLoading.value = false
+  }
+}
+
+async function updateWorkspaceMode(value: string): Promise<void> {
+  if (!isWorkspaceMode(value) || workspaceSaving.value || workspaceLoading.value) {
+    return
+  }
+
+  const previousMode = workspaceMode.value
+
+  if (value === previousMode) {
+    return
+  }
+
+  workspaceMode.value = value
+  workspaceSaving.value = true
+  workspaceError.value = ''
+  workspaceSuccess.value = ''
+
+  try {
+    await saveWorkspacePreferences({
+      defaultMode: value,
+    })
+
+    workspaceSuccess.value = 'Default workspace saved.'
+  } catch (caught) {
+    workspaceMode.value = previousMode
+    workspaceError.value = getErrorMessage(caught)
+  } finally {
+    workspaceSaving.value = false
+  }
+}
+
+function openSidebar(): void {
+  emit('open-sidebar')
+}
+
+function openDetached(): void {
+  emit('open-detached')
 }
 
 function isServiceBusy(serviceId: ServiceId): boolean {
@@ -245,7 +337,6 @@ async function connectService(payload: ConnectPayload): Promise<void> {
       configured: true,
     }
 
-    // The background has tested and saved this configuration.
     statuses.value[serviceId] = 'connected'
     serviceSuccesses.value[serviceId] =
       `Connected to ${SERVICE_REGISTRY[serviceId].name} successfully.`
@@ -256,7 +347,6 @@ async function connectService(payload: ConnectPayload): Promise<void> {
       await loadJellyfinUsers()
     }
   } catch (caught) {
-    // A failed edit must not erase the health of an existing saved connection.
     updateServiceStatus(serviceId)
 
     if (!configs.value[serviceId]?.configured) {
@@ -291,7 +381,6 @@ async function testConnection(serviceId: ServiceId): Promise<void> {
     serviceSuccesses.value[serviceId] =
       `Connected to ${SERVICE_REGISTRY[serviceId].name} successfully.`
   } catch (caught) {
-    // A failed test changes health, not the saved configuration.
     statuses.value[serviceId] = 'failed'
     serviceErrors.value[serviceId] = getErrorMessage(caught)
   } finally {
@@ -348,16 +437,30 @@ async function removeService(serviceId: ServiceId): Promise<void> {
 
 onMounted(() => {
   void loadConfigs()
+  void loadWorkspacePreferences()
 })
 </script>
 
 <template>
   <mm-settings-template>
-    <template #selector>
-      <mm-service-selector v-model="selectedService" :statuses="statuses" />
+    <template #navigation>
+      <mm-tabs
+        :model-value="activeSection"
+        :items="settingsTabs"
+        label="Settings sections"
+        @update:model-value="selectSection"
+      />
     </template>
 
-    <template #configuration>
+    <section
+      v-if="activeSection === 'connections'"
+      class="settings-section"
+      aria-labelledby="service-connections-title"
+    >
+      <h2 id="service-connections-title" class="settings-section__title">Service Connections</h2>
+
+      <mm-service-selector v-model="selectedService" :statuses="statuses" />
+
       <mm-service-form
         :service-id="selectedService"
         :url="selectedUrl"
@@ -380,6 +483,76 @@ onMounted(() => {
         @edit="clearConnectionFeedback(selectedService)"
         @select-jellyfin-user="selectJellyfinUser"
       />
-    </template>
+    </section>
+
+    <section v-else class="settings-section" aria-labelledby="workspace-settings-title">
+      <h2 id="workspace-settings-title" class="settings-section__title">Workspace</h2>
+
+      <mm-panel aria-labelledby="workspace-settings-title">
+        <mm-select
+          :model-value="workspaceMode"
+          label="Default workspace"
+          :options="workspaceOptions"
+          hint="Choose how MediaManagarr opens when you click its toolbar icon."
+          :disabled="workspaceLoading || workspaceSaving"
+          :loading="workspaceLoading"
+          @update:model-value="updateWorkspaceMode"
+        />
+
+        <div class="settings-section__actions">
+          <h3 class="settings-section__title">Open workspace</h3>
+
+          <mm-button variant="secondary" block @click="openSidebar"> Open Sidebar </mm-button>
+
+          <mm-button variant="secondary" block @click="openDetached">
+            Open Detached Window
+          </mm-button>
+        </div>
+
+        <p v-if="workspaceError" class="settings-section__error" role="alert">
+          {{ workspaceError }}
+        </p>
+
+        <p v-if="workspaceSuccess" class="settings-section__success" role="status">
+          {{ workspaceSuccess }}
+        </p>
+      </mm-panel>
+    </section>
   </mm-settings-template>
 </template>
+
+<style scoped>
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.settings-section__title {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-section__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-section__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--font-size-sm);
+}
+
+.settings-section__success {
+  margin: 0;
+  color: var(--success);
+  font-size: var(--font-size-sm);
+}
+</style>
