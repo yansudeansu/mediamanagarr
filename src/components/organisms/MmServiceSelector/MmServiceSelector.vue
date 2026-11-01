@@ -1,25 +1,29 @@
 <script setup lang="ts">
 import MmServiceCard from '../../molecules/MmServiceCard/MmServiceCard.vue'
-import { SERVICES, SERVICE_REGISTRY } from '../../../services/registry'
-import type { ServiceId, ServiceState } from '../../../types/service'
+
+export interface ServiceSelectorItem {
+  id: string
+  name: string
+  status: 'connected' | 'failed' | 'configured' | 'not-configured'
+}
 
 interface Props {
-  modelValue?: ServiceId | null
-  statuses?: Partial<Record<ServiceId, ServiceState>>
+  modelValue?: string | null
+  services?: ServiceSelectorItem[]
   disabled?: boolean
 }
 
 withDefaults(defineProps<Props>(), {
   modelValue: null,
-  statuses: () => ({}),
+  services: () => [],
   disabled: false,
 })
 
 const emit = defineEmits<{
-  'update:modelValue': [value: ServiceId]
+  'update:modelValue': [value: string]
 }>()
 
-function selectService(serviceId: ServiceId) {
+function selectService(serviceId: string): void {
   emit('update:modelValue', serviceId)
 }
 </script>
@@ -28,13 +32,13 @@ function selectService(serviceId: ServiceId) {
   <div class="service-selector">
     <div class="service-selector__list" role="group" aria-label="Service connections">
       <mm-service-card
-        v-for="serviceId in SERVICES"
-        :key="serviceId"
-        :service="SERVICE_REGISTRY[serviceId]"
-        :status="statuses[serviceId] ?? 'not-configured'"
-        :selected="modelValue === serviceId"
+        v-for="service in services"
+        :key="service.id"
+        :name="service.name"
+        :status="service.status"
+        :selected="modelValue === service.id"
         :disabled="disabled"
-        @select="selectService(serviceId)"
+        @select="selectService(service.id)"
       />
     </div>
   </div>

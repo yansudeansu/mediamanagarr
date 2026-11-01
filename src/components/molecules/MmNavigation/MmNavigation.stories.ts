@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
-import { ref, watch } from 'vue'
 import { fn } from 'storybook/test'
 import MmNavigation from './MmNavigation.vue'
 import type { TabItem } from '../MmTabs/MmTabs.vue'
+import { useArgs } from 'storybook/internal/preview-api'
 
 const defaultItems: TabItem[] = [
   { id: 'overview', label: 'Overview' },
@@ -65,40 +65,34 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
-  render: (args) => ({
-    components: { MmNavigation },
+  render: (args) => {
+    const [, updateArgs] = useArgs()
 
-    setup() {
-      const activeView = ref(args.activeView)
+    return {
+      components: { MmNavigation },
 
-      watch(
-        () => args.activeView,
-        (value) => {
-          activeView.value = value
-        },
-      )
+      setup() {
+        function handleNavigate(view: string): void {
+          updateArgs({ activeView: view })
+          args.onNavigate?.(view)
+        }
 
-      function handleNavigate(view: string): void {
-        activeView.value = view
-        args.onNavigate?.(view)
-      }
+        return {
+          args,
+          handleNavigate,
+        }
+      },
 
-      return {
-        args,
-        activeView,
-        handleNavigate,
-      }
-    },
-
-    template: `
-      <mm-navigation
-        :active-view="activeView"
-        :items="args.items"
-        :label="args.label"
-        @navigate="handleNavigate"
-      />
-    `,
-  }),
+      template: `
+        <mm-navigation
+          :active-view="args.activeView"
+          :items="args.items"
+          :label="args.label"
+          @navigate="handleNavigate"
+        />
+      `,
+    }
+  },
 }
 
 export const Overview: Story = {}

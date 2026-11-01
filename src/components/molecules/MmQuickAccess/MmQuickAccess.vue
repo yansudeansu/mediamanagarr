@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { nextTick, onBeforeUnmount, ref } from 'vue'
 import MmButton from '../../atoms/MmButton/MmButton.vue'
 import MmIcon from '../../atoms/MmIcon/MmIcon.vue'
-import { SERVICE_REGISTRY, SERVICES } from '../../../services/registry'
-import { normalizeServerUrl } from '../../../utils/service-config'
-import type { SafeServiceConfigs } from '../../../types/service'
 
-interface Props {
-  services: SafeServiceConfigs
+export interface QuickAccessItem {
+  id: string
+  label: string
+  href: string
 }
 
-const props = defineProps<Props>()
+interface Props {
+  items: QuickAccessItem[]
+}
+
+defineProps<Props>()
 
 const emit = defineEmits<{
   settings: []
@@ -19,28 +22,6 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const triggerRef = ref<InstanceType<typeof MmButton> | null>(null)
 const menuRef = ref<HTMLElement | null>(null)
-
-const configuredServices = computed(() =>
-  SERVICES.flatMap((serviceId) => {
-    const config = props.services[serviceId]
-
-    if (!config?.configured) {
-      return []
-    }
-
-    try {
-      return [
-        {
-          id: serviceId,
-          name: SERVICE_REGISTRY[serviceId].name,
-          url: normalizeServerUrl(config.url),
-        },
-      ]
-    } catch {
-      return []
-    }
-  }),
-)
 
 function getTriggerElement(): HTMLButtonElement | null {
   const element = triggerRef.value?.$el
@@ -102,6 +83,19 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
+function handleFocusOut(event: FocusEvent): void {
+  const nextTarget = event.relatedTarget
+
+  if (
+    nextTarget instanceof Node &&
+    (menuRef.value?.contains(nextTarget) || getTriggerElement()?.contains(nextTarget))
+  ) {
+    return
+  }
+
+  closeMenu()
+}
+
 function openSettings(): void {
   closeMenu()
   emit('settings')
@@ -111,14 +105,14 @@ onBeforeUnmount(removeDocumentListeners)
 </script>
 
 <template>
-  <div class="quick-access">
+  <div class="quick-access" @focusout="handleFocusOut">
     <mm-button
       ref="triggerRef"
       variant="secondary"
       icon="menu"
       icon-only
       aria-label="Open workspace menu"
-      aria-controls="quick-access-menu"
+      :aria-controls="isOpen ? 'quick-access-menu' : undefined"
       :aria-expanded="isOpen"
       @click="toggleMenu"
     />
@@ -128,23 +122,21 @@ onBeforeUnmount(removeDocumentListeners)
 
       <div class="quick-access__services">
         <a
-          v-for="service in configuredServices"
-          :key="service.id"
+          v-for="item in items"
+          :key="item.id"
           class="quick-access__item"
-          :href="service.url"
+          :href="item.href"
           target="_blank"
           rel="noopener noreferrer"
-          :aria-label="`Open ${service.name} in a new tab`"
+          :aria-label="`Open ${item.label} in a new tab`"
           @click="closeMenu()"
         >
-          <span class="quick-access__name">{{ service.name }}</span>
+          <span class="quick-access__name">{{ item.label }}</span>
 
           <mm-icon name="external-link" :size="15" />
         </a>
 
-        <p v-if="configuredServices.length === 0" class="quick-access__empty">
-          No services configured
-        </p>
+        <p v-if="items.length === 0" class="quick-access__empty">No links available</p>
       </div>
 
       <div class="quick-access__separator" />

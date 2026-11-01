@@ -1,5 +1,6 @@
 <script setup lang="ts">
 interface Props {
+  brand: string
   version?: string
 }
 
@@ -10,7 +11,7 @@ withDefaults(defineProps<Props>(), {
 
 <template>
   <footer class="footer">
-    <span class="footer__brand">MediaManagarr</span>
+    <span class="footer__brand">{{ brand }}</span>
 
     <span v-if="version" class="footer__version">v{{ version }}</span>
   </footer>

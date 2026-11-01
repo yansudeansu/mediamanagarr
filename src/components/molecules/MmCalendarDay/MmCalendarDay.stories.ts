@@ -1,23 +1,24 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
+import { fn } from 'storybook/test'
 import MmCalendarDay from './MmCalendarDay.vue'
 import type { CalendarItem } from '../../../types/calendar'
 
 const tvItem: CalendarItem = {
-  id: 'sonarr-101',
+  id: 'episode-101',
   source: 'sonarr',
   type: 'tv',
-  title: 'TV Show 1',
-  subtitle: 'S01E01 · Episode 1',
+  title: 'Example Series',
+  subtitle: 'S01E01 · Pilot',
   date: '2026-11-05',
   releaseType: 'air',
   posterUrl: null,
 }
 
 const movieItem: CalendarItem = {
-  id: 'radarr-201',
+  id: 'movie-201',
   source: 'radarr',
   type: 'movie',
-  title: 'Movie 1',
+  title: 'Example Movie',
   subtitle: '2026',
   date: '2026-11-05',
   releaseType: 'digital',
@@ -35,6 +36,35 @@ const meta = {
     isToday: false,
     isSelected: false,
     isOutsideMonth: false,
+    tooltipId: undefined,
+    onSelect: fn(),
+    onPreview: fn(),
+  },
+  argTypes: {
+    date: {
+      control: 'text',
+      description: 'Calendar date in YYYY-MM-DD format.',
+    },
+    day: {
+      control: { type: 'number', min: 1, max: 31 },
+    },
+    items: {
+      control: 'object',
+      description: 'Releases scheduled for this date.',
+    },
+    isToday: {
+      control: 'boolean',
+    },
+    isSelected: {
+      control: 'boolean',
+    },
+    isOutsideMonth: {
+      control: 'boolean',
+    },
+    tooltipId: {
+      control: 'text',
+      description: 'ID of an associated tooltip, when present.',
+    },
   },
   parameters: {
     layout: 'centered',

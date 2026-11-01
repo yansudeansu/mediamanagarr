@@ -32,6 +32,16 @@ const meta = {
     date: '2026-11-05',
     items: [tvItem, movieItem],
   },
+  argTypes: {
+    date: {
+      control: 'text',
+      description: 'Calendar date in YYYY-MM-DD format.',
+    },
+    items: {
+      control: 'object',
+      description: 'Releases to display in the tooltip.',
+    },
+  },
 } satisfies Meta<typeof MmCalendarTooltip>
 
 export default meta
@@ -39,6 +49,12 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Default: Story = {}
+
+export const Empty: Story = {
+  args: {
+    items: [],
+  },
+}
 
 export const TvOnly: Story = {
   args: {

@@ -1,31 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmStatusBadge from './MmStatusBadge.vue'
-import type { ServiceState } from '../../../types/service'
 
 describe('MmStatusBadge', () => {
-  const statuses: {
-    status: ServiceState
-    label: string
-  }[] = [
-    { status: 'not-configured', label: 'Not set' },
-    { status: 'configured', label: 'Configured' },
-    { status: 'connected', label: 'Connected' },
-    { status: 'failed', label: 'Failed' },
-  ]
+  const variants = [
+    { variant: 'neutral', label: 'Not set' },
+    { variant: 'info', label: 'Configured' },
+    { variant: 'success', label: 'Connected' },
+    { variant: 'danger', label: 'Failed' },
+  ] as const
 
-  it.each(statuses)('renders the $status status', ({ status, label }) => {
+  it.each(variants)('renders the $variant variant', ({ variant, label }) => {
     const wrapper = mount(MmStatusBadge, {
-      props: { status },
+      props: { variant, label },
     })
 
     expect(wrapper.get('.status-badge__label').text()).toBe(label)
-    expect(wrapper.get('.status-badge').classes()).toContain(`status-badge--${status}`)
+    expect(wrapper.get('.status-badge').classes()).toContain(`status-badge--${variant}`)
   })
 
   it('renders a status indicator dot', () => {
     const wrapper = mount(MmStatusBadge, {
-      props: { status: 'connected' },
+      props: { variant: 'success', label: 'Connected' },
     })
 
     expect(wrapper.find('.status-badge__dot').exists()).toBe(true)
@@ -33,39 +29,40 @@ describe('MmStatusBadge', () => {
 
   it('hides the decorative dot from screen readers', () => {
     const wrapper = mount(MmStatusBadge, {
-      props: { status: 'connected' },
+      props: { variant: 'success', label: 'Connected' },
     })
 
     expect(wrapper.get('.status-badge__dot').attributes('aria-hidden')).toBe('true')
   })
 
-  it('exposes the status as readable text', () => {
+  it('exposes the label as readable text', () => {
     const wrapper = mount(MmStatusBadge, {
-      props: { status: 'connected' },
+      props: { variant: 'success', label: 'Connected' },
     })
 
     expect(wrapper.text()).toBe('Connected')
   })
 
-  it('updates when the status changes', async () => {
+  it('updates when the variant and label change', async () => {
     const wrapper = mount(MmStatusBadge, {
-      props: { status: 'configured' },
+      props: { variant: 'info', label: 'Configured' },
     })
 
     expect(wrapper.text()).toBe('Configured')
 
     await wrapper.setProps({
-      status: 'connected',
+      variant: 'success',
+      label: 'Connected',
     })
 
     expect(wrapper.text()).toBe('Connected')
-    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--connected')
-    expect(wrapper.get('.status-badge').classes()).not.toContain('status-badge--configured')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--success')
+    expect(wrapper.get('.status-badge').classes()).not.toContain('status-badge--info')
   })
 
   it('renders as an inline element', () => {
     const wrapper = mount(MmStatusBadge, {
-      props: { status: 'failed' },
+      props: { variant: 'danger', label: 'Failed' },
     })
 
     expect(wrapper.element.tagName).toBe('SPAN')
@@ -73,69 +70,69 @@ describe('MmStatusBadge', () => {
 
   it('does not render an interactive control', () => {
     const wrapper = mount(MmStatusBadge, {
-      props: { status: 'not-configured' },
+      props: { variant: 'neutral', label: 'Not set' },
     })
 
     expect(wrapper.find('button').exists()).toBe(false)
     expect(wrapper.find('a').exists()).toBe(false)
   })
 
-  it('uses a custom label when provided', () => {
+  it('supports custom labels independent of the visual variant', () => {
     const wrapper = mount(MmStatusBadge, {
       props: {
-        status: 'configured',
-        customLabel: 'Not checked yet',
+        variant: 'info',
+        label: 'Not checked yet',
       },
     })
 
     expect(wrapper.get('.status-badge__label').text()).toBe('Not checked yet')
-    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--configured')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--info')
   })
 
-  it('preserves the status styling when using a custom label', () => {
+  it('preserves the variant styling with a descriptive label', () => {
     const wrapper = mount(MmStatusBadge, {
       props: {
-        status: 'failed',
-        customLabel: 'Connection failed',
+        variant: 'danger',
+        label: 'Connection failed',
       },
     })
 
     expect(wrapper.get('.status-badge__label').text()).toBe('Connection failed')
-    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--failed')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--danger')
     expect(wrapper.get('.status-badge__dot').attributes('aria-hidden')).toBe('true')
   })
 
-  it('updates when the custom label changes', async () => {
+  it('updates when the label changes', async () => {
     const wrapper = mount(MmStatusBadge, {
       props: {
-        status: 'configured',
-        customLabel: 'Not checked yet',
+        variant: 'info',
+        label: 'Not checked yet',
       },
     })
 
     expect(wrapper.get('.status-badge__label').text()).toBe('Not checked yet')
 
     await wrapper.setProps({
-      customLabel: 'Checking connection',
+      label: 'Checking connection',
     })
 
     expect(wrapper.get('.status-badge__label').text()).toBe('Checking connection')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--info')
   })
 
-  it('falls back to the default label when the custom label is removed', async () => {
+  it('updates the label independently of the variant', async () => {
     const wrapper = mount(MmStatusBadge, {
       props: {
-        status: 'configured',
-        customLabel: 'Not checked yet',
+        variant: 'info',
+        label: 'Pending',
       },
     })
 
-    expect(wrapper.get('.status-badge__label').text()).toBe('Not checked yet')
-
     await wrapper.setProps({
-      customLabel: undefined,
+      label: 'Ready',
     })
 
-    expect(wrapper.get('.status-badge__label').text()).toBe('Configured')
+    expect(wrapper.get('.status-badge__label').text()).toBe('Ready')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--info')
   })
 })

@@ -77,64 +77,7 @@ Each pull request should contribute toward the target architecture while remaini
 - Prefer consolidating related controls over adding more buttons to an already compact interface.
 - Keep major features in separate, focused pull requests.
 
-## 1. Component Cleanup & Responsibility Boundaries
-
-**Priority: Medium / Incremental**
-
-Review the existing Vue components and simplify their responsibilities.
-
-The goal is to make reusable components primarily presentational and data-driven, while keeping feature behavior in views and application-level coordination in App.
-
-This is an incremental cleanup effort, not a requirement to rewrite the component library.
-
-### Reusable Components
-
-- Review atoms, molecules, organisms, and templates for unnecessary application-specific logic.
-- Prefer components that receive data through props and slots.
-- Communicate user interactions through clearly defined events.
-- Keep components independent of service configuration, background messaging, and browser storage wherever practical.
-- Avoid components directly opening workspaces, navigating application views, or communicating with external services.
-- Keep local UI behavior inside components when appropriate, such as dropdown visibility, keyboard interaction, focus management, and presentation state.
-- Avoid moving every small interaction into a view when doing so would make components harder to reuse.
-- Remove obsolete props, events, controls, and component-specific workarounds.
-- Consolidate duplicated presentation logic and CSS where it provides a clear benefit.
-- Prefer existing shared components over introducing near-duplicates.
-- Keep component APIs small, predictable, and appropriately typed.
-
-### Views & Application Logic
-
-- Let views own feature-specific state, data loading, and user workflows.
-- Let views coordinate reusable components and translate their events into feature actions.
-- Keep App responsible for application-level navigation, Settings visibility, workspace transitions, and shared application state.
-- Avoid moving feature-specific implementation details into App.
-- Keep persistence, browser-specific operations, and external API communication in shared utilities or background services.
-- Extract composables when behavior is genuinely shared or a view becomes difficult to maintain.
-- Avoid introducing composables solely to make components appear smaller.
-- Prefer clear ownership over rigid rules about file size or component complexity.
-
-### Component Testing
-
-- Focus component tests on observable behavior, rendered output, accessibility, props, and emitted events.
-- Avoid coupling parent component tests to the implementation details of their children.
-- Introduce reusable selector objects to make component tests easier to read and maintain.
-- Prefer stable, meaningful selectors over fragile DOM structure assumptions.
-- Keep tests independent of unrelated child component implementations where practical.
-- Preserve existing useful coverage while improving test structure incrementally.
-- Avoid rewriting working tests solely to adopt a new testing convention.
-- Continue using Storybook to document component states and interactions.
-
-### Cleanup Boundaries
-
-- Review components as related features are updated rather than migrating everything at once.
-- Keep cleanup pull requests focused and independently reviewable.
-- Preserve existing behavior, accessibility, and visual consistency.
-- Avoid unnecessary component splitting, wrapper components, and speculative abstractions.
-- Do not introduce a new state management library without a demonstrated need.
-- Treat simple, understandable code as the preferred outcome.
-
-The intended result is a component library that is easy to reuse, views that clearly own feature behavior, and an App component that coordinates the application without becoming responsible for every feature.
-
-## 2. Testing & Accessibility
+## 1. Testing & Accessibility
 
 **Priority: Ongoing / Pre-release**
 
@@ -168,7 +111,7 @@ Build on the existing Vitest and Storybook coverage with browser-level testing a
 
 Testing and accessibility remain ongoing requirements throughout every milestone.
 
-## 3. Extensible Integrations
+## 2. Extensible Integrations
 
 **Priority: Medium / Incremental**
 
@@ -187,7 +130,7 @@ Make it easier for contributors to add new integrations without rewriting existi
 
 Introduce provider abstractions incrementally as real integrations require them.
 
-## 4. Branding & Documentation
+## 3. Branding & Documentation
 
 **Priority: Pre-release**
 
@@ -203,7 +146,7 @@ Prepare MediaManagarr for a wider audience.
 - Document the service registry and integration architecture.
 - Review screenshots and other release materials.
 
-## 5. Release & Distribution
+## 4. Release & Distribution
 
 **Priority: Pre-release**
 
@@ -218,7 +161,7 @@ Prepare and publish MediaManagarr for supported browsers.
 - Prepare Firefox Add-ons and Chrome Web Store submissions.
 - Document release and distribution procedures.
 
-## 6. Future Possibilities
+## 5. Future Possibilities
 
 Ideas that may be explored after the initial release or when there is sufficient demand.
 
@@ -240,19 +183,7 @@ Future features will be prioritized based on user feedback and practical value r
 
 ## Implementation Plan
 
-### Phase 1 — Component Cleanup
-
-- Review reusable components for unnecessary feature-specific logic.
-- Clarify ownership between components, views, App, utilities, and background services.
-- Remove obsolete component APIs and duplicated presentation logic.
-- Introduce selector objects for component tests.
-- Preserve behavior and existing useful test coverage.
-
-**Suggested PR:** `refactor/component-cleanup`
-
-Component cleanup may also be performed incrementally alongside other phases when directly relevant.
-
-### Phase 2 — Testing & Accessibility
+### Phase 1 — Testing & Accessibility
 
 - Expand existing tests to cover new functionality.
 - Introduce browser-level end-to-end testing.
@@ -260,13 +191,13 @@ Component cleanup may also be performed incrementally alongside other phases whe
 - Complete cross-browser and manual accessibility audits.
 - Verify workspace behavior in supported browsers.
 
-### Phase 3 — Extensibility & Documentation
+### Phase 2 — Extensibility & Documentation
 
 - Introduce shared provider interfaces where needed.
 - Document how to add integrations and navigation features.
 - Refine branding, configuration guides, and troubleshooting documentation.
 
-### Phase 4 — Release & Distribution
+### Phase 3 — Release & Distribution
 
 - Validate release automation and extension packages.
 - Complete installation and upgrade testing.
@@ -294,13 +225,11 @@ Component cleanup may also be performed incrementally alongside other phases whe
 
 ## Suggested GitHub Issues
 
-1. `refactor: simplify component responsibilities and remove obsolete APIs`
-2. `test: introduce reusable component selector objects`
-3. `test: introduce browser-level end-to-end testing`
-4. `test: expand automated accessibility checks`
-5. `refactor: introduce extensible provider interfaces`
-6. `docs: improve integration and contributor documentation`
-7. `chore: prepare browser store releases`
+1. `test: introduce browser-level end-to-end testing`
+2. `test: expand automated accessibility checks`
+3. `refactor: introduce extensible provider interfaces`
+4. `docs: improve integration and contributor documentation`
+5. `chore: prepare browser store releases`
 
 ---
 

@@ -92,6 +92,83 @@ describe('MmRequestView', () => {
     expect(wrapper.text()).toContain('The Last of Us')
   })
 
+  it('maps Seerr request fields to the generic card data', async () => {
+    const wrapper = mount(MmRequestView)
+    await flushPromises()
+
+    const cards = wrapper.findAllComponents(MmRequestCard)
+
+    expect(cards[0]?.props('request')).toEqual({
+      title: 'Dune: Part Two',
+      type: 'movie',
+      posterUrl: null,
+      status: 'Approved',
+      mediaStatus: 'Available',
+      requestedBy: 'Alice',
+      createdAt: '2026-10-20T12:00:00.000Z',
+    })
+
+    expect(cards[1]?.props('request')).toEqual({
+      title: 'The Last of Us',
+      type: 'tv',
+      posterUrl: null,
+      status: 'Pending',
+      mediaStatus: 'Pending',
+      requestedBy: 'Bob',
+      createdAt: '2026-10-19T09:30:00.000Z',
+    })
+  })
+
+  it('converts a relative poster path into a TMDB image URL', async () => {
+    mockSuccessfulLoad(
+      requestsPage([
+        {
+          ...mockRequests[0]!,
+          posterPath: '/example-poster.jpg',
+        },
+      ]),
+    )
+
+    const wrapper = mount(MmRequestView)
+    await flushPromises()
+
+    expect(wrapper.getComponent(MmRequestCard).props('request').posterUrl).toBe(
+      'https://image.tmdb.org/t/p/w185/example-poster.jpg',
+    )
+  })
+
+  it('passes null when the poster path is missing', async () => {
+    const wrapper = mount(MmRequestView)
+    await flushPromises()
+
+    const cards = wrapper.findAllComponents(MmRequestCard)
+
+    expect(cards[0]?.props('request').posterUrl).toBeNull()
+    expect(cards[1]?.props('request').posterUrl).toBeNull()
+  })
+
+  it.each([
+    ['absolute HTTP URL', 'http://untrusted.example.com/poster.jpg'],
+    ['absolute HTTPS URL', 'https://untrusted.example.com/poster.jpg'],
+    ['protocol-relative URL', '//untrusted.example.com/poster.jpg'],
+    ['relative path without leading slash', 'poster.jpg'],
+    ['backslash-prefixed path', '\\untrusted.example.com\\poster.jpg'],
+  ])('rejects an unsafe %s', async (_description, posterPath) => {
+    mockSuccessfulLoad(
+      requestsPage([
+        {
+          ...mockRequests[0]!,
+          posterPath,
+        },
+      ]),
+    )
+
+    const wrapper = mount(MmRequestView)
+    await flushPromises()
+
+    expect(wrapper.getComponent(MmRequestCard).props('request').posterUrl).toBeNull()
+  })
+
   it('shows a loading state while fetching requests', async () => {
     const pending = deferredResponse<{
       success: true

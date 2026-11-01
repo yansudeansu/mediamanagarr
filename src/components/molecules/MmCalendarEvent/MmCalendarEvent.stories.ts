@@ -3,10 +3,10 @@ import MmCalendarEvent from './MmCalendarEvent.vue'
 import type { CalendarItem } from '../../../types/calendar'
 
 const tvItem: CalendarItem = {
-  id: 'sonarr-101',
+  id: 'episode-101',
   source: 'sonarr',
   type: 'tv',
-  title: 'TV Show 1',
+  title: 'Example Series',
   subtitle: 'S02E03 · Episode 3',
   date: '2026-11-05T20:00:00Z',
   releaseType: 'air',
@@ -14,10 +14,10 @@ const tvItem: CalendarItem = {
 }
 
 const digitalMovie: CalendarItem = {
-  id: 'radarr-201',
+  id: 'movie-201',
   source: 'radarr',
   type: 'movie',
-  title: 'Movie 1',
+  title: 'Example Movie',
   subtitle: '2026',
   date: '2026-11-05',
   releaseType: 'digital',
@@ -40,6 +40,16 @@ const meta = {
   args: {
     item: tvItem,
     image: null,
+  },
+  argTypes: {
+    item: {
+      control: 'object',
+      description: 'Calendar release to display.',
+    },
+    image: {
+      control: 'text',
+      description: 'Optional poster image URL.',
+    },
   },
   parameters: {
     layout: 'centered',
@@ -67,8 +77,8 @@ export const PhysicalMovie: Story = {
   args: {
     item: {
       ...digitalMovie,
-      id: 'radarr-202',
-      title: 'Movie 2',
+      id: 'movie-202',
+      title: 'Example Movie 2',
       releaseType: 'physical',
     },
   },
@@ -76,14 +86,14 @@ export const PhysicalMovie: Story = {
 
 export const TvWithPoster: Story = {
   args: {
-    image: createPoster('TV Show 1'),
+    image: createPoster('SERIES'),
   },
 }
 
 export const MovieWithPoster: Story = {
   args: {
     item: digitalMovie,
-    image: createPoster('Movie 1'),
+    image: createPoster('MOVIE'),
   },
 }
 
@@ -91,7 +101,7 @@ export const LongTitle: Story = {
   args: {
     item: {
       ...tvItem,
-      title: 'TV Show 1 — Extended Edition With an Extremely Long Title for Layout Testing',
+      title: 'Example Series — Extended Edition With an Extremely Long Title for Layout Testing',
       subtitle: 'S12E24 · Episode 24 With an Extremely Long Subtitle for Layout Testing',
     },
   },

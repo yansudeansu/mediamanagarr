@@ -68,11 +68,14 @@ describe('MmSelect', () => {
       expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
     })
 
-    it('shows an empty state when no options are available', async () => {
+    it('does not open the dropdown when no options are available', async () => {
       const wrapper = createWrapper({ options: [] })
+
       await wrapper.get('.select-field__trigger').trigger('click')
 
-      expect(wrapper.get('.select-field__empty').text()).toBe('No options available')
+      expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
+      expect(wrapper.get('.select-field__trigger').attributes('aria-expanded')).toBe('false')
+      expect(wrapper.get('.select-field__value').text()).toBe('Select an option')
     })
 
     it('reacts when its model value changes', async () => {

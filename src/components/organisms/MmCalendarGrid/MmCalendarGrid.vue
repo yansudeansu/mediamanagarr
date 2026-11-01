@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 import MmCalendarDay from '../../molecules/MmCalendarDay/MmCalendarDay.vue'
 import MmCalendarTooltip from '../../molecules/MmCalendarTooltip/MmCalendarTooltip.vue'
 import type { CalendarItem } from '../../../types/calendar'
@@ -32,6 +32,7 @@ const gridRef = ref<HTMLElement | null>(null)
 const activePreviewDate = ref<string | null>(null)
 const tooltipLeft = ref(0)
 const tooltipTop = ref(0)
+const tooltipId = useId()
 
 const TOOLTIP_WIDTH = 220
 const TOOLTIP_GAP = 8
@@ -132,6 +133,7 @@ async function showPreview(date: string): Promise<void> {
   )
 
   if (!button) {
+    activePreviewDate.value = null
     return
   }
 
@@ -191,7 +193,7 @@ watch(
         :is-today="day.date === today"
         :is-selected="day.date === selectedDate"
         :is-outside-month="day.isOutsideMonth"
-        :tooltip-id="activePreviewDate === day.date ? 'calendar-day-tooltip' : undefined"
+        :tooltip-id="activePreviewDate === day.date ? tooltipId : undefined"
         @select="selectDate"
         @preview="showPreview"
         @hide-preview="hidePreview"
@@ -206,11 +208,7 @@ watch(
         top: `${tooltipTop}px`,
       }"
     >
-      <mm-calendar-tooltip
-        id="calendar-day-tooltip"
-        :date="activePreviewDate"
-        :items="previewItems"
-      />
+      <mm-calendar-tooltip :id="tooltipId" :date="activePreviewDate" :items="previewItems" />
     </div>
   </section>
 </template>

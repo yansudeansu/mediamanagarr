@@ -5,10 +5,17 @@ import MmButton from '../../atoms/MmButton/MmButton.vue'
 import MmTransferStats from '../../molecules/MmTransferStats/MmTransferStats.vue'
 import MmTorrentList from '../../organisms/MmTorrentList/MmTorrentList.vue'
 import MmTorrentConfirmation from '../../molecules/MmTorrentConfirmation/MmTorrentConfirmation.vue'
-import type { QBittorrentTorrent } from '../../../types/qbittorrent'
+import type { TorrentCardData } from '../../molecules/MmTorrentCard/MmTorrentCard.vue'
+import type { ConfirmationItem } from '../../molecules/MmTorrentConfirmation/MmTorrentConfirmation.vue'
 
-function createTorrent(index: number): QBittorrentTorrent {
-  const states = ['downloading', 'stalledDL', 'uploading', 'stoppedDL'] as const
+function createTorrent(index: number): TorrentCardData {
+  const states = ['downloading', 'neutral', 'seeding', 'stopped'] as const
+
+  const statusLabels = ['Downloading', 'Stalled', 'Seeding', 'Stopped'] as const
+
+  const stateIndex = (index - 1) % states.length
+  const statusVariant = states[stateIndex]!
+  const statusLabel = statusLabels[stateIndex]!
 
   const isMovie = index % 2 !== 0
   const mediaNumber = Math.ceil(index / 2)
@@ -17,20 +24,25 @@ function createTorrent(index: number): QBittorrentTorrent {
     ? `Movie ${mediaNumber} (2026) 1080p WEB-DL`
     : `TV Show ${mediaNumber} S01E01 1080p WEB-DL`
 
+  const progress = Math.min(1, index / 20)
+  const stopped = statusVariant === 'stopped'
+
   return {
-    hash: index.toString(16).padStart(40, '0'),
+    id: index.toString(16).padStart(40, '0'),
     name,
-    progress: Math.min(1, index / 20),
-    state: states[(index - 1) % states.length],
-    downloadSpeed: index % 4 === 0 ? 0 : 1024 * 1024 * index,
-    uploadSpeed: index % 3 === 0 ? 512 * 1024 : 0,
-    eta: index * 600,
-    size: 1024 ** 3,
-    downloaded: Math.min(1, index / 20) * 1024 ** 3,
+    statusLabel,
+    statusVariant,
+    progress: progress * 100,
+    progressLabel: `${(progress * 100).toFixed(1)}%`,
+    sizeLabel: `${Math.round(progress * 1024)} MiB / 1.0 GiB`,
+    downloadSpeedLabel: index % 4 === 0 ? '0 B/s' : `${index}.0 MiB/s`,
+    uploadSpeedLabel: index % 3 === 0 ? '512 KiB/s' : '0 B/s',
+    etaLabel: `${index * 10}m`,
+    primaryActionLabel: stopped ? 'Start' : 'Stop',
   }
 }
 
-function createTorrents(count: number): QBittorrentTorrent[] {
+function createTorrents(count: number): TorrentCardData[] {
   return Array.from({ length: count }, (_, index) => createTorrent(index + 1))
 }
 
@@ -68,29 +80,56 @@ export const Default: Story = {
 
     setup() {
       const page = ref(1)
-      const selectedTorrent = ref<QBittorrentTorrent | null>(null)
+      const torrents = ref<TorrentCardData[]>([...mockTorrents])
+      const selectedTorrent = ref<ConfirmationItem | null>(null)
 
-      function selectTorrent(hash: string) {
-        selectedTorrent.value = mockTorrents.find((torrent) => torrent.hash === hash) ?? null
+      function selectTorrent(id: string): void {
+        const torrent = torrents.value.find((item) => item.id === id)
+
+        selectedTorrent.value = torrent ? { id: torrent.id, name: torrent.name } : null
       }
 
-      function confirmRemoval() {
+      function confirmRemoval(payload: { id: string; deleteFiles: boolean }): void {
+        torrents.value = torrents.value.filter((torrent) => torrent.id !== payload.id)
+
         selectedTorrent.value = null
+      }
+
+      function handlePrimaryAction(id: string): void {
+        torrents.value = torrents.value.map((torrent) => {
+          if (torrent.id !== id) {
+            return torrent
+          }
+
+          const stopped = torrent.primaryActionLabel === 'Start'
+
+          return {
+            ...torrent,
+            statusLabel: stopped ? 'Downloading' : 'Stopped',
+            statusVariant: stopped ? ('downloading' as const) : ('stopped' as const),
+            primaryActionLabel: stopped ? 'Stop' : 'Start',
+          }
+        })
       }
 
       return {
         page,
-        mockTorrents,
+        torrents,
         selectedTorrent,
         selectTorrent,
         confirmRemoval,
+        handlePrimaryAction,
       }
     },
 
     template: `
       <MmDownloadsTemplate>
         <template #actions>
-          <MmButton variant="secondary" size="small" icon="refresh">
+          <MmButton
+            variant="secondary"
+            size="small"
+            icon="refresh"
+          >
             Refresh
           </MmButton>
         </template>
@@ -104,7 +143,13 @@ export const Default: Story = {
 
         <template v-if="selectedTorrent" #confirmation>
           <MmTorrentConfirmation
-            :torrent="selectedTorrent"
+            :item="selectedTorrent"
+            title="Remove torrent?"
+            description="Remove this torrent from the download client."
+            delete-files-label="Also delete downloaded files"
+            delete-files-hint="Permanently delete downloaded data."
+            delete-files-warning="This cannot be undone."
+            confirm-label="Remove torrent"
             @cancel="selectedTorrent = null"
             @confirm="confirmRemoval"
           />
@@ -112,7 +157,8 @@ export const Default: Story = {
 
         <MmTorrentList
           v-model:page="page"
-          :torrents="mockTorrents"
+          :torrents="torrents"
+          @primary-action="handlePrimaryAction"
           @remove="selectTorrent"
         />
       </MmDownloadsTemplate>
@@ -179,7 +225,7 @@ export const Error: Story = {
     setup() {
       const retrying = ref(false)
 
-      function retry() {
+      function retry(): void {
         retrying.value = true
       }
 
@@ -192,7 +238,9 @@ export const Error: Story = {
     template: `
       <MmDownloadsTemplate>
         <div role="alert">
-          <p style="margin: 0 0 10px; color: var(--danger); font-size: 12px;">
+          <p
+            style="margin: 0 0 10px; color: var(--danger); font-size: 12px;"
+          >
             Unable to load downloads from qBittorrent.
           </p>
 
@@ -221,12 +269,20 @@ export const RemovalConfirmation: Story = {
 
     setup() {
       const page = ref(1)
-      const selectedTorrent = ref<QBittorrentTorrent | null>(mockTorrents[0])
+      const selectedTorrent = ref<ConfirmationItem | null>({
+        id: mockTorrents[0]!.id,
+        name: mockTorrents[0]!.name,
+      })
+
+      function confirmRemoval(): void {
+        selectedTorrent.value = null
+      }
 
       return {
         page,
         mockTorrents,
         selectedTorrent,
+        confirmRemoval,
       }
     },
 
@@ -239,10 +295,17 @@ export const RemovalConfirmation: Story = {
           />
         </template>
 
-        <template #confirmation>
+        <template v-if="selectedTorrent" #confirmation>
           <MmTorrentConfirmation
-            :torrent="selectedTorrent"
+            :item="selectedTorrent"
+            title="Remove torrent?"
+            description="Remove this torrent from the download client."
+            delete-files-label="Also delete downloaded files"
+            delete-files-hint="Permanently delete downloaded data."
+            delete-files-warning="This cannot be undone."
+            confirm-label="Remove torrent"
             @cancel="selectedTorrent = null"
+            @confirm="confirmRemoval"
           />
         </template>
 

@@ -14,12 +14,35 @@ const meta = {
   title: 'Atoms/MediaPoster',
   component: MmMediaPoster,
   tags: ['autodocs'],
+
+  argTypes: {
+    title: {
+      control: 'text',
+      description: 'Media title used for accessible image descriptions.',
+    },
+    type: {
+      control: 'select',
+      options: ['movie', 'tv'],
+      description: 'Media type used to select the placeholder icon.',
+    },
+    image: {
+      control: 'text',
+      description: 'Optional poster image URL. Clear the value to show the placeholder.',
+    },
+    size: {
+      control: 'select',
+      options: ['default', 'small'],
+      description: 'Poster display size.',
+    },
+  },
+
   args: {
-    title: 'Movie 1',
+    title: 'Example Movie',
     type: 'movie',
     image: null,
     size: 'default',
   },
+
   parameters: {
     layout: 'centered',
   },
@@ -29,39 +52,72 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
+/**
+ * Interactive playground for all poster properties.
+ */
+export const Playground: Story = {}
+
+/**
+ * Movie placeholder when no poster image is available.
+ */
 export const MoviePlaceholder: Story = {}
 
+/**
+ * TV placeholder when no poster image is available.
+ */
 export const TvPlaceholder: Story = {
   args: {
-    title: 'TV Show 1',
+    title: 'Example TV Show',
     type: 'tv',
   },
 }
 
+/**
+ * Movie poster with an image.
+ */
 export const MovieWithImage: Story = {
   args: {
-    image: createPoster('Movie 1'),
+    image: createPoster('Movie'),
   },
 }
 
+/**
+ * TV poster with an image.
+ */
 export const TvWithImage: Story = {
   args: {
-    title: 'TV Show 1',
+    title: 'Example TV Show',
     type: 'tv',
-    image: createPoster('TV Show 1'),
+    image: createPoster('TV'),
   },
 }
 
+/**
+ * Small movie placeholder.
+ */
 export const SmallMovie: Story = {
   args: {
     size: 'small',
   },
 }
 
+/**
+ * Small TV placeholder.
+ */
 export const SmallTv: Story = {
   args: {
-    title: 'TV Show 1',
+    title: 'Example TV Show',
     type: 'tv',
+    size: 'small',
+  },
+}
+
+/**
+ * Small poster with an image.
+ */
+export const SmallWithImage: Story = {
+  args: {
+    image: createPoster('Movie'),
     size: 'small',
   },
 }

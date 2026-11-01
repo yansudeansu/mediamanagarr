@@ -1,38 +1,39 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
+import { fn } from 'storybook/test'
 import MmQuickAccess from './MmQuickAccess.vue'
-import type { SafeServiceConfigs } from '../../../types/service'
+import type { QuickAccessItem } from './MmQuickAccess.vue'
 
-const allServices: SafeServiceConfigs = {
-  jellyfin: {
-    url: 'https://media.example.com/jellyfin',
-    configured: true,
+const defaultItems: QuickAccessItem[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    href: 'https://example.com/dashboard',
   },
-  seerr: {
-    url: 'https://requests.example.com:5055',
-    configured: true,
+  {
+    id: 'reports',
+    label: 'Reports',
+    href: 'https://example.com/reports',
   },
-  sonarr: {
-    url: 'http://localhost:8989/sonarr',
-    configured: true,
+  {
+    id: 'documentation',
+    label: 'Documentation',
+    href: 'https://docs.example.com',
   },
-  radarr: {
-    url: 'http://localhost:7878/radarr',
-    configured: true,
-  },
-  qbittorrent: {
-    url: 'http://localhost:8080',
-    configured: true,
-  },
-}
+]
 
-const partialServices: SafeServiceConfigs = {
-  jellyfin: allServices.jellyfin,
-  seerr: allServices.seerr,
-  sonarr: {
-    url: 'http://localhost:8989',
-    configured: false,
+const extendedItems: QuickAccessItem[] = [
+  ...defaultItems,
+  {
+    id: 'projects',
+    label: 'Projects',
+    href: 'https://example.com/projects',
   },
-}
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    href: 'https://example.com/analytics',
+  },
+]
 
 const meta = {
   title: 'Molecules/QuickAccess',
@@ -44,25 +45,28 @@ const meta = {
     docs: {
       description: {
         component:
-          'A compact workspace menu providing shortcuts to configured services and access to Settings. Service URLs are supplied without API keys.',
+          'A compact dropdown menu providing quick access to external links and a Settings action. The parent supplies the links; the component handles menu interaction and accessibility.',
       },
     },
   },
 
+  args: {
+    items: defaultItems,
+    onSettings: fn(),
+  },
+
   argTypes: {
-    services: {
+    items: {
       control: 'object',
-      description: 'Configured services and their safe URLs.',
+      description: 'Links displayed in the menu. Each item requires an id, label, and href.',
     },
 
     onSettings: {
-      action: 'settings',
-      description: 'Emitted when Settings is selected.',
+      description: 'Emitted when the Settings button is selected.',
+      table: {
+        category: 'events',
+      },
     },
-  },
-
-  args: {
-    services: allServices,
   },
 
   decorators: [
@@ -94,51 +98,67 @@ type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {}
 
-export const AllConfigured: Story = {
+export const Default: Story = {}
+
+export const SingleLink: Story = {
   args: {
-    services: allServices,
+    items: [
+      {
+        id: 'dashboard',
+        label: 'Dashboard',
+        href: 'https://example.com/dashboard',
+      },
+    ],
   },
 }
 
-export const PartiallyConfigured: Story = {
+export const MultipleLinks: Story = {
   args: {
-    services: partialServices,
+    items: extendedItems,
   },
 }
 
-export const NoServices: Story = {
+export const NoLinks: Story = {
   args: {
-    services: {},
+    items: [],
   },
 }
 
-export const InvalidUrl: Story = {
+export const CustomLinks: Story = {
   args: {
-    services: {
-      jellyfin: {
-        url: 'javascript:alert(1)',
-        configured: true,
+    items: [
+      {
+        id: 'design-system',
+        label: 'Design System',
+        href: 'https://example.com/design-system',
       },
-      seerr: allServices.seerr,
-    },
+      {
+        id: 'api-reference',
+        label: 'API Reference',
+        href: 'https://example.com/api',
+      },
+      {
+        id: 'support',
+        label: 'Support Center',
+        href: 'https://example.com/support',
+      },
+    ],
   },
 }
 
-export const ReverseProxyUrls: Story = {
+export const LongLabels: Story = {
   args: {
-    services: {
-      jellyfin: {
-        url: 'https://example.com/media/jellyfin',
-        configured: true,
+    items: [
+      {
+        id: 'documentation',
+        label: 'Comprehensive Documentation and Developer Resources',
+        href: 'https://example.com/documentation',
       },
-      sonarr: {
-        url: 'https://example.com/apps/sonarr',
-        configured: true,
+      {
+        id: 'settings-guide',
+        label: 'Advanced Configuration and Administration Guide',
+        href: 'https://example.com/settings-guide',
       },
-      radarr: {
-        url: 'https://example.com/apps/radarr',
-        configured: true,
-      },
-    },
+    ],
   },
 }

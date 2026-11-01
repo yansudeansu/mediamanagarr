@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
+import { useArgs } from 'storybook/preview-api'
 import MmInput from './MmInput.vue'
 
 const meta = {
@@ -63,22 +64,33 @@ const meta = {
     name: 'name',
   },
 
-  render: (args) => ({
-    components: { MmInput },
+  render: (args) => {
+    const [, updateArgs] = useArgs()
 
-    setup() {
-      return { args }
-    },
+    return {
+      components: { MmInput },
 
-    template: `
+      setup() {
+        function updateValue(value: string) {
+          updateArgs({ modelValue: value })
+        }
+
+        return {
+          args,
+          updateValue,
+        }
+      },
+
+      template: `
       <div style="width: 320px; max-width: 100%;">
         <mm-input
           v-bind="args"
-          @update:model-value="args.modelValue = $event"
+          @update:model-value="updateValue"
         />
       </div>
     `,
-  }),
+    }
+  },
 } satisfies Meta<typeof MmInput>
 
 export default meta

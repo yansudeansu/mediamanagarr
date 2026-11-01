@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import MmDownloadsView from './MmDownloadsView.vue'
+import MmTorrentConfirmation from '../components/molecules/MmTorrentConfirmation/MmTorrentConfirmation.vue'
+import MmTorrentList from '../components/organisms/MmTorrentList/MmTorrentList.vue'
+import type { TorrentCardData } from '../components/molecules/MmTorrentCard/MmTorrentCard.vue'
 import type { QBittorrentSnapshot, QBittorrentTorrent } from '../types/qbittorrent'
 import { sendBackgroundMessage } from '../utils/background-messaging'
 import type { BackgroundMessage, BackgroundResponse } from '../types/messages.ts'
@@ -54,6 +57,10 @@ function mockMessages(
     downloadsResponse(),
 ) {
   mockedSendMessage.mockImplementation((message) => Promise.resolve(handler(message)))
+}
+
+function getTorrentCards(wrapper: ReturnType<typeof mount>): TorrentCardData[] {
+  return wrapper.getComponent(MmTorrentList).props('torrents') as TorrentCardData[]
 }
 
 describe('MmDownloadsView', () => {
@@ -135,6 +142,104 @@ describe('MmDownloadsView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('No torrents')
+
+    wrapper.unmount()
+  })
+
+  it('maps qBittorrent data into display-ready torrent cards', async () => {
+    mockMessages()
+
+    const wrapper = mount(MmDownloadsView)
+
+    await flushPromises()
+
+    expect(getTorrentCards(wrapper)).toEqual([
+      {
+        id: torrent.hash,
+        name: torrent.name,
+        statusLabel: 'Downloading',
+        statusVariant: 'downloading',
+        progress: 50,
+        progressLabel: '50.0%',
+        sizeLabel: '512 MiB / 1.0 GiB',
+        downloadSpeedLabel: '1.0 MiB/s',
+        uploadSpeedLabel: '0 B/s',
+        etaLabel: '1h 0m',
+        primaryActionLabel: 'Stop',
+      },
+    ])
+
+    wrapper.unmount()
+  })
+
+  it('maps stopped torrents to start-labelled cards', async () => {
+    mockMessages(() =>
+      downloadsResponse({
+        ...snapshot,
+        torrents: [stoppedTorrent],
+      }),
+    )
+
+    const wrapper = mount(MmDownloadsView)
+
+    await flushPromises()
+
+    expect(getTorrentCards(wrapper)[0]).toMatchObject({
+      id: stoppedTorrent.hash,
+      statusLabel: 'Stopped',
+      statusVariant: 'stopped',
+      primaryActionLabel: 'Start',
+    })
+
+    wrapper.unmount()
+  })
+
+  it('normalizes invalid torrent progress in the view', async () => {
+    mockMessages(() =>
+      downloadsResponse({
+        ...snapshot,
+        torrents: [
+          {
+            ...torrent,
+            progress: Number.NaN,
+          },
+        ],
+      }),
+    )
+
+    const wrapper = mount(MmDownloadsView)
+
+    await flushPromises()
+
+    expect(getTorrentCards(wrapper)[0]).toMatchObject({
+      progress: 0,
+      progressLabel: '0.0%',
+    })
+
+    wrapper.unmount()
+  })
+
+  it('clamps torrent progress above 100 percent', async () => {
+    mockMessages(() =>
+      downloadsResponse({
+        ...snapshot,
+        torrents: [
+          {
+            ...torrent,
+            progress: 1.5,
+          },
+        ],
+      }),
+    )
+
+    const wrapper = mount(MmDownloadsView)
+
+    await flushPromises()
+
+    expect(getTorrentCards(wrapper)[0]).toMatchObject({
+      progress: 100,
+      progressLabel: '100.0%',
+    })
 
     wrapper.unmount()
   })
@@ -287,6 +392,41 @@ describe('MmDownloadsView', () => {
     wrapper.unmount()
   })
 
+  it('maps a pending stop action to the generic primary state', async () => {
+    let resolveAction!: (value: ReturnType<typeof actionResponse>) => void
+
+    mockedSendMessage.mockImplementation((message) => {
+      if (message.type === 'STOP_QBITTORRENT_TORRENT') {
+        return new Promise((resolve) => {
+          resolveAction = resolve
+        })
+      }
+
+      return Promise.resolve(downloadsResponse())
+    })
+
+    const wrapper = mount(MmDownloadsView)
+
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Stop Example Download"]').trigger('click')
+
+    await flushPromises()
+
+    expect(wrapper.getComponent(MmTorrentList).props('pendingAction')).toEqual({
+      id: torrent.hash,
+      action: 'primary',
+    })
+
+    expect(wrapper.getComponent(MmTorrentList).props('disabled')).toBe(true)
+
+    resolveAction(actionResponse())
+
+    await flushPromises()
+
+    wrapper.unmount()
+  })
+
   it('does not remove a torrent before confirmation', async () => {
     mockMessages()
 
@@ -303,6 +443,60 @@ describe('MmDownloadsView', () => {
     await removeButton!.trigger('click')
 
     expect(wrapper.text()).toContain('Remove torrent?')
+
+    expect(mockedSendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'DELETE_QBITTORRENT_TORRENT',
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('passes the selected torrent as a generic confirmation item', async () => {
+    mockMessages()
+
+    const wrapper = mount(MmDownloadsView)
+
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Remove Example Download"]').trigger('click')
+
+    const confirmation = wrapper.getComponent(MmTorrentConfirmation)
+
+    expect(confirmation.props('item')).toEqual({
+      id: torrent.hash,
+      name: torrent.name,
+    })
+
+    expect(confirmation.props('title')).toBe('Remove torrent?')
+
+    expect(confirmation.props('description')).toContain(
+      'This will remove the torrent from qBittorrent.',
+    )
+
+    expect(confirmation.props('deleteFilesLabel')).toBe('Also delete downloaded files')
+
+    wrapper.unmount()
+  })
+
+  it('does not remove a torrent when the confirmation ID does not match', async () => {
+    mockMessages()
+
+    const wrapper = mount(MmDownloadsView)
+
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Remove Example Download"]').trigger('click')
+
+    const confirmation = wrapper.getComponent(MmTorrentConfirmation)
+
+    confirmation.vm.$emit('confirm', {
+      id: 'b'.repeat(40),
+      deleteFiles: true,
+    })
+
+    await flushPromises()
 
     expect(mockedSendMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({
@@ -450,6 +644,60 @@ describe('MmDownloadsView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Unable to stop torrent.')
+
+    wrapper.unmount()
+  })
+
+  it('passes its page size explicitly to the torrent list', async () => {
+    mockMessages()
+
+    const wrapper = mount(MmDownloadsView)
+    await flushPromises()
+
+    expect(wrapper.getComponent(MmTorrentList).props('pageSize')).toBe(10)
+
+    wrapper.unmount()
+  })
+
+  it('clamps the current page when the torrent count shrinks', async () => {
+    const manyTorrents = Array.from({ length: 21 }, (_, index) => ({
+      ...torrent,
+      hash: String(index).padStart(40, '0'),
+      name: `Download ${index + 1}`,
+    }))
+
+    let currentSnapshot: QBittorrentSnapshot = {
+      ...snapshot,
+      torrents: manyTorrents,
+    }
+
+    mockMessages(() => downloadsResponse(currentSnapshot))
+
+    const wrapper = mount(MmDownloadsView)
+    await flushPromises()
+
+    const list = wrapper.getComponent(MmTorrentList)
+
+    list.vm.$emit('update:page', 3)
+    await flushPromises()
+
+    expect(list.props('page')).toBe(3)
+
+    currentSnapshot = {
+      ...snapshot,
+      torrents: [torrent],
+    }
+
+    const refreshButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Refresh'))
+
+    expect(refreshButton).toBeDefined()
+
+    await refreshButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.getComponent(MmTorrentList).props('page')).toBe(1)
 
     wrapper.unmount()
   })

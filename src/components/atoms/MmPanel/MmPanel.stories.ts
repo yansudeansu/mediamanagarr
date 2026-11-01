@@ -2,12 +2,18 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import { ref } from 'vue'
 import MmPanel from './MmPanel.vue'
 import MmSelect from '../MmSelect/MmSelect.vue'
-import MmButton from '../MmButton/MmButton.vue'
+
+const preferenceOptions = [
+  { label: 'Compact', value: 'compact' },
+  { label: 'Comfortable', value: 'comfortable' },
+  { label: 'Spacious', value: 'spacious' },
+]
 
 const meta = {
   title: 'Atoms/Panel',
   component: MmPanel,
   tags: ['autodocs'],
+
   argTypes: {
     padding: {
       control: 'select',
@@ -15,15 +21,17 @@ const meta = {
       description: 'Controls the internal padding of the panel.',
     },
   },
+
   args: {
     padding: 'md',
   },
+
   parameters: {
     docs: {
       description: {
         component:
-          'A bordered container for grouping related controls or information. ' +
-          'Use MmPanel for settings and grouped UI; use MmCard for standalone content items.',
+          'A bordered container for grouping related content or controls. ' +
+          'Use MmPanel for grouped layouts and MmCard for standalone content items.',
       },
     },
   },
@@ -33,14 +41,8 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-const workspaceOptions = [
-  { label: 'Popup', value: 'popup' },
-  { label: 'Sidebar', value: 'sidebar' },
-  { label: 'Detached window', value: 'detached' },
-]
-
 /**
- * Basic panel demonstrating the default content slot and padding control.
+ * Interactive playground demonstrating the default slot and padding control.
  */
 export const Playground: Story = {
   render: (args) => ({
@@ -51,7 +53,7 @@ export const Playground: Story = {
     },
 
     template: `
-      <div style="width: 340px">
+      <div style="width: 340px; max-width: 100%">
         <mm-panel v-bind="args" aria-label="Example panel">
           <h2 style="margin: 0; font-size: var(--font-size-md)">
             Panel heading
@@ -73,6 +75,7 @@ export const Compact: Story = {
   args: {
     padding: 'sm',
   },
+
   render: (args) => ({
     components: { MmPanel },
 
@@ -81,7 +84,7 @@ export const Compact: Story = {
     },
 
     template: `
-      <div style="width: 340px">
+      <div style="width: 340px; max-width: 100%">
         <mm-panel v-bind="args" aria-label="Compact panel">
           <p style="margin: 0">
             Compact panel content
@@ -93,51 +96,43 @@ export const Compact: Story = {
 }
 
 /**
- * Illustrates the intended use in Workspace Settings.
- *
- * Interactions are local to Storybook and do not call extension APIs.
+ * Demonstrates a panel containing an interactive form control.
+ * State is local to Storybook.
  */
-export const WorkspacePreferences: Story = {
+export const WithControls: Story = {
   render: (args) => ({
     components: {
       MmPanel,
       MmSelect,
-      MmButton,
     },
 
     setup() {
-      const workspaceMode = ref('popup')
+      const preference = ref('comfortable')
 
       return {
         args,
-        workspaceMode,
-        workspaceOptions,
+        preference,
+        preferenceOptions,
       }
     },
 
     template: `
-      <div style="width: 340px">
-        <mm-panel v-bind="args" aria-label="Workspace preferences">
+      <div style="width: 340px; max-width: 100%">
+        <mm-panel v-bind="args" aria-label="Display preferences">
+          <h2 style="margin: 0; font-size: var(--font-size-md)">
+            Display preferences
+          </h2>
+
           <mm-select
-            v-model="workspaceMode"
-            label="Default workspace"
-            :options="workspaceOptions"
-            hint="Choose how MediaManagarr opens when you click its toolbar icon."
+            v-model="preference"
+            label="Content density"
+            :options="preferenceOptions"
+            hint="Choose how much spacing to use between items."
           />
 
-          <div style="display: flex; flex-direction: column; gap: var(--space-3)">
-            <h3 style="margin: 0; font-size: var(--font-size-xs)">
-              Open workspace
-            </h3>
-
-            <mm-button variant="secondary" block>
-              Open Sidebar
-            </mm-button>
-
-            <mm-button variant="secondary" block>
-              Open Detached Window
-            </mm-button>
-          </div>
+          <p style="margin: 0; color: var(--muted); font-size: var(--font-size-sm)">
+            Selected density: {{ preference }}
+          </p>
         </mm-panel>
       </div>
     `,
@@ -145,35 +140,36 @@ export const WorkspacePreferences: Story = {
 }
 
 /**
- * Demonstrates a panel containing a service configuration heading.
+ * Demonstrates a panel containing grouped information.
  */
-export const ServiceConfiguration: Story = {
+export const WithInformation: Story = {
   render: (args) => ({
-    components: {
-      MmPanel,
-      MmButton,
-    },
+    components: { MmPanel },
 
     setup() {
       return { args }
     },
 
     template: `
-      <div style="width: 340px">
-        <mm-panel v-bind="args" aria-label="Jellyfin configuration">
-          <div style="display: flex; flex-direction: column; gap: var(--space-1)">
-            <h2 style="margin: 0; font-size: var(--font-size-md)">
-              Jellyfin
-            </h2>
+      <div style="width: 340px; max-width: 100%">
+        <mm-panel v-bind="args" aria-label="Account information">
+          <h2 style="margin: 0; font-size: var(--font-size-md)">
+            Account information
+          </h2>
 
-            <p style="margin: 0; color: var(--muted); font-size: var(--font-size-sm)">
-              Connect your Jellyfin media server.
+          <div style="display: flex; flex-direction: column; gap: var(--space-2)">
+            <p style="margin: 0">
+              <strong>Name:</strong> Example User
+            </p>
+
+            <p style="margin: 0">
+              <strong>Role:</strong> Editor
+            </p>
+
+            <p style="margin: 0">
+              <strong>Status:</strong> Active
             </p>
           </div>
-
-          <mm-button variant="primary" block>
-            Connect &amp; Test
-          </mm-button>
         </mm-panel>
       </div>
     `,

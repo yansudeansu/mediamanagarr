@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { defineComponent, h } from 'vue'
 import MmCalendarGrid from './MmCalendarGrid.vue'
 import MmCalendarDay from '../../molecules/MmCalendarDay/MmCalendarDay.vue'
 import MmCalendarTooltip from '../../molecules/MmCalendarTooltip/MmCalendarTooltip.vue'
@@ -27,14 +28,14 @@ const movieItem: CalendarItem = {
   posterUrl: null,
 }
 
-function mountGrid(
-  options: {
-    month?: string
-    selectedDate?: string | null
-    today?: string
-    items?: CalendarItem[]
-  } = {},
-) {
+interface MountOptions {
+  month?: string
+  selectedDate?: string | null
+  today?: string
+  items?: CalendarItem[]
+}
+
+function mountGrid(options: MountOptions = {}) {
   return mount(MmCalendarGrid, {
     props: {
       month: options.month ?? '2026-11-01',
@@ -121,7 +122,6 @@ describe('MmCalendarGrid', () => {
     const wrapper = mountGrid()
 
     expect(wrapper.get('[data-date="2026-11-05"]').classes()).not.toContain('calendar-day--outside')
-
     expect(wrapper.get('[data-date="2026-10-26"]').classes()).toContain('calendar-day--outside')
   })
 
@@ -362,7 +362,53 @@ describe('MmCalendarGrid', () => {
 
     await day.trigger('mouseenter')
 
-    expect(day.attributes('aria-describedby')).toBe('calendar-day-tooltip')
-    expect(wrapper.get('#calendar-day-tooltip').attributes('role')).toBe('tooltip')
+    const tooltip = wrapper.get('.calendar-tooltip')
+    const tooltipId = tooltip.attributes('id')
+
+    expect(tooltipId).toBeTruthy()
+    expect(tooltip.attributes('role')).toBe('tooltip')
+    expect(day.attributes('aria-describedby')).toBe(tooltipId)
+  })
+
+  it('uses unique tooltip IDs for multiple grids in the same application', async () => {
+    const Parent = defineComponent({
+      setup() {
+        return () =>
+          h('div', [
+            h(MmCalendarGrid, {
+              month: '2026-11-01',
+              today: '2026-11-05',
+              items: [tvItem],
+            }),
+            h(MmCalendarGrid, {
+              month: '2026-11-01',
+              today: '2026-11-05',
+              items: [tvItem],
+            }),
+          ])
+      },
+    })
+
+    const wrapper = mount(Parent)
+    const grids = wrapper.findAllComponents(MmCalendarGrid)
+
+    expect(grids).toHaveLength(2)
+
+    await grids[0]!.get('[data-date="2026-11-05"]').trigger('mouseenter')
+    await grids[1]!.get('[data-date="2026-11-05"]').trigger('mouseenter')
+
+    const firstTooltip = grids[0]!.get('.calendar-tooltip')
+    const secondTooltip = grids[1]!.get('.calendar-tooltip')
+
+    const firstId = firstTooltip.attributes('id')
+    const secondId = secondTooltip.attributes('id')
+
+    expect(firstId).toBeTruthy()
+    expect(secondId).toBeTruthy()
+    expect(firstId).not.toBe(secondId)
+
+    expect(grids[0]!.get('[data-date="2026-11-05"]').attributes('aria-describedby')).toBe(firstId)
+
+    expect(grids[1]!.get('[data-date="2026-11-05"]').attributes('aria-describedby')).toBe(secondId)
   })
 })

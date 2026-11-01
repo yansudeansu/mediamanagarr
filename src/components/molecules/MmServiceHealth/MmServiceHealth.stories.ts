@@ -7,22 +7,35 @@ const meta = {
   tags: ['autodocs'],
 
   argTypes: {
-    health: {
-      control: 'object',
-      description:
-        'Latest connection health, including status, last check time, and optional error.',
+    status: {
+      control: 'select',
+      options: ['not-checked', 'connected', 'failed'],
+      description: 'Connection health status to display.',
+    },
+    lastCheckedLabel: {
+      control: 'text',
+      description: 'Preformatted label for the last connection check.',
+    },
+    error: {
+      control: 'text',
+      description: 'Error message displayed when the connection has failed.',
     },
   },
 
   args: {
-    health: {
-      status: 'unknown',
-      lastCheckedAt: null,
-    },
+    status: 'not-checked',
+    lastCheckedLabel: '',
+    error: '',
   },
 
   parameters: {
     layout: 'centered',
+    docs: {
+      description: {
+        component:
+          'Displays a connection health status, an optional preformatted last-checked label, and an optional error message. The parent is responsible for formatting timestamps and supplying presentation data.',
+      },
+    },
   },
 
   decorators: [
@@ -44,47 +57,41 @@ export const Playground: Story = {}
 
 export const NotCheckedYet: Story = {
   args: {
-    health: {
-      status: 'unknown',
-      lastCheckedAt: null,
-    },
+    status: 'not-checked',
+    lastCheckedLabel: '',
+    error: '',
   },
 }
 
 export const Connected: Story = {
   args: {
-    health: {
-      status: 'connected',
-      lastCheckedAt: '2026-10-31T12:00:00.000Z',
-    },
+    status: 'connected',
+    lastCheckedLabel: '31 Oct 2026, 13:00',
+    error: '',
   },
 }
 
 export const ConnectionFailed: Story = {
   args: {
-    health: {
-      status: 'failed',
-      lastCheckedAt: '2026-10-31T12:00:00.000Z',
-      error: 'Unable to reach the server. Check the URL and try again.',
-    },
+    status: 'failed',
+    lastCheckedLabel: '31 Oct 2026, 13:00',
+    error: 'Unable to reach the server. Check the URL and try again.',
   },
 }
 
 export const ConnectionFailedWithoutDetails: Story = {
   args: {
-    health: {
-      status: 'failed',
-      lastCheckedAt: '2026-10-31T12:00:00.000Z',
-    },
+    status: 'failed',
+    lastCheckedLabel: '31 Oct 2026, 13:00',
+    error: '',
   },
 }
 
 export const ConnectedWithoutTimestamp: Story = {
   args: {
-    health: {
-      status: 'connected',
-      lastCheckedAt: null,
-    },
+    status: 'connected',
+    lastCheckedLabel: '',
+    error: '',
   },
 }
 
@@ -92,28 +99,28 @@ export const AllStates: Story = {
   render: () => ({
     components: { MmServiceHealth },
 
-    setup() {
-      const checkedAt = '2026-10-31T12:00:00.000Z'
-
-      return { checkedAt }
-    },
-
     template: `
-      <div style="display: flex; flex-direction: column; gap: 16px; width: min(420px, 90vw);">
+      <div
+        style="
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          width: min(420px, 90vw);
+        "
+      >
         <mm-service-health
-          :health="{ status: 'unknown', lastCheckedAt: null }"
+          status="not-checked"
         />
 
         <mm-service-health
-          :health="{ status: 'connected', lastCheckedAt: checkedAt }"
+          status="connected"
+          last-checked-label="31 Oct 2026, 13:00"
         />
 
         <mm-service-health
-          :health="{
-            status: 'failed',
-            lastCheckedAt: checkedAt,
-            error: 'Unable to reach the server. Check the URL and try again.',
-          }"
+          status="failed"
+          last-checked-label="31 Oct 2026, 13:00"
+          error="Unable to reach the server. Check the URL and try again."
         />
       </div>
     `,

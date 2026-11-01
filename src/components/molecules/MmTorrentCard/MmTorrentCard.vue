@@ -3,19 +3,26 @@ import { computed } from 'vue'
 import MmButton from '../../atoms/MmButton/MmButton.vue'
 import MmCard from '../../atoms/MmCard/MmCard.vue'
 import MmProgressBar from '../../atoms/MmProgressBar/MmProgressBar.vue'
-import type { QBittorrentTorrent, QBittorrentTorrentAction } from '../../../types/qbittorrent'
-import {
-  formatBytes,
-  formatEta,
-  formatProgress,
-  formatSpeed,
-  formatTorrentStatus,
-  isTorrentStopped,
-} from '../../../utils/qbittorrent-format'
+
+export type TorrentCardStatusVariant = 'downloading' | 'seeding' | 'stopped' | 'error' | 'neutral'
+
+export interface TorrentCardData {
+  id: string
+  name: string
+  statusLabel: string
+  statusVariant: TorrentCardStatusVariant
+  progress: number
+  progressLabel: string
+  sizeLabel: string
+  downloadSpeedLabel: string
+  uploadSpeedLabel: string
+  etaLabel: string
+  primaryActionLabel: string
+}
 
 interface Props {
-  torrent: QBittorrentTorrent
-  pendingAction?: QBittorrentTorrentAction | null
+  torrent: TorrentCardData
+  pendingAction?: 'primary' | 'remove' | null
   disabled?: boolean
 }
 
@@ -25,12 +32,9 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  start: [hash: string]
-  stop: [hash: string]
-  remove: [hash: string]
+  primaryAction: [id: string]
+  remove: [id: string]
 }>()
-
-const isStopped = computed(() => isTorrentStopped(props.torrent.state))
 
 const isPending = computed(() => props.pendingAction !== null)
 
@@ -39,59 +43,23 @@ const progressPercentage = computed(() => {
     return 0
   }
 
-  return Math.min(100, Math.max(0, props.torrent.progress * 100))
+  return Math.min(100, Math.max(0, props.torrent.progress))
 })
 
-const statusLabel = computed(() => formatTorrentStatus(props.torrent.state))
-
-const statusVariant = computed(() => {
-  const state = props.torrent.state
-
-  if (state === 'error' || state === 'missingFiles') {
-    return 'error'
-  }
-
-  if (isTorrentStopped(state)) {
-    return 'stopped'
-  }
-
-  if (state === 'downloading' || state === 'forcedDL') {
-    return 'downloading'
-  }
-
-  if (state === 'uploading' || state === 'forcedUP' || state === 'stalledUP') {
-    return 'seeding'
-  }
-
-  return 'neutral'
-})
-
-const actionLabel = computed(() => (isStopped.value ? 'Start' : 'Stop'))
-
-const isActionLoading = computed(() => {
-  return props.pendingAction === (isStopped.value ? 'start' : 'stop')
-})
+const isPrimaryActionLoading = computed(() => props.pendingAction === 'primary')
 
 const isRemoveLoading = computed(() => props.pendingAction === 'remove')
 
-function handleToggle() {
-  if (props.disabled || isPending.value) {
-    return
-  }
+function handlePrimaryAction(): void {
+  if (props.disabled || isPending.value) return
 
-  if (isStopped.value) {
-    emit('start', props.torrent.hash)
-  } else {
-    emit('stop', props.torrent.hash)
-  }
+  emit('primaryAction', props.torrent.id)
 }
 
-function handleRemove() {
-  if (props.disabled || isPending.value) {
-    return
-  }
+function handleRemove(): void {
+  if (props.disabled || isPending.value) return
 
-  emit('remove', props.torrent.hash)
+  emit('remove', props.torrent.id)
 }
 </script>
 
@@ -103,19 +71,22 @@ function handleRemove() {
           {{ torrent.name }}
         </h3>
 
-        <span class="torrent-card__status" :class="`torrent-card__status--${statusVariant}`">
-          {{ statusLabel }}
+        <span
+          class="torrent-card__status"
+          :class="`torrent-card__status--${torrent.statusVariant}`"
+        >
+          {{ torrent.statusLabel }}
         </span>
       </div>
 
       <div class="torrent-card__progress">
         <div class="torrent-card__progress-details">
           <span class="torrent-card__size">
-            {{ formatBytes(torrent.downloaded) }} / {{ formatBytes(torrent.size) }}
+            {{ torrent.sizeLabel }}
           </span>
 
           <span class="torrent-card__percentage">
-            {{ formatProgress(torrent.progress) }}
+            {{ torrent.progressLabel }}
           </span>
         </div>
 
@@ -123,18 +94,18 @@ function handleRemove() {
       </div>
 
       <div class="torrent-card__stats">
-        <span class="torrent-card__stat" :title="`Download: ${formatSpeed(torrent.downloadSpeed)}`">
+        <span class="torrent-card__stat" :title="`Download: ${torrent.downloadSpeedLabel}`">
           <span class="torrent-card__stat-label">DL</span>
-          {{ formatSpeed(torrent.downloadSpeed) }}
+          {{ torrent.downloadSpeedLabel }}
         </span>
 
-        <span class="torrent-card__stat" :title="`Upload: ${formatSpeed(torrent.uploadSpeed)}`">
+        <span class="torrent-card__stat" :title="`Upload: ${torrent.uploadSpeedLabel}`">
           <span class="torrent-card__stat-label">UL</span>
-          {{ formatSpeed(torrent.uploadSpeed) }}
+          {{ torrent.uploadSpeedLabel }}
         </span>
 
         <span class="torrent-card__stat torrent-card__stat--eta">
-          ETA: {{ formatEta(torrent.eta) }}
+          ETA: {{ torrent.etaLabel }}
         </span>
       </div>
 
@@ -142,12 +113,12 @@ function handleRemove() {
         <mm-button
           variant="secondary"
           size="small"
-          :loading="isActionLoading"
+          :loading="isPrimaryActionLoading"
           :disabled="disabled || isPending"
-          :aria-label="`${actionLabel} ${torrent.name}`"
-          @click="handleToggle"
+          :aria-label="`${torrent.primaryActionLabel} ${torrent.name}`"
+          @click="handlePrimaryAction"
         >
-          {{ actionLabel }}
+          {{ torrent.primaryActionLabel }}
         </mm-button>
 
         <mm-button

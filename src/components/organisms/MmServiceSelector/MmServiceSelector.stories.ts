@@ -1,7 +1,118 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
-import { ref, watch } from 'vue'
+import { useArgs } from 'storybook/preview-api'
 import MmServiceSelector from './MmServiceSelector.vue'
-import type { ServiceId } from '../../../types/service'
+
+const notConfiguredServices = [
+  {
+    id: 'jellyfin',
+    name: 'Jellyfin',
+    status: 'not-configured',
+  },
+  {
+    id: 'seerr',
+    name: 'Seerr',
+    status: 'not-configured',
+  },
+  {
+    id: 'sonarr',
+    name: 'Sonarr',
+    status: 'not-configured',
+  },
+  {
+    id: 'radarr',
+    name: 'Radarr',
+    status: 'not-configured',
+  },
+  {
+    id: 'qbittorrent',
+    name: 'qBittorrent',
+    status: 'not-configured',
+  },
+] as const
+
+const partiallyConfiguredServices = [
+  {
+    id: 'jellyfin',
+    name: 'Jellyfin',
+    status: 'configured',
+  },
+  {
+    id: 'seerr',
+    name: 'Seerr',
+    status: 'configured',
+  },
+  {
+    id: 'sonarr',
+    name: 'Sonarr',
+    status: 'not-configured',
+  },
+  {
+    id: 'radarr',
+    name: 'Radarr',
+    status: 'not-configured',
+  },
+  {
+    id: 'qbittorrent',
+    name: 'qBittorrent',
+    status: 'not-configured',
+  },
+] as const
+
+const connectedServices = [
+  {
+    id: 'jellyfin',
+    name: 'Jellyfin',
+    status: 'connected',
+  },
+  {
+    id: 'seerr',
+    name: 'Seerr',
+    status: 'connected',
+  },
+  {
+    id: 'sonarr',
+    name: 'Sonarr',
+    status: 'connected',
+  },
+  {
+    id: 'radarr',
+    name: 'Radarr',
+    status: 'connected',
+  },
+  {
+    id: 'qbittorrent',
+    name: 'qBittorrent',
+    status: 'connected',
+  },
+] as const
+
+const failedConnectionServices = [
+  {
+    id: 'jellyfin',
+    name: 'Jellyfin',
+    status: 'connected',
+  },
+  {
+    id: 'seerr',
+    name: 'Seerr',
+    status: 'configured',
+  },
+  {
+    id: 'sonarr',
+    name: 'Sonarr',
+    status: 'connected',
+  },
+  {
+    id: 'radarr',
+    name: 'Radarr',
+    status: 'failed',
+  },
+  {
+    id: 'qbittorrent',
+    name: 'qBittorrent',
+    status: 'not-configured',
+  },
+] as const
 
 const meta = {
   title: 'Organisms/Service Selector',
@@ -12,11 +123,12 @@ const meta = {
     modelValue: {
       control: 'select',
       options: [null, 'jellyfin', 'seerr', 'sonarr', 'radarr', 'qbittorrent'],
-      description: 'Currently selected service.',
+      description: 'ID of the currently selected service.',
     },
-    statuses: {
+    services: {
       control: 'object',
-      description: 'Connection status for each service.',
+      description:
+        'Ordered list of services, including each service ID, display name, and connection status.',
     },
     disabled: {
       control: 'boolean',
@@ -26,41 +138,39 @@ const meta = {
 
   args: {
     modelValue: 'jellyfin',
-    statuses: {
-      jellyfin: 'configured',
-      seerr: 'configured',
-      sonarr: 'not-configured',
-      radarr: 'not-configured',
-      qbittorrent: 'not-configured',
-    },
+    services: partiallyConfiguredServices.map((service) => ({
+      ...service,
+    })),
     disabled: false,
   },
 
-  render: (args) => ({
-    components: { MmServiceSelector },
+  render: (args) => {
+    const [, updateArgs] = useArgs()
 
-    setup() {
-      const selected = ref<ServiceId | null>(args.modelValue ?? null)
+    return {
+      components: { MmServiceSelector },
 
-      watch(
-        () => args.modelValue,
-        (value) => {
-          selected.value = value ?? null
-        },
-      )
+      setup() {
+        function updateSelection(value: string): void {
+          updateArgs({ modelValue: value })
+        }
 
-      return { args, selected }
-    },
+        return {
+          args,
+          updateSelection,
+        }
+      },
 
-    template: `
-      <div style="width: 320px">
-        <mm-service-selector
-          v-bind="args"
-          v-model="selected"
-        />
-      </div>
-    `,
-  }),
+      template: `
+        <div style="width: 320px">
+          <mm-service-selector
+            v-bind="args"
+            @update:model-value="updateSelection"
+          />
+        </div>
+      `,
+    }
+  },
 } satisfies Meta<typeof MmServiceSelector>
 
 export default meta
@@ -78,7 +188,9 @@ export const Playground: Story = {}
 export const FreshInstall: Story = {
   args: {
     modelValue: null,
-    statuses: {},
+    services: notConfiguredServices.map((service) => ({
+      ...service,
+    })),
   },
 }
 
@@ -88,13 +200,9 @@ export const FreshInstall: Story = {
 export const PartiallyConfigured: Story = {
   args: {
     modelValue: 'jellyfin',
-    statuses: {
-      jellyfin: 'configured',
-      seerr: 'configured',
-      sonarr: 'not-configured',
-      radarr: 'not-configured',
-      qbittorrent: 'not-configured',
-    },
+    services: partiallyConfiguredServices.map((service) => ({
+      ...service,
+    })),
   },
 }
 
@@ -104,13 +212,9 @@ export const PartiallyConfigured: Story = {
 export const AllConnected: Story = {
   args: {
     modelValue: 'jellyfin',
-    statuses: {
-      jellyfin: 'connected',
-      seerr: 'connected',
-      sonarr: 'connected',
-      radarr: 'connected',
-      qbittorrent: 'connected',
-    },
+    services: connectedServices.map((service) => ({
+      ...service,
+    })),
   },
 }
 
@@ -120,13 +224,9 @@ export const AllConnected: Story = {
 export const ConnectionFailed: Story = {
   args: {
     modelValue: 'radarr',
-    statuses: {
-      jellyfin: 'connected',
-      seerr: 'configured',
-      sonarr: 'connected',
-      radarr: 'failed',
-      qbittorrent: 'not-configured',
-    },
+    services: failedConnectionServices.map((service) => ({
+      ...service,
+    })),
   },
 }
 
@@ -136,5 +236,41 @@ export const ConnectionFailed: Story = {
 export const Disabled: Story = {
   args: {
     disabled: true,
+  },
+}
+
+/**
+ * The selector renders an empty group when no services are supplied.
+ */
+export const Empty: Story = {
+  args: {
+    modelValue: null,
+    services: [],
+  },
+}
+
+/**
+ * The selector supports services outside MediaManagarr's registry.
+ */
+export const CustomServices: Story = {
+  args: {
+    modelValue: 'alpha',
+    services: [
+      {
+        id: 'alpha',
+        name: 'Alpha Server',
+        status: 'connected',
+      },
+      {
+        id: 'beta',
+        name: 'Beta Server',
+        status: 'configured',
+      },
+      {
+        id: 'gamma',
+        name: 'Gamma Server',
+        status: 'failed',
+      },
+    ],
   },
 }

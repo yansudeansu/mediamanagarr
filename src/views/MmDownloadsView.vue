@@ -3,6 +3,11 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import MmDownloadsTemplate from '../components/templates/MmDownloadsTemplate/MmDownloadsTemplate.vue'
 import MmTransferStats from '../components/molecules/MmTransferStats/MmTransferStats.vue'
 import MmTorrentConfirmation from '../components/molecules/MmTorrentConfirmation/MmTorrentConfirmation.vue'
+import type { ConfirmationItem } from '../components/molecules/MmTorrentConfirmation/MmTorrentConfirmation.vue'
+import type {
+  TorrentCardData,
+  TorrentCardStatusVariant,
+} from '../components/molecules/MmTorrentCard/MmTorrentCard.vue'
 import MmTorrentList from '../components/organisms/MmTorrentList/MmTorrentList.vue'
 import MmButton from '../components/atoms/MmButton/MmButton.vue'
 import type {
@@ -11,9 +16,17 @@ import type {
   QBittorrentTorrent,
   QBittorrentTorrentAction,
 } from '../types/qbittorrent'
-import { isTorrentStopped } from '../utils/qbittorrent-format'
+import {
+  formatBytes,
+  formatEta,
+  formatProgress,
+  formatSpeed,
+  formatTorrentStatus,
+  isTorrentStopped,
+} from '../utils/qbittorrent-format'
 import { sendBackgroundMessage } from '../utils/background-messaging'
 
+const PAGE_SIZE = 10
 const POLL_INTERVAL_MS = 5000
 const ACTION_VERIFY_INTERVAL_MS = 500
 const ACTION_VERIFY_ATTEMPTS = 8
@@ -35,12 +48,81 @@ const selectedTorrent = ref<QBittorrentTorrent | null>(null)
 
 const torrents = computed(() => snapshot.value.torrents)
 
+function getStatusVariant(torrent: QBittorrentTorrent): TorrentCardStatusVariant {
+  const state = torrent.state
+
+  if (state === 'error' || state === 'missingFiles') {
+    return 'error'
+  }
+
+  if (isTorrentStopped(state)) {
+    return 'stopped'
+  }
+
+  if (state === 'downloading' || state === 'forcedDL') {
+    return 'downloading'
+  }
+
+  if (state === 'uploading' || state === 'forcedUP' || state === 'stalledUP') {
+    return 'seeding'
+  }
+
+  return 'neutral'
+}
+
+function toTorrentCardData(torrent: QBittorrentTorrent): TorrentCardData {
+  const progress = Number.isFinite(torrent.progress)
+    ? Math.min(1, Math.max(0, torrent.progress))
+    : 0
+
+  return {
+    id: torrent.hash,
+    name: torrent.name,
+    statusLabel: formatTorrentStatus(torrent.state),
+    statusVariant: getStatusVariant(torrent),
+    progress: progress * 100,
+    progressLabel: formatProgress(progress),
+    sizeLabel: `${formatBytes(torrent.downloaded)} / ${formatBytes(torrent.size)}`,
+    downloadSpeedLabel: formatSpeed(torrent.downloadSpeed),
+    uploadSpeedLabel: formatSpeed(torrent.uploadSpeed),
+    etaLabel: formatEta(torrent.eta),
+    primaryActionLabel: isTorrentStopped(torrent.state) ? 'Start' : 'Stop',
+  }
+}
+
+const torrentCards = computed<TorrentCardData[]>(() => torrents.value.map(toTorrentCardData))
+
+const listPendingAction = computed<{
+  id: string
+  action: 'primary' | 'remove'
+} | null>(() => {
+  if (!pendingAction.value) {
+    return null
+  }
+
+  return {
+    id: pendingAction.value.hash,
+    action: pendingAction.value.action === 'remove' ? 'remove' : 'primary',
+  }
+})
+
+const confirmationItem = computed<ConfirmationItem | null>(() => {
+  if (!selectedTorrent.value) {
+    return null
+  }
+
+  return {
+    id: selectedTorrent.value.hash,
+    name: selectedTorrent.value.name,
+  }
+})
+
+const pendingRemoval = computed(() => pendingAction.value?.action === 'remove')
+
 let mounted = false
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let requestInFlight = false
 let lifecycleSequence = 0
-
-const pendingRemoval = computed(() => pendingAction.value?.action === 'remove')
 
 function getErrorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : 'An unexpected error occurred.'
@@ -67,9 +149,8 @@ async function fetchSnapshot(): Promise<QBittorrentSnapshot> {
 function applySnapshot(nextSnapshot: QBittorrentSnapshot): void {
   snapshot.value = nextSnapshot
 
-  // MmTorrentList also guards against out-of-range pages,
-  // but keeping the view's page valid avoids unnecessary updates.
-  const totalPages = Math.max(1, Math.ceil(nextSnapshot.torrents.length / 10))
+  // Keep the view's controlled page within the available range.
+  const totalPages = Math.max(1, Math.ceil(nextSnapshot.torrents.length / PAGE_SIZE))
 
   if (page.value > totalPages) {
     page.value = totalPages
@@ -137,6 +218,7 @@ function selectTorrentForRemoval(hash: string): void {
   }
 
   selectedTorrent.value = torrents.value.find((torrent) => torrent.hash === hash) ?? null
+
   actionError.value = ''
 }
 
@@ -236,8 +318,7 @@ async function verifyTorrentAction(
         return true
       }
     } catch {
-      // A transient fetch failure should not immediately fail
-      // action verification. Retry within the bounded window.
+      // Retry transient snapshot failures within the bounded window.
     }
   }
 
@@ -273,7 +354,9 @@ async function performAction(
 
     if (!verified) {
       throw new Error(
-        `qBittorrent did not confirm that the torrent was ${action === 'remove' ? 'removed' : action === 'start' ? 'started' : 'stopped'}.`,
+        `qBittorrent did not confirm that the torrent was ${
+          action === 'remove' ? 'removed' : action === 'start' ? 'started' : 'stopped'
+        }.`,
       )
     }
 
@@ -293,20 +376,24 @@ async function performAction(
   }
 }
 
-function startTorrent(hash: string): void {
-  void performAction('start', hash)
-}
+function handlePrimaryAction(hash: string): void {
+  const torrent = torrents.value.find((item) => item.hash === hash)
 
-function stopTorrent(hash: string): void {
-  void performAction('stop', hash)
-}
-
-function confirmRemoval(payload: { hash: string; deleteFiles: boolean }): void {
-  if (selectedTorrent.value?.hash !== payload.hash) {
+  if (!torrent) {
     return
   }
 
-  void performAction('remove', payload.hash, payload.deleteFiles)
+  const action: QBittorrentTorrentAction = isTorrentStopped(torrent.state) ? 'start' : 'stop'
+
+  void performAction(action, hash)
+}
+
+function confirmRemoval(payload: { id: string; deleteFiles: boolean }): void {
+  if (selectedTorrent.value?.hash !== payload.id) {
+    return
+  }
+
+  void performAction('remove', payload.id, payload.deleteFiles)
 }
 
 onMounted(() => {
@@ -357,8 +444,14 @@ onUnmounted(() => {
 
     <template v-if="selectedTorrent && !loading" #confirmation>
       <mm-torrent-confirmation
-        :torrent="selectedTorrent"
+        :item="confirmationItem"
         :loading="pendingRemoval"
+        title="Remove torrent?"
+        description="This will remove the torrent from qBittorrent. Your downloaded files will be kept unless you choose to delete them below."
+        delete-files-label="Also delete downloaded files"
+        delete-files-hint="Permanently delete the downloaded data from disk."
+        delete-files-warning="Warning: Downloaded files will also be deleted. This cannot be undone."
+        confirm-label="Remove torrent"
         @confirm="confirmRemoval"
         @cancel="cancelRemoval"
       />
@@ -378,13 +471,13 @@ onUnmounted(() => {
       </div>
 
       <mm-torrent-list
-        :torrents="torrents"
+        :torrents="torrentCards"
         :page="page"
-        :pending-action="pendingAction"
+        :page-size="PAGE_SIZE"
+        :pending-action="listPendingAction"
         :disabled="pendingAction !== null"
         @update:page="selectPage"
-        @start="startTorrent"
-        @stop="stopTorrent"
+        @primary-action="handlePrimaryAction"
         @remove="selectTorrentForRemoval"
       />
     </template>
@@ -394,7 +487,6 @@ onUnmounted(() => {
 <style scoped>
 .downloads-view__message {
   margin: 0;
-
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
@@ -409,7 +501,6 @@ onUnmounted(() => {
 
 .downloads-view__error p {
   margin: 0;
-
   color: var(--danger);
   font-size: 12px;
   line-height: 1.5;

@@ -1,63 +1,56 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import MmStatusBadge from '../../atoms/MmStatusBadge/MmStatusBadge.vue'
-import type { ServiceHealth, ServiceState } from '../../../types/service'
+
+type HealthStatus = 'connected' | 'failed' | 'not-checked'
 
 interface Props {
-  health?: ServiceHealth
+  status?: HealthStatus
+  lastCheckedLabel?: string
+  error?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  health: undefined,
+  status: 'not-checked',
+  lastCheckedLabel: '',
+  error: '',
 })
 
-const status = computed<ServiceState>(() => {
-  switch (props.health?.status) {
+const badge = computed(() => {
+  switch (props.status) {
     case 'connected':
-      return 'connected'
+      return {
+        variant: 'success' as const,
+        label: 'Connected',
+      }
     case 'failed':
-      return 'failed'
+      return {
+        variant: 'danger' as const,
+        label: 'Connection failed',
+      }
     default:
-      return 'configured'
+      return {
+        variant: 'info' as const,
+        label: 'Not checked yet',
+      }
   }
 })
 
-const customLabel = computed(() => {
-  switch (props.health?.status) {
-    case 'failed':
-      return 'Connection failed'
-    case 'connected':
-      return undefined
-    default:
-      return 'Not checked yet'
-  }
-})
-
-const lastCheckedLabel = computed(() => {
-  const timestamp = props.health?.lastCheckedAt
-
-  if (!timestamp) return ''
-
-  const date = new Date(timestamp)
-
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString()
-})
-
-const error = computed(() => (props.health?.status === 'failed' ? props.health.error : undefined))
+const visibleError = computed(() => (props.status === 'failed' ? props.error : ''))
 </script>
 
 <template>
   <div class="service-health">
     <div class="service-health__row">
-      <mm-status-badge :status="status" :custom-label="customLabel" />
+      <mm-status-badge :variant="badge.variant" :label="badge.label" />
 
       <span v-if="lastCheckedLabel" class="service-health__time">
         {{ lastCheckedLabel }}
       </span>
     </div>
 
-    <p v-if="error" class="service-health__error" role="alert">
-      {{ error }}
+    <p v-if="visibleError" class="service-health__error" role="alert">
+      {{ visibleError }}
     </p>
   </div>
 </template>

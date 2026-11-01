@@ -2,27 +2,26 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmRequestCard from './MmRequestCard.vue'
 import MmMediaPoster from '../../atoms/MmMediaPoster/MmMediaPoster.vue'
-import type { SeerrRequest } from '../../../types/seerr'
+import type { RequestCardData } from './MmRequestCard.vue'
 
-const movieRequest: SeerrRequest = {
-  id: 42,
+const movieRequest: RequestCardData = {
   type: 'movie',
   title: 'Example Movie',
   status: 'Pending',
   mediaStatus: 'Processing',
   requestedBy: 'Alice',
   createdAt: '2026-10-20T12:00:00.000Z',
-  posterPath: '/example-poster.jpg',
+  posterUrl: 'https://image.tmdb.org/t/p/w185/example-poster.jpg',
 }
 
-function createRequest(overrides: Partial<SeerrRequest> = {}): SeerrRequest {
+function createRequest(overrides: Partial<RequestCardData> = {}): RequestCardData {
   return {
     ...movieRequest,
     ...overrides,
   }
 }
 
-function mountRequest(overrides: Partial<SeerrRequest> = {}) {
+function mountRequest(overrides: Partial<RequestCardData> = {}) {
   return mount(MmRequestCard, {
     props: {
       request: createRequest(overrides),
@@ -71,7 +70,7 @@ describe('MmRequestCard', () => {
     })
   })
 
-  it('renders a TMDB poster', () => {
+  it('renders the supplied poster URL', () => {
     const wrapper = mountRequest()
 
     const image = wrapper.get('img')
@@ -83,7 +82,7 @@ describe('MmRequestCard', () => {
 
   it('renders a placeholder when the poster is missing', () => {
     const wrapper = mountRequest({
-      posterPath: null,
+      posterUrl: null,
     })
 
     expect(wrapper.find('img').exists()).toBe(false)
@@ -97,19 +96,10 @@ describe('MmRequestCard', () => {
     const wrapper = mountRequest({
       type: 'tv',
       title: 'Example Series',
-      posterPath: null,
+      posterUrl: null,
     })
 
     expect(wrapper.get('.media-poster__placeholder').text()).toContain('📺')
-  })
-
-  it('rejects non-relative poster paths', () => {
-    const wrapper = mountRequest({
-      posterPath: 'https://untrusted.example.com/poster.jpg',
-    })
-
-    expect(wrapper.find('img').exists()).toBe(false)
-    expect(wrapper.find('.media-poster__placeholder').exists()).toBe(true)
   })
 
   it('renders exactly one status badge', () => {
@@ -211,7 +201,6 @@ describe('MmRequestCard', () => {
 
     await wrapper.setProps({
       request: createRequest({
-        id: 43,
         title: 'Another Movie',
         status: 'Approved',
         mediaStatus: 'Available',
@@ -255,7 +244,7 @@ describe('MmRequestCard', () => {
       request: createRequest({
         title: 'Updated Series',
         type: 'tv',
-        posterPath: null,
+        posterUrl: null,
       }),
     })
 
@@ -268,6 +257,20 @@ describe('MmRequestCard', () => {
     })
 
     expect(wrapper.get('.media-poster__placeholder').text()).toContain('📺')
+  })
+
+  it('updates the supplied poster URL reactively', async () => {
+    const wrapper = mountRequest()
+
+    await wrapper.setProps({
+      request: createRequest({
+        posterUrl: 'https://example.com/updated-poster.jpg',
+      }),
+    })
+
+    expect(wrapper.getComponent(MmMediaPoster).props('image')).toBe(
+      'https://example.com/updated-poster.jpg',
+    )
   })
 
   it('does not create an interactive control', () => {

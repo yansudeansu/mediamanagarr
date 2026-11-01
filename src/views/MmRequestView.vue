@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import MmRequestsTemplate from '../components/templates/MmRequestsTemplate/MmRequestsTemplate.vue'
 import MmRequestCard from '../components/molecules/MmRequestCard/MmRequestCard.vue'
 import MmPagination from '../components/molecules/MmPagination/MmPagination.vue'
 import MmFilterGroup from '../components/molecules/MmFilterGroup/MmFilterGroup.vue'
 import MmButton from '../components/atoms/MmButton/MmButton.vue'
+import type { RequestCardData } from '../components/molecules/MmRequestCard/MmRequestCard.vue'
 import type { SeerrRequest, SeerrRequestFilter } from '../types/seerr'
 import { sendBackgroundMessage } from '../utils/background-messaging'
 
 const PAGE_SIZE = 10
+const TMDB_IMAGE_ORIGIN = 'https://image.tmdb.org'
 
 const filters = [
   { label: 'All', value: 'all' },
@@ -25,13 +27,51 @@ const error = ref('')
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
+const requestCards = computed<Array<{ id: number; data: RequestCardData }>>(() =>
+  requests.value.map((request) => ({
+    id: request.id,
+    data: {
+      title: request.title,
+      type: request.type,
+      posterUrl: getPosterUrl(request.posterPath),
+      status: request.status,
+      mediaStatus: request.mediaStatus,
+      requestedBy: request.requestedBy,
+      createdAt: request.createdAt,
+    },
+  })),
+)
+
 let requestSequence = 0
+let isUnmounted = false
+
+function getPosterUrl(path: string | null | undefined): string | null {
+  if (!path || !path.startsWith('/') || path.startsWith('//')) {
+    return null
+  }
+
+  try {
+    const url = new URL(path, TMDB_IMAGE_ORIGIN)
+
+    if (url.origin !== TMDB_IMAGE_ORIGIN) {
+      return null
+    }
+
+    return `${TMDB_IMAGE_ORIGIN}/t/p/w185${path}`
+  } catch {
+    return null
+  }
+}
 
 function getErrorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : 'An unexpected error occurred.'
 }
 
 async function loadRequests(): Promise<void> {
+  if (isUnmounted) {
+    return
+  }
+
   const sequence = ++requestSequence
   const requestedPage = page.value
   const requestedFilter = activeFilter.value
@@ -47,7 +87,7 @@ async function loadRequests(): Promise<void> {
       filter: requestedFilter,
     })
 
-    if (sequence !== requestSequence) {
+    if (isUnmounted || sequence !== requestSequence) {
       return
     }
 
@@ -55,10 +95,18 @@ async function loadRequests(): Promise<void> {
       throw new Error(response.error)
     }
 
+    const availablePages = Math.max(1, Math.ceil(response.requests.total / PAGE_SIZE))
+
+    if (requestedPage > availablePages) {
+      page.value = availablePages
+      void loadRequests()
+      return
+    }
+
     requests.value = response.requests.items
     total.value = response.requests.total
   } catch (caught) {
-    if (sequence !== requestSequence) {
+    if (isUnmounted || sequence !== requestSequence) {
       return
     }
 
@@ -66,7 +114,7 @@ async function loadRequests(): Promise<void> {
     total.value = 0
     error.value = getErrorMessage(caught)
   } finally {
-    if (sequence === requestSequence) {
+    if (!isUnmounted && sequence === requestSequence) {
       loading.value = false
     }
   }
@@ -113,6 +161,11 @@ function refresh(): void {
 onMounted(() => {
   void loadRequests()
 })
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+  requestSequence += 1
+})
 </script>
 
 <template>
@@ -150,7 +203,7 @@ onMounted(() => {
     <p v-else-if="requests.length === 0" class="request-view__message">No requests found.</p>
 
     <template v-else>
-      <mm-request-card v-for="request in requests" :key="request.id" :request="request" />
+      <mm-request-card v-for="request in requestCards" :key="request.id" :request="request.data" />
     </template>
 
     <template v-if="!loading && !error && totalPages > 1" #pagination>
@@ -162,7 +215,6 @@ onMounted(() => {
 <style scoped>
 .request-view__message {
   margin: 0;
-
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
@@ -177,7 +229,6 @@ onMounted(() => {
 
 .request-view__error p {
   margin: 0;
-
   color: var(--danger);
   font-size: 12px;
   line-height: 1.5;

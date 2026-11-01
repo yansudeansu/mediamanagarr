@@ -3,7 +3,7 @@ import MmCalendarGrid from './MmCalendarGrid.vue'
 import type { CalendarItem } from '../../../types/calendar'
 
 const tvItem: CalendarItem = {
-  id: 'sonarr-101',
+  id: 'episode-101',
   source: 'sonarr',
   type: 'tv',
   title: 'TV Show 1',
@@ -14,7 +14,7 @@ const tvItem: CalendarItem = {
 }
 
 const movieItem: CalendarItem = {
-  id: 'radarr-201',
+  id: 'movie-201',
   source: 'radarr',
   type: 'movie',
   title: 'Movie 1',
@@ -29,21 +29,21 @@ const items: CalendarItem[] = [
   movieItem,
   {
     ...tvItem,
-    id: 'sonarr-102',
+    id: 'episode-102',
     title: 'TV Show 2',
     subtitle: 'S01E01 · Episode 1',
     date: '2026-11-12',
   },
   {
     ...movieItem,
-    id: 'radarr-202',
+    id: 'movie-202',
     title: 'Movie 2',
     date: '2026-11-20',
     releaseType: 'physical',
   },
   {
     ...tvItem,
-    id: 'sonarr-103',
+    id: 'episode-103',
     title: 'TV Show 3',
     subtitle: 'S01E02 · Episode 2',
     date: '2026-10-29',
@@ -68,7 +68,7 @@ const meta = {
 
   decorators: [
     () => ({
-      template: '<div style="width: 340px"><story /></div>',
+      template: '<div style="width: 340px; max-width: 100%;"><story /></div>',
     }),
   ],
 
@@ -98,6 +98,7 @@ type Story = StoryObj<typeof meta>
 
 /**
  * Hover over November 5, 12, or 20 to see the custom tooltip.
+ * Dates can also be focused using the keyboard.
  */
 export const Default: Story = {}
 
@@ -108,12 +109,30 @@ export const Empty: Story = {
   },
 }
 
+/**
+ * November 2026 requires six calendar rows.
+ */
 export const SixWeeks: Story = {
   args: {
     month: '2026-11-01',
   },
 }
 
+/**
+ * September 2026 requires five calendar rows.
+ */
+export const FiveWeeks: Story = {
+  args: {
+    month: '2026-09-01',
+    selectedDate: '2026-09-15',
+    today: '2026-09-10',
+    items: [],
+  },
+}
+
+/**
+ * February 2027 fits into four calendar rows.
+ */
 export const FourWeeks: Story = {
   args: {
     month: '2027-02-01',

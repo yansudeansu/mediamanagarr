@@ -5,13 +5,15 @@ import MmInput from '../../atoms/MmInput/MmInput.vue'
 import MmPanel from '../../atoms/MmPanel/MmPanel.vue'
 import MmSelect from '../../atoms/MmSelect/MmSelect.vue'
 import MmServiceHealth from '../../molecules/MmServiceHealth/MmServiceHealth.vue'
-import { SERVICE_REGISTRY } from '../../../services/registry'
-import type { ServiceHealth, ServiceId } from '../../../types/service'
-import type { JellyfinUser } from '../../../types/jellyfin'
-import { normalizeServerUrl } from '../../../utils/service-config'
+
+interface UserOption {
+  label: string
+  value: string
+}
 
 interface Props {
-  serviceId: ServiceId
+  name: string
+  description?: string
   url?: string
   configured?: boolean
   loading?: boolean
@@ -19,16 +21,23 @@ interface Props {
   removing?: boolean
   error?: string
   success?: string
-  health?: ServiceHealth
-  jellyfinUsers?: JellyfinUser[]
-  jellyfinUserId?: string
-  jellyfinUsersLoading?: boolean
-  jellyfinUserSaving?: boolean
-  jellyfinUsersError?: string
-  jellyfinUserSuccess?: string
+  healthStatus?: 'connected' | 'failed' | 'not-checked'
+  healthLastCheckedLabel?: string
+  healthError?: string
+  canReuseSavedKey?: boolean
+  userSelectionLabel?: string
+  userSelectionHint?: string
+  userOptions?: UserOption[]
+  selectedUserId?: string
+  usersLoading?: boolean
+  userSaving?: boolean
+  usersError?: string
+  userSuccess?: string
+  removalNote?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  description: '',
   url: '',
   configured: false,
   loading: false,
@@ -36,24 +45,28 @@ const props = withDefaults(defineProps<Props>(), {
   removing: false,
   error: '',
   success: '',
-  health: undefined,
-  jellyfinUsers: () => [],
-  jellyfinUserId: '',
-  jellyfinUsersLoading: false,
-  jellyfinUserSaving: false,
-  jellyfinUsersError: '',
-  jellyfinUserSuccess: '',
+  healthStatus: 'not-checked',
+  healthLastCheckedLabel: '',
+  healthError: '',
+  canReuseSavedKey: false,
+  userSelectionLabel: '',
+  userSelectionHint: '',
+  userOptions: () => [],
+  selectedUserId: '',
+  usersLoading: false,
+  userSaving: false,
+  usersError: '',
+  userSuccess: '',
+  removalNote: '',
 })
 
 const emit = defineEmits<{
-  connect: [payload: { serviceId: ServiceId; url: string; apiKey: string }]
-  testConnection: [serviceId: ServiceId]
-  remove: [serviceId: ServiceId]
-  selectJellyfinUser: [userId: string]
+  connect: [payload: { url: string; apiKey: string }]
+  testConnection: []
+  remove: []
+  selectUser: [userId: string]
   edit: []
 }>()
-
-const service = computed(() => SERVICE_REGISTRY[props.serviceId])
 
 const serverUrl = ref(props.url)
 const apiKey = ref('')
@@ -62,50 +75,34 @@ const confirmingRemoval = ref(false)
 
 const busy = computed(() => props.loading || props.testing || props.removing)
 
-function getNormalizedUrl(value: string): string {
-  try {
-    return normalizeServerUrl(value)
-  } catch {
-    return ''
-  }
-}
+const isSavedUrl = computed(() => props.configured && serverUrl.value.trim() === props.url.trim())
 
-const isSavedUrl = computed(() => {
-  if (!props.configured) return false
+const canReuseKey = computed(() => props.canReuseSavedKey && isSavedUrl.value)
 
-  const savedUrl = getNormalizedUrl(props.url)
-  const draftUrl = getNormalizedUrl(serverUrl.value)
+// A configured service without a saved URL cannot be tested.
+// The draft must also match the saved URL, with no new API key entered.
+const canTestSavedConnection = computed(
+  () => isSavedUrl.value && Boolean(props.url.trim()) && apiKey.value.trim() === '',
+)
 
-  return savedUrl !== '' && draftUrl === savedUrl
-})
-
-const canTestSavedConnection = computed(() => isSavedUrl.value && apiKey.value.trim() === '')
-
-const showJellyfinUserSelect = computed(() => props.serviceId === 'jellyfin' && isSavedUrl.value)
+const showUserSelect = computed(() => Boolean(props.userSelectionLabel) && isSavedUrl.value)
 
 const showSuccess = computed(
   () => Boolean(props.success) && !validationError.value && !props.error && !busy.value,
 )
 
-const showJellyfinUserSuccess = computed(
+const showUserSuccess = computed(
   () =>
-    showJellyfinUserSelect.value &&
-    Boolean(props.jellyfinUserSuccess) &&
-    !props.jellyfinUserSaving &&
-    !props.jellyfinUsersLoading &&
-    !props.jellyfinUsersError &&
+    showUserSelect.value &&
+    Boolean(props.userSuccess) &&
+    !props.userSaving &&
+    !props.usersLoading &&
+    !props.usersError &&
     !busy.value,
 )
 
-const jellyfinUserOptions = computed(() =>
-  props.jellyfinUsers.map((user) => ({
-    label: user.name,
-    value: user.id,
-  })),
-)
-
 watch(
-  () => [props.serviceId, props.url] as const,
+  () => [props.name, props.url] as const,
   () => {
     serverUrl.value = props.url
     apiKey.value = ''
@@ -123,30 +120,26 @@ watch(
   },
 )
 
-function handleEdit() {
+function handleEdit(): void {
   validationError.value = ''
   confirmingRemoval.value = false
   emit('edit')
 }
 
-function handleConnect() {
+function handleConnect(): void {
   if (busy.value) return
 
   validationError.value = ''
 
-  let url: string
+  const url = serverUrl.value.trim()
+  const key = apiKey.value.trim()
 
-  try {
-    url = normalizeServerUrl(serverUrl.value)
-  } catch (error) {
-    validationError.value = error instanceof Error ? error.message : 'Enter a valid server URL.'
+  if (!url) {
+    validationError.value = 'Enter a server URL.'
     return
   }
 
-  const key = apiKey.value.trim()
-  const canReuseKey = isSavedUrl.value
-
-  if (!key && !canReuseKey) {
+  if (!key && !canReuseKey.value) {
     validationError.value = 'Enter an API key.'
     return
   }
@@ -154,46 +147,52 @@ function handleConnect() {
   confirmingRemoval.value = false
 
   emit('connect', {
-    serviceId: props.serviceId,
     url,
     apiKey: key,
   })
 }
 
-function handleTestConnection() {
+function handleTestConnection(): void {
   if (busy.value || !canTestSavedConnection.value) return
 
   validationError.value = ''
   confirmingRemoval.value = false
 
-  emit('testConnection', props.serviceId)
+  emit('testConnection')
 }
 
-function requestRemoval() {
+function requestRemoval(): void {
   if (busy.value || !props.configured) return
 
   validationError.value = ''
   confirmingRemoval.value = true
 }
 
-function cancelRemoval() {
+function cancelRemoval(): void {
   if (busy.value) return
 
   confirmingRemoval.value = false
 }
 
-function confirmRemoval() {
-  if (busy.value || !props.configured || !confirmingRemoval.value) return
+function confirmRemoval(): void {
+  if (busy.value || !props.configured || !confirmingRemoval.value) {
+    return
+  }
 
-  emit('remove', props.serviceId)
+  emit('remove')
 }
 </script>
 
 <template>
-  <mm-panel class="service-form" :aria-label="`${service.name} configuration`">
+  <mm-panel class="service-form" :aria-label="`${name} configuration`">
     <div class="service-form__heading">
-      <h2 class="service-form__title">{{ service.name }}</h2>
-      <p class="service-form__description">{{ service.description }}</p>
+      <h2 class="service-form__title">
+        {{ name }}
+      </h2>
+
+      <p class="service-form__description">
+        {{ description }}
+      </p>
     </div>
 
     <form class="service-form__fields" @submit.prevent="handleConnect">
@@ -217,35 +216,30 @@ function confirmRemoval() {
         @update:model-value="handleEdit"
       />
 
-      <div v-if="showJellyfinUserSelect" class="service-form__jellyfin-user">
+      <div v-if="showUserSelect" class="service-form__user-selection">
         <mm-select
-          :model-value="jellyfinUserId"
-          label="Jellyfin User"
-          :options="jellyfinUserOptions"
-          placeholder="Select a Jellyfin user"
-          :loading="jellyfinUsersLoading"
-          :disabled="busy || jellyfinUserSaving || jellyfinUserOptions.length === 0"
-          :error="jellyfinUsersError"
-          hint="Choose the Jellyfin user whose library you want to view."
-          @update:model-value="emit('selectJellyfinUser', $event)"
+          :model-value="selectedUserId"
+          :label="userSelectionLabel"
+          :options="userOptions"
+          placeholder="Select a user"
+          :loading="usersLoading"
+          :disabled="busy || userSaving || userOptions.length === 0"
+          :error="usersError"
+          :hint="userSelectionHint"
+          @update:model-value="emit('selectUser', $event)"
         />
 
-        <p
-          v-if="jellyfinUserSaving"
-          class="service-form__user-feedback"
-          role="status"
-          aria-live="polite"
-        >
-          Saving Jellyfin user…
+        <p v-if="userSaving" class="service-form__user-feedback" role="status" aria-live="polite">
+          Saving user…
         </p>
 
         <p
-          v-else-if="showJellyfinUserSuccess"
+          v-else-if="showUserSuccess"
           class="service-form__success"
           role="status"
           aria-live="polite"
         >
-          {{ jellyfinUserSuccess }}
+          {{ userSuccess }}
         </p>
       </div>
 
@@ -261,7 +255,12 @@ function confirmRemoval() {
         Connect &amp; Test
       </mm-button>
 
-      <mm-service-health v-if="configured" :health="health" />
+      <mm-service-health
+        v-if="configured"
+        :status="healthStatus"
+        :last-checked-label="healthLastCheckedLabel"
+        :error="healthError"
+      />
 
       <mm-button
         v-if="configured"
@@ -280,15 +279,16 @@ function confirmRemoval() {
           v-if="confirmingRemoval"
           class="service-form__confirmation"
           role="group"
-          :aria-label="`Remove ${service.name} server confirmation`"
+          :aria-label="`Remove ${name} server confirmation`"
         >
-          <h3 class="service-form__confirmation-title">Remove {{ service.name }} server?</h3>
+          <h3 class="service-form__confirmation-title">Remove {{ name }} server?</h3>
 
           <p class="service-form__confirmation-description">
             This removes the saved server connection and API key from MediaManagarr. Your actual
             server and media library won't be affected.
-            <template v-if="serviceId === 'jellyfin'">
-              Your selected Jellyfin user will also be cleared.
+
+            <template v-if="removalNote">
+              {{ removalNote }}
             </template>
           </p>
 
@@ -351,7 +351,7 @@ function confirmRemoval() {
   gap: var(--space-3);
 }
 
-.service-form__jellyfin-user {
+.service-form__user-selection {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

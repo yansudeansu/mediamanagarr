@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import MmUpNextTemplate from '../components/templates/MmUpNextTemplate/MmUpNextTemplate.vue'
 import MmArrivalCard from '../components/molecules/MmArrivalCard/MmArrivalCard.vue'
 import MmPagination from '../components/molecules/MmPagination/MmPagination.vue'
@@ -46,6 +46,9 @@ const description = computed(() =>
 )
 
 let requestSequence = 0
+let isUnmounted = false
+
+const pendingImages = new Set<string>()
 
 function getErrorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : 'An unexpected error occurred.'
@@ -55,32 +58,44 @@ function getMediaUrl(arrival: JellyfinArrival): string | null {
   return getJellyfinMediaUrl(props.jellyfinUrl, arrival.id)
 }
 
-async function loadImage(arrival: JellyfinArrival, sequence: number): Promise<void> {
-  if (Object.hasOwn(images.value, arrival.imageId)) {
+async function loadImage(arrival: JellyfinArrival): Promise<void> {
+  const imageId = arrival.imageId
+
+  if (isUnmounted || Object.hasOwn(images.value, imageId) || pendingImages.has(imageId)) {
     return
   }
+
+  pendingImages.add(imageId)
 
   try {
     const response = await sendBackgroundMessage({
       type: 'GET_JELLYFIN_IMAGE',
-      itemId: arrival.imageId,
+      itemId: imageId,
       imageTag: arrival.imageTag,
     })
 
-    if (sequence !== requestSequence) {
+    if (isUnmounted) {
       return
     }
 
-    images.value[arrival.imageId] = response.success ? response.image : null
+    images.value[imageId] = response.success ? response.image : null
   } catch {
-    if (sequence === requestSequence) {
-      images.value[arrival.imageId] = null
+    if (!isUnmounted) {
+      images.value[imageId] = null
     }
+  } finally {
+    pendingImages.delete(imageId)
   }
 }
 
 async function loadArrivals(): Promise<void> {
+  if (isUnmounted) {
+    return
+  }
+
   const sequence = ++requestSequence
+  const requestedPage = page.value
+  const requestedFilter = activeFilter.value
 
   loading.value = true
   error.value = ''
@@ -89,12 +104,12 @@ async function loadArrivals(): Promise<void> {
   try {
     const response = await sendBackgroundMessage({
       type: 'GET_JELLYFIN_ARRIVALS',
-      page: page.value,
+      page: requestedPage,
       pageSize: PAGE_SIZE,
-      filter: activeFilter.value,
+      filter: requestedFilter,
     })
 
-    if (sequence !== requestSequence) {
+    if (isUnmounted || sequence !== requestSequence) {
       return
     }
 
@@ -102,19 +117,27 @@ async function loadArrivals(): Promise<void> {
       throw new Error(response.error)
     }
 
+    const availablePages = Math.max(1, Math.ceil(response.arrivals.total / PAGE_SIZE))
+
+    if (requestedPage > availablePages) {
+      page.value = availablePages
+      void loadArrivals()
+      return
+    }
+
     arrivals.value = response.arrivals.items
     total.value = response.arrivals.total
     unreadCount.value = response.unreadCount
 
-    if (activeFilter.value === 'all') {
+    if (requestedFilter === 'all') {
       allTotal.value = response.arrivals.total
     }
 
     for (const arrival of response.arrivals.items) {
-      void loadImage(arrival, sequence)
+      void loadImage(arrival)
     }
   } catch (caught) {
-    if (sequence !== requestSequence) {
+    if (isUnmounted || sequence !== requestSequence) {
       return
     }
 
@@ -122,7 +145,7 @@ async function loadArrivals(): Promise<void> {
     total.value = 0
     error.value = getErrorMessage(caught)
   } finally {
-    if (sequence === requestSequence) {
+    if (!isUnmounted && sequence === requestSequence) {
       loading.value = false
     }
   }
@@ -166,12 +189,15 @@ function refresh(): void {
 }
 
 async function toggleUnread(itemId: string, unread: boolean): Promise<void> {
-  if (busyItems.value.includes(itemId)) {
+  if (isUnmounted || clearing.value || busyItems.value.includes(itemId)) {
     return
   }
 
   busyItems.value = [...busyItems.value, itemId]
   actionError.value = ''
+
+  const filterAtStart = activeFilter.value
+  const sequenceAtStart = requestSequence
 
   try {
     const response = await sendBackgroundMessage({
@@ -180,8 +206,16 @@ async function toggleUnread(itemId: string, unread: boolean): Promise<void> {
       unread,
     })
 
+    if (isUnmounted) {
+      return
+    }
+
     if (!response.success) {
       throw new Error(response.error)
+    }
+
+    if (sequenceAtStart !== requestSequence || filterAtStart !== activeFilter.value) {
+      return
     }
 
     unreadCount.value = response.unreadCount
@@ -198,27 +232,42 @@ async function toggleUnread(itemId: string, unread: boolean): Promise<void> {
       )
     }
   } catch (caught) {
-    actionError.value = getErrorMessage(caught)
+    if (!isUnmounted && sequenceAtStart === requestSequence) {
+      actionError.value = getErrorMessage(caught)
+    }
   } finally {
-    busyItems.value = busyItems.value.filter((id) => id !== itemId)
+    if (!isUnmounted) {
+      busyItems.value = busyItems.value.filter((id) => id !== itemId)
+    }
   }
 }
 
 async function clearNotifications(): Promise<void> {
-  if (clearing.value || unreadCount.value === 0) {
+  if (isUnmounted || clearing.value || unreadCount.value === 0) {
     return
   }
 
   clearing.value = true
   actionError.value = ''
 
+  const filterAtStart = activeFilter.value
+  const sequenceAtStart = requestSequence
+
   try {
     const response = await sendBackgroundMessage({
       type: 'CLEAR_JELLYFIN_NOTIFICATIONS',
     })
 
+    if (isUnmounted) {
+      return
+    }
+
     if (!response.success) {
       throw new Error(response.error)
+    }
+
+    if (sequenceAtStart !== requestSequence || filterAtStart !== activeFilter.value) {
+      return
     }
 
     unreadCount.value = response.unreadCount
@@ -233,14 +282,24 @@ async function clearNotifications(): Promise<void> {
       }))
     }
   } catch (caught) {
-    actionError.value = getErrorMessage(caught)
+    if (!isUnmounted && sequenceAtStart === requestSequence) {
+      actionError.value = getErrorMessage(caught)
+    }
   } finally {
-    clearing.value = false
+    if (!isUnmounted) {
+      clearing.value = false
+    }
   }
 }
 
 onMounted(() => {
   void loadArrivals()
+})
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+  requestSequence += 1
+  pendingImages.clear()
 })
 </script>
 
