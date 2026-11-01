@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import MmTorrentCard from '../../molecules/MmTorrentCard/MmTorrentCard.vue'
+import type { TorrentCardData } from '../../molecules/MmTorrentCard/MmTorrentCard.vue'
 import MmPagination from '../../molecules/MmPagination/MmPagination.vue'
-import type { QBittorrentPendingAction, QBittorrentTorrent } from '../../../types/qbittorrent'
+
+interface PendingAction {
+  id: string
+  action: 'primary' | 'remove'
+}
 
 interface Props {
-  torrents: QBittorrentTorrent[]
+  torrents: TorrentCardData[]
   page: number
   pageSize?: number
-  pendingAction?: QBittorrentPendingAction | null
+  pendingAction?: PendingAction | null
   disabled?: boolean
 }
 
@@ -20,9 +25,8 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:page': [page: number]
-  start: [hash: string]
-  stop: [hash: string]
-  remove: [hash: string]
+  primaryAction: [id: string]
+  remove: [id: string]
 }>()
 
 const normalizedPageSize = computed(() => {
@@ -60,12 +64,24 @@ watch(
   },
 )
 
-function handlePageChange(page: number) {
+function handlePageChange(page: number): void {
   emit('update:page', page)
 }
 
-function pendingActionFor(hash: string) {
-  return props.pendingAction?.hash === hash ? props.pendingAction.action : null
+function pendingActionFor(id: string): 'primary' | 'remove' | null {
+  if (props.pendingAction?.id !== id) {
+    return null
+  }
+
+  return props.pendingAction.action
+}
+
+function handlePrimaryAction(id: string): void {
+  emit('primaryAction', id)
+}
+
+function handleRemove(id: string): void {
+  emit('remove', id)
 }
 </script>
 
@@ -78,14 +94,13 @@ function pendingActionFor(hash: string) {
 
     <template v-else>
       <ul class="torrent-list__items">
-        <li v-for="torrent in visibleTorrents" :key="torrent.hash" class="torrent-list__item">
+        <li v-for="torrent in visibleTorrents" :key="torrent.id" class="torrent-list__item">
           <mm-torrent-card
             :torrent="torrent"
-            :pending-action="pendingActionFor(torrent.hash)"
+            :pending-action="pendingActionFor(torrent.id)"
             :disabled="disabled"
-            @start="emit('start', $event)"
-            @stop="emit('stop', $event)"
-            @remove="emit('remove', $event)"
+            @primary-action="handlePrimaryAction"
+            @remove="handleRemove"
           />
         </li>
       </ul>

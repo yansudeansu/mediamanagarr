@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import MmCard from '../../atoms/MmCard/MmCard.vue'
 import MmIcon from '../../atoms/MmIcon/MmIcon.vue'
-import { formatSpeed } from '../../../utils/qbittorrent-format'
 
 interface Props {
   downloadSpeed: number
@@ -11,8 +10,32 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const formattedDownloadSpeed = computed(() => formatSpeed(props.downloadSpeed))
-const formattedUploadSpeed = computed(() => formatSpeed(props.uploadSpeed))
+function formatTransferSpeed(bytesPerSecond: number): string {
+  if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) {
+    return '0 B/s'
+  }
+
+  const units = ['B/s', 'KiB/s', 'MiB/s', 'GiB/s', 'TiB/s']
+  let value = bytesPerSecond
+  let unitIndex = 0
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+
+  if (unitIndex === 0) {
+    return `${Math.round(value)} B/s`
+  }
+
+  const formattedValue = value >= 10 ? Math.round(value).toString() : value.toFixed(1)
+
+  return `${formattedValue} ${units[unitIndex]}`
+}
+
+const formattedDownloadSpeed = computed(() => formatTransferSpeed(props.downloadSpeed))
+
+const formattedUploadSpeed = computed(() => formatTransferSpeed(props.uploadSpeed))
 </script>
 
 <template>

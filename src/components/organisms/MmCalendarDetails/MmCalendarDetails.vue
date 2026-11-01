@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import MmCalendarEvent from '../../molecules/MmCalendarEvent/MmCalendarEvent.vue'
 import type { CalendarItem } from '../../../types/calendar'
 import { parseCalendarDateKey } from '../../../utils/calendar-date'
@@ -16,6 +16,8 @@ const props = withDefaults(defineProps<Props>(), {
   images: () => ({}),
   loading: false,
 })
+
+const headingId = useId()
 
 const formattedDate = computed(() => {
   const date = parseCalendarDateKey(props.date)
@@ -40,10 +42,10 @@ const releaseLabel = computed(() =>
 </script>
 
 <template>
-  <section class="calendar-details" aria-labelledby="calendar-details-heading">
+  <section class="calendar-details" :aria-labelledby="headingId">
     <header class="calendar-details__header">
       <div class="calendar-details__heading">
-        <h3 id="calendar-details-heading" class="calendar-details__title">
+        <h3 :id="headingId" class="calendar-details__title">
           {{ formattedDate }}
         </h3>
 

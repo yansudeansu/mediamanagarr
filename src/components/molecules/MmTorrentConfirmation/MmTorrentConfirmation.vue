@@ -1,47 +1,65 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, useId, watch } from 'vue'
 import MmButton from '../../atoms/MmButton/MmButton.vue'
 import MmCard from '../../atoms/MmCard/MmCard.vue'
 import MmCheckbox from '../../atoms/MmCheckbox/MmCheckbox.vue'
-import type { QBittorrentTorrent } from '../../../types/qbittorrent'
+
+export interface ConfirmationItem {
+  id: string
+  name: string
+}
 
 interface Props {
-  torrent: QBittorrentTorrent | null
+  item: ConfirmationItem | null
   loading?: boolean
+  title?: string
+  description?: string
+  deleteFilesLabel?: string
+  deleteFilesHint?: string
+  deleteFilesWarning?: string
+  confirmLabel?: string
+  confirmWithFilesLabel?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
+  title: 'Remove item?',
+  description:
+    'This will remove the item. Its associated files will be kept unless you choose to delete them below.',
+  deleteFilesLabel: 'Also delete associated files',
+  deleteFilesHint: 'Permanently delete the associated files from disk.',
+  deleteFilesWarning: 'Warning: Associated files will also be deleted. This cannot be undone.',
+  confirmLabel: 'Remove item',
+  confirmWithFilesLabel: 'Remove + files',
 })
 
 const emit = defineEmits<{
-  confirm: [payload: { hash: string; deleteFiles: boolean }]
+  confirm: [payload: { id: string; deleteFiles: boolean }]
   cancel: []
 }>()
 
+const titleId = useId()
 const deleteFiles = ref(false)
 
-// Reset the destructive option whenever the confirmation opens,
-// closes, or switches to a different torrent.
 watch(
-  () => props.torrent,
+  () => props.item,
   () => {
     deleteFiles.value = false
   },
 )
 
-function handleConfirm() {
-  if (!props.torrent || props.loading) {
+function handleConfirm(): void {
+  if (!props.item || props.loading) {
     return
   }
 
   emit('confirm', {
-    hash: props.torrent.hash,
+    id: props.item.id,
     deleteFiles: deleteFiles.value,
   })
 }
 
-function handleCancel() {
+function handleCancel(): void {
   if (props.loading) {
     return
   }
@@ -52,31 +70,32 @@ function handleCancel() {
 </script>
 
 <template>
-  <mm-card v-if="torrent" padding="none">
-    <section class="torrent-confirmation" aria-labelledby="torrent-confirmation-title">
+  <mm-card v-if="item" padding="none">
+    <section class="torrent-confirmation" :aria-labelledby="titleId">
       <div class="torrent-confirmation__content">
-        <h3 id="torrent-confirmation-title" class="torrent-confirmation__title">Remove torrent?</h3>
+        <h3 :id="titleId" class="torrent-confirmation__title">
+          {{ title }}
+        </h3>
 
-        <p class="torrent-confirmation__name" :title="torrent.name">
-          {{ torrent.name }}
+        <p class="torrent-confirmation__name" :title="item.name">
+          {{ item.name }}
         </p>
 
         <p class="torrent-confirmation__description">
-          This will remove the torrent from qBittorrent. Your downloaded files will be kept unless
-          you choose to delete them below.
+          {{ description }}
         </p>
 
         <div class="torrent-confirmation__option">
           <mm-checkbox
             v-model="deleteFiles"
-            label="Also delete downloaded files"
-            hint="Permanently delete the downloaded data from disk."
+            :label="deleteFilesLabel"
+            :hint="deleteFilesHint"
             :disabled="loading"
           />
         </div>
 
         <p v-if="deleteFiles" class="torrent-confirmation__warning" role="alert">
-          Warning: Downloaded files will also be deleted. This cannot be undone.
+          {{ deleteFilesWarning }}
         </p>
       </div>
 
@@ -92,7 +111,7 @@ function handleCancel() {
           :disabled="loading"
           @click="handleConfirm"
         >
-          {{ deleteFiles ? 'Remove + files' : 'Remove torrent' }}
+          {{ deleteFiles ? confirmWithFilesLabel : confirmLabel }}
         </mm-button>
       </div>
     </section>

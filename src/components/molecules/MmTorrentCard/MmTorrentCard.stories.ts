@@ -1,17 +1,20 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
+import { fn } from 'storybook/test'
 import MmTorrentCard from './MmTorrentCard.vue'
-import type { QBittorrentTorrent } from '../../../types/qbittorrent'
+import type { TorrentCardData } from './MmTorrentCard.vue'
 
-const baseTorrent: QBittorrentTorrent = {
-  hash: 'a'.repeat(40),
-  name: 'Movie 1 (2026) 1080p WEB-DL',
-  progress: 0.425,
-  state: 'downloading',
-  downloadSpeed: 2_500_000,
-  uploadSpeed: 125_000,
-  eta: 3600,
-  size: 8_000_000_000,
-  downloaded: 3_400_000_000,
+const baseTorrent: TorrentCardData = {
+  id: 'a'.repeat(40),
+  name: 'Example Download (2026) 1080p WEB-DL',
+  statusLabel: 'Downloading',
+  statusVariant: 'downloading',
+  progress: 42.5,
+  progressLabel: '42.5%',
+  sizeLabel: '3.2 GiB / 7.5 GiB',
+  downloadSpeedLabel: '2.4 MiB/s',
+  uploadSpeedLabel: '122 KiB/s',
+  etaLabel: '1h 0m',
+  primaryActionLabel: 'Stop',
 }
 
 const meta = {
@@ -22,14 +25,30 @@ const meta = {
     torrent: baseTorrent,
     pendingAction: null,
     disabled: false,
+    onPrimaryAction: fn(),
+    onRemove: fn(),
   },
   argTypes: {
+    torrent: {
+      control: 'object',
+      description: 'Formatted display data for the transfer.',
+    },
     pendingAction: {
       control: 'select',
-      options: [null, 'start', 'stop', 'remove'],
+      options: [null, 'primary', 'remove'],
+      description: 'Action currently in progress.',
     },
     disabled: {
       control: 'boolean',
+      description: 'Disable both actions.',
+    },
+    onPrimaryAction: {
+      action: 'primaryAction',
+      description: 'Emitted when the primary action is requested.',
+    },
+    onRemove: {
+      action: 'remove',
+      description: 'Emitted when removal is requested.',
     },
   },
   decorators: [
@@ -49,9 +68,10 @@ export const Stalled: Story = {
   args: {
     torrent: {
       ...baseTorrent,
-      state: 'stalledDL',
-      downloadSpeed: 0,
-      eta: 8_640_000,
+      statusLabel: 'Stalled',
+      statusVariant: 'neutral',
+      downloadSpeedLabel: '0 B/s',
+      etaLabel: 'Unknown',
     },
   },
 }
@@ -60,12 +80,14 @@ export const Seeding: Story = {
   args: {
     torrent: {
       ...baseTorrent,
-      progress: 1,
-      state: 'uploading',
-      downloaded: baseTorrent.size,
-      downloadSpeed: 0,
-      uploadSpeed: 800_000,
-      eta: 0,
+      statusLabel: 'Seeding',
+      statusVariant: 'seeding',
+      progress: 100,
+      progressLabel: '100.0%',
+      sizeLabel: '7.5 GiB / 7.5 GiB',
+      downloadSpeedLabel: '0 B/s',
+      uploadSpeedLabel: '781 KiB/s',
+      etaLabel: 'Complete',
     },
   },
 }
@@ -74,9 +96,12 @@ export const Stopped: Story = {
   args: {
     torrent: {
       ...baseTorrent,
-      state: 'stoppedDL',
-      downloadSpeed: 0,
-      uploadSpeed: 0,
+      statusLabel: 'Stopped',
+      statusVariant: 'stopped',
+      downloadSpeedLabel: '0 B/s',
+      uploadSpeedLabel: '0 B/s',
+      etaLabel: 'Unknown',
+      primaryActionLabel: 'Start',
     },
   },
 }
@@ -85,9 +110,10 @@ export const NearlyComplete: Story = {
   args: {
     torrent: {
       ...baseTorrent,
-      progress: 0.987,
-      downloaded: 7_896_000_000,
-      eta: 120,
+      progress: 98.7,
+      progressLabel: '98.7%',
+      sizeLabel: '7.4 GiB / 7.5 GiB',
+      etaLabel: '2m 0s',
     },
   },
 }
@@ -96,9 +122,11 @@ export const Error: Story = {
   args: {
     torrent: {
       ...baseTorrent,
-      state: 'error',
-      downloadSpeed: 0,
-      uploadSpeed: 0,
+      statusLabel: 'Error',
+      statusVariant: 'error',
+      downloadSpeedLabel: '0 B/s',
+      uploadSpeedLabel: '0 B/s',
+      etaLabel: 'Unknown',
     },
   },
 }
@@ -107,14 +135,14 @@ export const LongName: Story = {
   args: {
     torrent: {
       ...baseTorrent,
-      name: 'Movie 1 (2026) Extended Edition With Additional Bonus Content and an Extremely Long Filename for Layout Testing - 2160p HDR',
+      name: 'Example Download (2026) Extended Edition With Additional Bonus Content and an Extremely Long Filename for Layout Testing - 2160p HDR',
     },
   },
 }
 
 export const StopPending: Story = {
   args: {
-    pendingAction: 'stop',
+    pendingAction: 'primary',
   },
 }
 

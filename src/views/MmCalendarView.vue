@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import MmCalendarTemplate from '../components/templates/MmCalendarTemplate/MmCalendarTemplate.vue'
 import MmCalendarHeader from '../components/molecules/MmCalendarHeader/MmCalendarHeader.vue'
 import MmCalendarGrid from '../components/organisms/MmCalendarGrid/MmCalendarGrid.vue'
@@ -47,6 +47,7 @@ const imageCache = new Map<string, string | null>()
 const pendingImages = new Map<string, Promise<string | null>>()
 
 let requestSequence = 0
+let isUnmounted = false
 
 const filteredItems = computed(() => {
   if (activeFilter.value === 'all') {
@@ -114,6 +115,10 @@ async function restorePosition(): Promise<void> {
       [STORAGE_KEY]?: CalendarPosition
     }
 
+    if (isUnmounted) {
+      return
+    }
+
     const stored = result[STORAGE_KEY]
 
     if (!stored) {
@@ -141,6 +146,10 @@ async function restorePosition(): Promise<void> {
 }
 
 async function loadCalendar(): Promise<void> {
+  if (isUnmounted) {
+    return
+  }
+
   const sequence = ++requestSequence
   const { start, end } = calendarMonthRange(currentMonthDate())
 
@@ -154,7 +163,7 @@ async function loadCalendar(): Promise<void> {
       end: calendarDateKey(end),
     })
 
-    if (sequence !== requestSequence) {
+    if (isUnmounted || sequence !== requestSequence) {
       return
     }
 
@@ -165,7 +174,7 @@ async function loadCalendar(): Promise<void> {
     items.value = response.calendar.items
     services.value = response.calendar.services
   } catch (caught) {
-    if (sequence !== requestSequence) {
+    if (isUnmounted || sequence !== requestSequence) {
       return
     }
 
@@ -173,13 +182,17 @@ async function loadCalendar(): Promise<void> {
     services.value = []
     error.value = getErrorMessage(caught)
   } finally {
-    if (sequence === requestSequence) {
+    if (!isUnmounted && sequence === requestSequence) {
       loading.value = false
     }
   }
 }
 
 async function loadImage(item: CalendarItem): Promise<void> {
+  if (isUnmounted) {
+    return
+  }
+
   const mediaId = item.posterMediaId
 
   if (typeof mediaId !== 'number' || !Number.isSafeInteger(mediaId) || mediaId < 1) {
@@ -215,6 +228,10 @@ async function loadImage(item: CalendarItem): Promise<void> {
 
   try {
     const image = await request
+
+    if (isUnmounted) {
+      return
+    }
 
     imageCache.set(cacheKey, image)
     images.value[item.id] = image
@@ -281,8 +298,9 @@ function nextMonth(): void {
 }
 
 function goToToday(): void {
-  const currentToday = calendarDateKey(new Date())
-  const todayMonth = calendarDateKey(startOfCalendarMonth(new Date()))
+  const now = new Date()
+  const currentToday = calendarDateKey(now)
+  const todayMonth = calendarDateKey(startOfCalendarMonth(now))
 
   selectedDate.value = currentToday
 
@@ -304,7 +322,15 @@ function refresh(): void {
 
 onMounted(async () => {
   await restorePosition()
-  await loadCalendar()
+
+  if (!isUnmounted) {
+    await loadCalendar()
+  }
+})
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+  requestSequence += 1
 })
 </script>
 

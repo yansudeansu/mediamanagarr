@@ -1,16 +1,21 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
-import MmHeader from './components/molecules/MmHeader/MmHeader.vue'
+import MmHeader from './components/atoms/MmHeader/MmHeader.vue'
+import MmQuickAccess from './components/molecules/MmQuickAccess/MmQuickAccess.vue'
+import type { QuickAccessItem } from './components/molecules/MmQuickAccess/MmQuickAccess.vue'
 import MmNavigation from './components/molecules/MmNavigation/MmNavigation.vue'
 import MmFooter from './components/atoms/MmFooter/MmFooter.vue'
 import MmButton from './components/atoms/MmButton/MmButton.vue'
+import mmLogo from './assets/mm-logo.svg'
 import MmRequestView from './views/MmRequestView.vue'
 import MmUpNextView from './views/MmUpNextView.vue'
 import MmCalendarView from './views/MmCalendarView.vue'
 import MmDownloadsView from './views/MmDownloadsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import { getAvailableNavigationItems } from './navigation/features'
+import { SERVICE_REGISTRY, SERVICES } from './services/registry'
 import { sendBackgroundMessage } from './utils/background-messaging'
+import { normalizeServerUrl } from './utils/service-config'
 import { openWorkspaceSidebar } from './utils/workspace-sidebar'
 import { getSafeServiceConfigs } from './utils/service-storage'
 import { getAppVersion } from './utils/version'
@@ -24,7 +29,31 @@ const activeView = ref<NavigationView>('requests')
 const safeServices = ref<SafeServiceConfigs>({})
 
 const navigationItems = computed(() => getAvailableNavigationItems(safeServices.value))
+
+const quickAccessItems = computed<QuickAccessItem[]>(() =>
+  SERVICES.flatMap((serviceId) => {
+    const config = safeServices.value[serviceId]
+
+    if (!config?.configured) {
+      return []
+    }
+
+    try {
+      return [
+        {
+          id: serviceId,
+          label: SERVICE_REGISTRY[serviceId].name,
+          href: normalizeServerUrl(config.url),
+        },
+      ]
+    } catch {
+      return []
+    }
+  }),
+)
+
 const servicesReady = ref(false)
+const workspaceStateReady = ref(false)
 
 const navigationReady = computed(() => workspaceStateReady.value && servicesReady.value)
 
@@ -52,12 +81,15 @@ const windowMode = ref<WorkspaceMode>(
 
 const workspaceError = ref('')
 const workspaceLoading = ref(false)
-const workspaceStateReady = ref(false)
 
 const version = getAppVersion()
 
 let serviceLoadVersion = 0
 let isUnmounted = false
+
+// Navigation writes run sequentially so a stale write cannot
+// overwrite a newer state in session storage.
+let navigationSaveQueue: Promise<void> = Promise.resolve()
 
 function hasWorkspaceStorage(): boolean {
   return (
@@ -72,6 +104,8 @@ function hasServiceStorage(): boolean {
 }
 
 async function refreshSafeServices(): Promise<void> {
+  if (isUnmounted) return
+
   const loadVersion = ++serviceLoadVersion
 
   if (!hasServiceStorage()) {
@@ -87,9 +121,8 @@ async function refreshSafeServices(): Promise<void> {
       safeServices.value = configs
     }
   } catch (error) {
-    console.warn('MediaManagarr: Unable to load safe service configurations:', error)
-
     if (!isUnmounted && loadVersion === serviceLoadVersion) {
+      console.warn('MediaManagarr: Unable to load safe service configurations:', error)
       safeServices.value = {}
     }
   } finally {
@@ -103,11 +136,39 @@ function handleStorageChange(
   changes: Record<string, chrome.storage.StorageChange>,
   areaName: string,
 ): void {
-  if (areaName !== 'local' || !changes.mediaManagarrServices) {
+  if (isUnmounted || areaName !== 'local' || !changes.mediaManagarrServices) {
     return
   }
 
   void refreshSafeServices()
+}
+
+function saveNavigationState(): Promise<void> {
+  if (isUnmounted || !workspaceStateReady.value || !hasWorkspaceStorage()) {
+    return Promise.resolve()
+  }
+
+  // Capture the state when the save is requested, rather than
+  // reading potentially different values when the queue runs.
+  const state = {
+    activeView: activeView.value,
+    settingsOpen: settingsOpen.value,
+  }
+
+  const save = navigationSaveQueue.then(() => saveWorkspaceNavigationState(state))
+
+  // Keep the queue usable even if an individual write fails.
+  navigationSaveQueue = save.catch(() => undefined)
+
+  return save
+}
+
+function queueNavigationSave(): void {
+  void saveNavigationState().catch((error: unknown) => {
+    if (!isUnmounted) {
+      console.warn('MediaManagarr: Unable to save workspace navigation:', error)
+    }
+  })
 }
 
 onMounted(async () => {
@@ -122,13 +183,19 @@ onMounted(async () => {
     if (hasWorkspaceStorage()) {
       const state = await getWorkspaceNavigationState()
 
+      if (isUnmounted) return
+
       activeView.value = state.activeView
       settingsOpen.value = state.settingsOpen
     }
   } catch (error) {
-    console.warn('MediaManagarr: Unable to restore workspace navigation:', error)
+    if (!isUnmounted) {
+      console.warn('MediaManagarr: Unable to restore workspace navigation:', error)
+    }
   } finally {
-    workspaceStateReady.value = true
+    if (!isUnmounted) {
+      workspaceStateReady.value = true
+    }
   }
 })
 
@@ -141,19 +208,10 @@ onBeforeUnmount(() => {
   }
 })
 
-watch([activeView, settingsOpen], async () => {
-  if (!workspaceStateReady.value || !hasWorkspaceStorage()) {
-    return
-  }
+watch([activeView, settingsOpen], () => {
+  if (!workspaceStateReady.value || isUnmounted) return
 
-  try {
-    await saveWorkspaceNavigationState({
-      activeView: activeView.value,
-      settingsOpen: settingsOpen.value,
-    })
-  } catch (error) {
-    console.warn('MediaManagarr: Unable to save workspace navigation:', error)
-  }
+  queueNavigationSave()
 })
 
 function handleNavigate(view: string): void {
@@ -163,7 +221,7 @@ function handleNavigate(view: string): void {
 }
 
 async function detachWorkspace(): Promise<void> {
-  if (workspaceLoading.value) {
+  if (isUnmounted || workspaceLoading.value) {
     return
   }
 
@@ -172,29 +230,34 @@ async function detachWorkspace(): Promise<void> {
 
   try {
     if (hasWorkspaceStorage()) {
-      await saveWorkspaceNavigationState({
-        activeView: activeView.value,
-        settingsOpen: settingsOpen.value,
-      })
+      await saveNavigationState()
+
+      if (isUnmounted) return
     }
 
     const response = await sendBackgroundMessage({
       type: 'OPEN_DETACHED_WORKSPACE',
     })
 
+    if (isUnmounted) return
+
     if (!response.success) {
       workspaceError.value = response.error
     }
   } catch (error) {
-    workspaceError.value =
-      error instanceof Error ? error.message : 'Unable to open the detached workspace.'
+    if (!isUnmounted) {
+      workspaceError.value =
+        error instanceof Error ? error.message : 'Unable to open the detached workspace.'
+    }
   } finally {
-    workspaceLoading.value = false
+    if (!isUnmounted) {
+      workspaceLoading.value = false
+    }
   }
 }
 
 async function openSidebar(): Promise<void> {
-  if (workspaceLoading.value) {
+  if (isUnmounted || workspaceLoading.value) {
     return
   }
 
@@ -207,22 +270,30 @@ async function openSidebar(): Promise<void> {
 
     if (hasWorkspaceStorage()) {
       try {
-        await saveWorkspaceNavigationState({
-          activeView: activeView.value,
-          settingsOpen: settingsOpen.value,
-        })
+        await saveNavigationState()
       } catch (error) {
-        console.warn('MediaManagarr: Unable to save workspace navigation:', error)
+        if (!isUnmounted) {
+          console.warn('MediaManagarr: Unable to save workspace navigation:', error)
+        }
       }
     }
 
+    // Always observe the sidebar operation, including if the view
+    // unmounted while navigation state was being saved.
     await sidebarPromise
+
+    if (isUnmounted) return
+
     window.close()
   } catch (error) {
-    workspaceError.value =
-      error instanceof Error ? error.message : 'Unable to open the browser sidebar.'
+    if (!isUnmounted) {
+      workspaceError.value =
+        error instanceof Error ? error.message : 'Unable to open the browser sidebar.'
+    }
   } finally {
-    workspaceLoading.value = false
+    if (!isUnmounted) {
+      workspaceLoading.value = false
+    }
   }
 }
 </script>
@@ -235,12 +306,21 @@ async function openSidebar(): Promise<void> {
       'app-shell--sidebar': windowMode === 'sidebar',
     }"
   >
-    <mm-header
-      :mode="settingsOpen ? 'settings' : 'main'"
-      :services="safeServices"
-      @settings="settingsOpen = true"
-      @back="settingsOpen = false"
-    />
+    <mm-header :title="settingsOpen ? 'Settings' : 'MediaManagarr'" :logo="mmLogo">
+      <template #actions>
+        <mm-button
+          v-if="settingsOpen"
+          variant="secondary"
+          icon="arrow-left"
+          icon-only
+          aria-label="Back to previous view"
+          title="Back to previous view"
+          @click="settingsOpen = false"
+        />
+
+        <mm-quick-access v-else :items="quickAccessItems" @settings="settingsOpen = true" />
+      </template>
+    </mm-header>
 
     <p v-if="workspaceError" class="workspace-error" role="alert">
       {{ workspaceError }}
@@ -280,7 +360,7 @@ async function openSidebar(): Promise<void> {
       </template>
     </main>
 
-    <mm-footer :version="version" />
+    <mm-footer brand="MediaManagarr" :version="version" />
   </div>
 </template>
 

@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmUpNextTemplate from './MmUpNextTemplate.vue'
 import MmArrivalCard from '../../molecules/MmArrivalCard/MmArrivalCard.vue'
@@ -156,7 +156,7 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-function createStory(initialFilter: ArrivalFilter = 'all') {
+function createStory(initialFilter: ArrivalFilter = 'all'): Story['render'] {
   return () => ({
     components: {
       MmUpNextTemplate,
@@ -167,24 +167,27 @@ function createStory(initialFilter: ArrivalFilter = 'all') {
 
     setup() {
       const arrivals = ref<JellyfinArrival[]>(mockArrivals.map((arrival) => ({ ...arrival })))
+
       const activeFilter = ref<ArrivalFilter>(initialFilter)
       const page = ref(1)
 
       const unreadCount = computed(() => arrivals.value.filter((arrival) => arrival.unread).length)
 
-      const totalPages = computed(() => Math.max(1, Math.ceil(arrivals.value.length / PAGE_SIZE)))
+      const filteredArrivals = computed(() =>
+        activeFilter.value === 'new'
+          ? arrivals.value.filter((arrival) => arrival.unread)
+          : arrivals.value,
+      )
 
-      const currentPageArrivals = computed(() => {
+      const totalPages = computed(() =>
+        Math.max(1, Math.ceil(filteredArrivals.value.length / PAGE_SIZE)),
+      )
+
+      const visibleArrivals = computed(() => {
         const start = (page.value - 1) * PAGE_SIZE
 
-        return arrivals.value.slice(start, start + PAGE_SIZE)
+        return filteredArrivals.value.slice(start, start + PAGE_SIZE)
       })
-
-      const visibleArrivals = computed(() =>
-        activeFilter.value === 'new'
-          ? currentPageArrivals.value.filter((arrival) => arrival.unread)
-          : currentPageArrivals.value,
-      )
 
       const description = computed(() =>
         unreadCount.value > 0
@@ -192,24 +195,31 @@ function createStory(initialFilter: ArrivalFilter = 'all') {
           : `${arrivals.value.length} unwatched items`,
       )
 
-      function selectFilter(filter: ArrivalFilter) {
+      watch(totalPages, (count) => {
+        if (page.value > count) {
+          page.value = count
+        }
+      })
+
+      function selectFilter(filter: ArrivalFilter): void {
         activeFilter.value = filter
+        page.value = 1
       }
 
-      function toggleUnread(itemId: string, unread: boolean) {
+      function toggleUnread(itemId: string, unread: boolean): void {
         arrivals.value = arrivals.value.map((arrival) =>
           arrival.id === itemId ? { ...arrival, unread } : arrival,
         )
       }
 
-      function clearNotifications() {
+      function clearNotifications(): void {
         arrivals.value = arrivals.value.map((arrival) => ({
           ...arrival,
           unread: false,
         }))
       }
 
-      function refresh() {
+      function refresh(): void {
         arrivals.value = mockArrivals.map((arrival) => ({ ...arrival }))
         activeFilter.value = 'all'
         page.value = 1
@@ -378,7 +388,7 @@ export const Error: Story = {
     setup() {
       const retrying = ref(false)
 
-      function retry() {
+      function retry(): void {
         retrying.value = true
       }
 

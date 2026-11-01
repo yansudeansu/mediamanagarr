@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import MmSettingsTemplate from '../components/templates/MmSettingsTemplate/MmSettingsTemplate.vue'
 import MmServiceSelector from '../components/organisms/MmServiceSelector/MmServiceSelector.vue'
 import MmServiceForm from '../components/organisms/MmServiceForm/MmServiceForm.vue'
@@ -23,7 +23,6 @@ import { getHostPermission, normalizeServerUrl } from '../utils/service-config'
 import { getWorkspacePreferences, saveWorkspacePreferences } from '../utils/workspace-storage'
 
 interface ConnectPayload {
-  serviceId: ServiceId
   url: string
   apiKey: string
 }
@@ -72,6 +71,16 @@ const jellyfinUserSaving = ref(false)
 const jellyfinUsersError = ref('')
 const jellyfinUserSuccess = ref('')
 
+// The parent owns the registry and maps domain-specific service
+// state into the generic selector's presentational contract.
+const serviceSelectorItems = computed(() =>
+  SERVICES.map((serviceId) => ({
+    id: serviceId,
+    name: SERVICE_REGISTRY[serviceId].name,
+    status: statuses.value[serviceId] ?? 'not-configured',
+  })),
+)
+
 const selectedUrl = computed(() => configs.value[selectedService.value]?.url ?? '')
 const configured = computed(() => configs.value[selectedService.value]?.configured ?? false)
 const loading = computed(() => loadingServices.value[selectedService.value] ?? false)
@@ -80,10 +89,61 @@ const removing = computed(() => removingServices.value[selectedService.value] ??
 const error = computed(() => serviceErrors.value[selectedService.value] ?? '')
 const success = computed(() => serviceSuccesses.value[selectedService.value] ?? '')
 const selectedHealth = computed(() => healthStates.value[selectedService.value])
+const selectedServiceName = computed(() => SERVICE_REGISTRY[selectedService.value].name)
+
+// A configured service may reuse its saved key only for its saved URL.
+// The background connection handler remains responsible for enforcing this.
+const canReuseSavedKey = computed(() => configured.value && Boolean(selectedUrl.value.trim()))
+
+const healthStatus = computed<'connected' | 'failed' | 'not-checked'>(() => {
+  const status = selectedHealth.value?.status
+
+  return status === 'connected' || status === 'failed' ? status : 'not-checked'
+})
+
+const healthLastCheckedLabel = computed(() => {
+  const timestamp = selectedHealth.value?.lastCheckedAt
+
+  if (!timestamp) return ''
+
+  const date = new Date(timestamp)
+
+  if (Number.isNaN(date.getTime())) return ''
+
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+})
+
+const healthError = computed(() => selectedHealth.value?.error ?? '')
+
+const showJellyfinUsers = computed(() => selectedService.value === 'jellyfin')
+
+const jellyfinUserOptions = computed(() =>
+  jellyfinUsers.value.map((user) => ({
+    label: user.name,
+    value: user.id,
+  })),
+)
+
+let isUnmounted = false
+let healthRequestSequence = 0
+let jellyfinUsersRequestSequence = 0
 
 function selectSection(value: string): void {
   if (value === 'connections' || value === 'workspace') {
     activeSection.value = value
+  }
+}
+
+function selectService(value: string): void {
+  // The generic selector emits strings. Only registered service IDs
+  // are permitted to enter this view's domain-specific state.
+  const serviceId = SERVICES.find((id) => id === value)
+
+  if (serviceId !== undefined) {
+    selectedService.value = serviceId
   }
 }
 
@@ -92,29 +152,37 @@ function getErrorMessage(caught: unknown): string {
 }
 
 async function loadWorkspacePreferences(): Promise<void> {
+  if (isUnmounted) return
+
   workspaceLoading.value = true
   workspaceError.value = ''
+  workspaceSuccess.value = ''
 
   try {
     const preferences = await getWorkspacePreferences()
+
+    if (isUnmounted) return
+
     workspaceMode.value = preferences.defaultMode
   } catch (caught) {
-    workspaceError.value = getErrorMessage(caught)
+    if (!isUnmounted) {
+      workspaceError.value = getErrorMessage(caught)
+    }
   } finally {
-    workspaceLoading.value = false
+    if (!isUnmounted) {
+      workspaceLoading.value = false
+    }
   }
 }
 
 async function updateWorkspaceMode(value: string): Promise<void> {
-  if (!isWorkspaceMode(value) || workspaceSaving.value || workspaceLoading.value) {
+  if (isUnmounted || !isWorkspaceMode(value) || workspaceSaving.value || workspaceLoading.value) {
     return
   }
 
   const previousMode = workspaceMode.value
 
-  if (value === previousMode) {
-    return
-  }
+  if (value === previousMode) return
 
   workspaceMode.value = value
   workspaceSaving.value = true
@@ -126,12 +194,18 @@ async function updateWorkspaceMode(value: string): Promise<void> {
       defaultMode: value,
     })
 
+    if (isUnmounted) return
+
     workspaceSuccess.value = 'Default workspace saved.'
   } catch (caught) {
+    if (isUnmounted) return
+
     workspaceMode.value = previousMode
     workspaceError.value = getErrorMessage(caught)
   } finally {
-    workspaceSaving.value = false
+    if (!isUnmounted) {
+      workspaceSaving.value = false
+    }
   }
 }
 
@@ -162,6 +236,8 @@ function clearJellyfinUserFeedback(): void {
 }
 
 function clearJellyfinUsers(): void {
+  jellyfinUsersRequestSequence += 1
+  jellyfinUsersLoading.value = false
   jellyfinUsers.value = []
   jellyfinUserId.value = ''
   clearJellyfinUserFeedback()
@@ -180,9 +256,15 @@ function updateServiceStatus(serviceId: ServiceId): void {
 }
 
 async function loadHealth(): Promise<void> {
+  if (isUnmounted) return
+
+  const sequence = ++healthRequestSequence
+
   const response = await sendBackgroundMessage({
     type: 'GET_SERVICE_HEALTH',
   })
+
+  if (isUnmounted || sequence !== healthRequestSequence) return
 
   if (!response.success) {
     throw new Error(response.error)
@@ -199,15 +281,21 @@ async function refreshHealthSafely(serviceId: ServiceId): Promise<void> {
   try {
     await loadHealth()
   } catch (caught) {
-    console.warn(`MediaManagarr: Unable to load service health for ${serviceId}:`, caught)
+    if (!isUnmounted) {
+      console.warn(`MediaManagarr: Unable to load service health for ${serviceId}:`, caught)
+    }
   }
 }
 
 async function loadJellyfinUsers(): Promise<void> {
+  if (isUnmounted) return
+
   if (!configs.value.jellyfin?.configured) {
     clearJellyfinUsers()
     return
   }
+
+  const sequence = ++jellyfinUsersRequestSequence
 
   jellyfinUsersLoading.value = true
   clearJellyfinUserFeedback()
@@ -217,23 +305,35 @@ async function loadJellyfinUsers(): Promise<void> {
       type: 'GET_JELLYFIN_USERS',
     })
 
+    if (isUnmounted || sequence !== jellyfinUsersRequestSequence) return
+
     if (!response.success) {
       throw new Error(response.error)
+    }
+
+    if (!configs.value.jellyfin?.configured) {
+      clearJellyfinUsers()
+      return
     }
 
     jellyfinUsers.value = response.users
     jellyfinUserId.value = response.selectedUserId
   } catch (caught) {
+    if (isUnmounted || sequence !== jellyfinUsersRequestSequence) return
+
     jellyfinUsers.value = []
     jellyfinUserId.value = ''
     jellyfinUsersError.value = getErrorMessage(caught)
   } finally {
-    jellyfinUsersLoading.value = false
+    if (!isUnmounted && sequence === jellyfinUsersRequestSequence) {
+      jellyfinUsersLoading.value = false
+    }
   }
 }
 
 async function selectJellyfinUser(userId: string): Promise<void> {
   if (
+    isUnmounted ||
     jellyfinUserSaving.value ||
     jellyfinUsersLoading.value ||
     isServiceBusy('jellyfin') ||
@@ -251,6 +351,8 @@ async function selectJellyfinUser(userId: string): Promise<void> {
       userId,
     })
 
+    if (isUnmounted) return
+
     if (!response.success) {
       throw new Error(response.error)
     }
@@ -258,17 +360,25 @@ async function selectJellyfinUser(userId: string): Promise<void> {
     jellyfinUserId.value = response.userId
     jellyfinUserSuccess.value = 'Jellyfin user saved successfully.'
   } catch (caught) {
-    jellyfinUsersError.value = getErrorMessage(caught)
+    if (!isUnmounted) {
+      jellyfinUsersError.value = getErrorMessage(caught)
+    }
   } finally {
-    jellyfinUserSaving.value = false
+    if (!isUnmounted) {
+      jellyfinUserSaving.value = false
+    }
   }
 }
 
 async function loadConfigs(): Promise<void> {
+  if (isUnmounted) return
+
   try {
     const response = await sendBackgroundMessage({
       type: 'GET_SERVICE_CONFIGS',
     })
+
+    if (isUnmounted) return
 
     if (!response.success) {
       throw new Error(response.error)
@@ -282,22 +392,22 @@ async function loadConfigs(): Promise<void> {
 
     await refreshHealthSafely(selectedService.value)
 
-    if (response.configs.jellyfin?.configured) {
+    if (isUnmounted) return
+
+    if (configs.value.jellyfin?.configured) {
       await loadJellyfinUsers()
     } else {
       clearJellyfinUsers()
     }
   } catch (caught) {
-    serviceErrors.value[selectedService.value] = getErrorMessage(caught)
+    if (!isUnmounted) {
+      serviceErrors.value[selectedService.value] = getErrorMessage(caught)
+    }
   }
 }
 
-async function connectService(payload: ConnectPayload): Promise<void> {
-  const { serviceId } = payload
-
-  if (isServiceBusy(serviceId)) {
-    return
-  }
+async function connectService(serviceId: ServiceId, payload: ConnectPayload): Promise<void> {
+  if (isUnmounted || isServiceBusy(serviceId)) return
 
   loadingServices.value[serviceId] = true
   clearConnectionFeedback(serviceId)
@@ -308,12 +418,27 @@ async function connectService(payload: ConnectPayload): Promise<void> {
 
   try {
     const normalizedUrl = normalizeServerUrl(payload.url)
+    const savedConfig = configs.value[serviceId]
+
+    // Never reuse a saved API key for a different server.
+    if (!payload.apiKey.trim()) {
+      if (!savedConfig?.configured || !savedConfig.url) {
+        throw new Error('Enter an API key.')
+      }
+
+      if (normalizeServerUrl(savedConfig.url) !== normalizedUrl) {
+        throw new Error('Enter an API key for the new server URL.')
+      }
+    }
+
     const permission = getHostPermission(normalizedUrl)
 
     // Keep the permission request in the direct user gesture.
     const granted = await chrome.permissions.request({
       origins: [permission],
     })
+
+    if (isUnmounted) return
 
     if (!granted) {
       throw new Error('Server access was not granted.')
@@ -327,6 +452,8 @@ async function connectService(payload: ConnectPayload): Promise<void> {
         apiKey: payload.apiKey,
       },
     })
+
+    if (isUnmounted) return
 
     if (!response.success) {
       throw new Error(response.error)
@@ -343,10 +470,14 @@ async function connectService(payload: ConnectPayload): Promise<void> {
 
     await refreshHealthSafely(serviceId)
 
+    if (isUnmounted) return
+
     if (serviceId === 'jellyfin') {
       await loadJellyfinUsers()
     }
   } catch (caught) {
+    if (isUnmounted) return
+
     updateServiceStatus(serviceId)
 
     if (!configs.value[serviceId]?.configured) {
@@ -355,12 +486,14 @@ async function connectService(payload: ConnectPayload): Promise<void> {
 
     serviceErrors.value[serviceId] = getErrorMessage(caught)
   } finally {
-    loadingServices.value[serviceId] = false
+    if (!isUnmounted) {
+      loadingServices.value[serviceId] = false
+    }
   }
 }
 
 async function testConnection(serviceId: ServiceId): Promise<void> {
-  if (isServiceBusy(serviceId) || !configs.value[serviceId]?.configured) {
+  if (isUnmounted || isServiceBusy(serviceId) || !configs.value[serviceId]?.configured) {
     return
   }
 
@@ -373,6 +506,8 @@ async function testConnection(serviceId: ServiceId): Promise<void> {
       serviceId,
     })
 
+    if (isUnmounted) return
+
     if (!response.success) {
       throw new Error(response.error)
     }
@@ -381,16 +516,22 @@ async function testConnection(serviceId: ServiceId): Promise<void> {
     serviceSuccesses.value[serviceId] =
       `Connected to ${SERVICE_REGISTRY[serviceId].name} successfully.`
   } catch (caught) {
+    if (isUnmounted) return
+
     statuses.value[serviceId] = 'failed'
     serviceErrors.value[serviceId] = getErrorMessage(caught)
   } finally {
-    await refreshHealthSafely(serviceId)
-    testingServices.value[serviceId] = false
+    if (!isUnmounted) {
+      await refreshHealthSafely(serviceId)
+      if (!isUnmounted) {
+        testingServices.value[serviceId] = false
+      }
+    }
   }
 }
 
 async function removeService(serviceId: ServiceId): Promise<void> {
-  if (isServiceBusy(serviceId) || !configs.value[serviceId]?.configured) {
+  if (isUnmounted || isServiceBusy(serviceId) || !configs.value[serviceId]?.configured) {
     return
   }
 
@@ -411,6 +552,8 @@ async function removeService(serviceId: ServiceId): Promise<void> {
       serviceId,
     })
 
+    if (isUnmounted) return
+
     if (!response.success) {
       throw new Error(response.error)
     }
@@ -429,15 +572,25 @@ async function removeService(serviceId: ServiceId): Promise<void> {
 
     await refreshHealthSafely(serviceId)
   } catch (caught) {
-    serviceErrors.value[serviceId] = getErrorMessage(caught)
+    if (!isUnmounted) {
+      serviceErrors.value[serviceId] = getErrorMessage(caught)
+    }
   } finally {
-    removingServices.value[serviceId] = false
+    if (!isUnmounted) {
+      removingServices.value[serviceId] = false
+    }
   }
 }
 
 onMounted(() => {
   void loadConfigs()
   void loadWorkspacePreferences()
+})
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+  healthRequestSequence += 1
+  jellyfinUsersRequestSequence += 1
 })
 </script>
 
@@ -459,10 +612,15 @@ onMounted(() => {
     >
       <h2 id="service-connections-title" class="settings-section__title">Service Connections</h2>
 
-      <mm-service-selector v-model="selectedService" :statuses="statuses" />
+      <mm-service-selector
+        :model-value="selectedService"
+        :services="serviceSelectorItems"
+        @update:model-value="selectService"
+      />
 
       <mm-service-form
-        :service-id="selectedService"
+        :key="selectedService"
+        :name="selectedServiceName"
         :url="selectedUrl"
         :configured="configured"
         :loading="loading"
@@ -470,18 +628,26 @@ onMounted(() => {
         :removing="removing"
         :error="error"
         :success="success"
-        :health="selectedHealth"
-        :jellyfin-users="jellyfinUsers"
-        :jellyfin-user-id="jellyfinUserId"
-        :jellyfin-users-loading="jellyfinUsersLoading"
-        :jellyfin-user-saving="jellyfinUserSaving"
-        :jellyfin-users-error="jellyfinUsersError"
-        :jellyfin-user-success="jellyfinUserSuccess"
-        @connect="connectService"
-        @test-connection="testConnection"
-        @remove="removeService"
+        :health-status="healthStatus"
+        :health-last-checked-label="healthLastCheckedLabel"
+        :health-error="healthError"
+        :can-reuse-saved-key="canReuseSavedKey"
+        :user-selection-label="showJellyfinUsers ? 'Jellyfin User' : ''"
+        :user-selection-hint="
+          showJellyfinUsers ? 'Select the Jellyfin user whose library should be displayed.' : ''
+        "
+        :user-options="showJellyfinUsers ? jellyfinUserOptions : []"
+        :selected-user-id="showJellyfinUsers ? jellyfinUserId : ''"
+        :users-loading="showJellyfinUsers && jellyfinUsersLoading"
+        :user-saving="showJellyfinUsers && jellyfinUserSaving"
+        :users-error="showJellyfinUsers ? jellyfinUsersError : ''"
+        :user-success="showJellyfinUsers ? jellyfinUserSuccess : ''"
+        :removal-note="showJellyfinUsers ? 'The selected Jellyfin user will also be cleared.' : ''"
+        @connect="connectService(selectedService, $event)"
+        @test-connection="testConnection(selectedService)"
+        @remove="removeService(selectedService)"
         @edit="clearConnectionFeedback(selectedService)"
-        @select-jellyfin-user="selectJellyfinUser"
+        @select-user="selectJellyfinUser"
       />
     </section>
 

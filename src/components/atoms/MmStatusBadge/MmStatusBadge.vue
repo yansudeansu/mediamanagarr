@@ -1,26 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { ServiceState } from '../../../types/service'
-
 interface Props {
-  status: ServiceState
-  customLabel?: string
+  variant: 'neutral' | 'info' | 'success' | 'danger'
+  label: string
 }
 
-const props = defineProps<Props>()
-
-const statusLabels: Record<ServiceState, string> = {
-  'not-configured': 'Not set',
-  configured: 'Configured',
-  connected: 'Connected',
-  failed: 'Failed',
-}
-
-const label = computed(() => props.customLabel ?? statusLabels[props.status])
+defineProps<Props>()
 </script>
 
 <template>
-  <span class="status-badge" :class="`status-badge--${status}`">
+  <span class="status-badge" :class="`status-badge--${variant}`">
     <span class="status-badge__dot" aria-hidden="true"></span>
     <span class="status-badge__label">{{ label }}</span>
   </span>
@@ -50,25 +38,25 @@ const label = computed(() => props.customLabel ?? statusLabels[props.status])
   background: currentColor;
 }
 
-.status-badge--not-configured {
+.status-badge--neutral {
   color: var(--status-neutral);
   background: var(--status-neutral-bg);
   border-color: var(--status-neutral-border);
 }
 
-.status-badge--configured {
+.status-badge--info {
   color: var(--status-info);
   background: var(--status-info-bg);
   border-color: var(--status-info-border);
 }
 
-.status-badge--connected {
+.status-badge--success {
   color: var(--status-success);
   background: var(--status-success-bg);
   border-color: var(--status-success-border);
 }
 
-.status-badge--failed {
+.status-badge--danger {
   color: var(--status-danger);
   background: var(--status-danger-bg);
   border-color: var(--status-danger-border);

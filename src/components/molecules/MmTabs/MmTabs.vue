@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import MmButton from '../../atoms/MmButton/MmButton.vue'
 
 export interface TabItem {
@@ -24,19 +25,38 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-const tabRefs = ref<HTMLElement[]>([])
+const tabRefs = new Map<string, HTMLElement>()
 const scrollContainer = ref<HTMLElement | null>(null)
 
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
 
+const isNavigation = computed(() => props.variant === 'navigation')
+
 const enabledIndexes = computed(() =>
   props.items.flatMap((item, index) => (item.disabled ? [] : [index])),
 )
 
-const isNavigation = computed(() => props.variant === 'navigation')
+const keyboardTabId = computed(() => {
+  const selected = props.items.find((item) => item.id === props.modelValue && !item.disabled)
+
+  return selected?.id ?? props.items.find((item) => !item.disabled)?.id
+})
 
 let resizeObserver: ResizeObserver | undefined
+
+function setTabRef(id: string, component: Element | ComponentPublicInstance | null): void {
+  if (!component) {
+    tabRefs.delete(id)
+    return
+  }
+
+  const element = component instanceof Element ? component : component.$el
+
+  if (element instanceof HTMLElement) {
+    tabRefs.set(id, element)
+  }
+}
 
 function updateScrollState(): void {
   const container = scrollContainer.value
@@ -69,8 +89,7 @@ function scrollActiveIntoView(): void {
   if (!isNavigation.value) return
 
   const container = scrollContainer.value
-  const index = props.items.findIndex((item) => item.id === props.modelValue)
-  const activeTab = tabRefs.value[index]
+  const activeTab = tabRefs.get(props.modelValue)
 
   if (!container || !activeTab) return
 
@@ -102,10 +121,8 @@ function selectTab(item: TabItem): void {
   emit('update:modelValue', item.id)
 }
 
-function focusTab(index: number): void {
-  nextTick(() => {
-    tabRefs.value[index]?.focus()
-  })
+function focusTab(id: string): void {
+  tabRefs.get(id)?.focus()
 }
 
 function handleKeydown(event: KeyboardEvent, index: number): void {
@@ -120,7 +137,7 @@ function handleKeydown(event: KeyboardEvent, index: number): void {
   if (event.key === 'Home') {
     nextIndex = indexes[0]
   } else if (event.key === 'End') {
-    nextIndex = indexes.at(-1)
+    nextIndex = indexes[indexes.length - 1]
   } else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
     const position = indexes.indexOf(index)
     const direction = event.key === 'ArrowRight' ? 1 : -1
@@ -135,21 +152,45 @@ function handleKeydown(event: KeyboardEvent, index: number): void {
 
   if (nextIndex === undefined) return
 
-  event.preventDefault()
-
   const item = props.items[nextIndex]
 
   if (!item) return
 
+  event.preventDefault()
+
   selectTab(item)
-  focusTab(nextIndex)
+  focusTab(item.id)
+}
+
+function observeNavigation(): void {
+  resizeObserver?.disconnect()
+
+  if (!isNavigation.value || !scrollContainer.value) return
+
+  if (typeof ResizeObserver === 'undefined') return
+
+  if (!resizeObserver) {
+    resizeObserver = new ResizeObserver(() => {
+      updateScrollState()
+      scrollActiveIntoView()
+    })
+  }
+
+  resizeObserver.observe(scrollContainer.value)
+
+  const content = scrollContainer.value.firstElementChild
+
+  if (content) {
+    resizeObserver.observe(content)
+  }
 }
 
 watch(
   () => props.items,
-  () => {
-    tabRefs.value = []
-    void refreshNavigation()
+  async () => {
+    await nextTick()
+    observeNavigation()
+    await refreshNavigation()
   },
   { deep: true },
 )
@@ -163,31 +204,21 @@ watch(
 
 watch(
   () => props.variant,
-  () => {
-    void refreshNavigation()
+  async () => {
+    await nextTick()
+    observeNavigation()
+    await refreshNavigation()
   },
 )
 
 onMounted(() => {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      updateScrollState()
-      scrollActiveIntoView()
-    })
-
-    if (scrollContainer.value) {
-      resizeObserver.observe(scrollContainer.value)
-
-      const content = scrollContainer.value.firstElementChild
-      if (content) resizeObserver.observe(content)
-    }
-  }
-
+  observeNavigation()
   void refreshNavigation()
 })
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
+  tabRefs.clear()
 })
 </script>
 
@@ -220,21 +251,15 @@ onBeforeUnmount(() => {
         <mm-button
           v-for="(item, index) in items"
           :key="item.id"
-          :ref="
-            (component) => {
-              if (component && '$el' in component) {
-                tabRefs[index] = component.$el as HTMLElement
-              }
-            }
-          "
+          :ref="(component) => setTabRef(item.id, component)"
           variant="ghost"
           size="small"
           class="tabs__item"
           :disabled="item.disabled"
           :role="variant === 'tabs' ? 'tab' : undefined"
           :aria-selected="variant === 'tabs' ? modelValue === item.id : undefined"
-          :aria-current="variant === 'navigation' && modelValue === item.id ? 'page' : undefined"
-          :tabindex="variant === 'tabs' ? (modelValue === item.id ? 0 : -1) : undefined"
+          :aria-current="isNavigation && modelValue === item.id ? 'page' : undefined"
+          :tabindex="variant === 'tabs' ? (keyboardTabId === item.id ? 0 : -1) : undefined"
           @click="selectTab(item)"
           @keydown="handleKeydown($event, index)"
         >

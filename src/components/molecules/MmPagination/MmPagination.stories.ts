@@ -1,6 +1,6 @@
-import { ref, watch } from 'vue'
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmPagination from './MmPagination.vue'
+import { useArgs } from 'storybook/internal/preview-api'
 
 const meta = {
   title: 'Molecules/Pagination',
@@ -31,34 +31,34 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 function interactiveStory() {
-  return (args: { page: number; totalPages: number }) => ({
-    components: { MmPagination },
+  return (args: { page: number; totalPages: number }) => {
+    const [, updateArgs] = useArgs()
 
-    setup() {
-      const currentPage = ref(args.page)
+    return {
+      components: { MmPagination },
 
-      watch(
-        () => args.page,
-        (page) => {
-          currentPage.value = page
-        },
-      )
+      setup() {
+        function handlePageChange(page: number): void {
+          updateArgs({ page })
+        }
 
-      return {
-        args,
-        currentPage,
-      }
-    },
+        return {
+          args,
+          handlePageChange,
+        }
+      },
 
-    template: `
-      <div style="width: 340px;">
-        <MmPagination
-          v-model:page="currentPage"
-          :total-pages="args.totalPages"
-        />
-      </div>
-    `,
-  })
+      template: `
+        <div style="width: 340px;">
+          <MmPagination
+            :page="args.page"
+            :total-pages="args.totalPages"
+            @update:page="handlePageChange"
+          />
+        </div>
+      `,
+    }
+  }
 }
 
 export const Default: Story = {

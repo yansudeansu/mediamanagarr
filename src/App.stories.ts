@@ -5,9 +5,8 @@ import App from './App.vue'
 import { createMockBackground, type MockBackgroundOptions } from './test/mock-background'
 import type { BackgroundMessage } from './types/messages'
 import type { ServiceConfigs } from './types/service'
+import type { WorkspaceMode } from './types/workspace'
 import { SERVICES } from './services/registry'
-
-type WorkspaceMode = 'popup' | 'detached' | 'sidebar'
 
 type StorageChangeListener = (
   changes: Record<string, chrome.storage.StorageChange>,
@@ -24,6 +23,13 @@ const meta = {
   parameters: {
     layout: 'centered',
     docs: {
+      description: {
+        component:
+          'Interactive application-shell integration stories. These render the real App.vue ' +
+          'with mocked browser-extension APIs, background messages, service configurations, ' +
+          'and workspace storage. Use them to explore service-aware navigation, Settings, ' +
+          'and popup, sidebar, or detached workspace behavior.',
+      },
       source: {
         type: 'code',
         code: '<App />',
@@ -66,21 +72,17 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
           continue
         }
 
-        const baseConfig = {
+        configs[serviceId] = {
           url: safeConfig.url,
           apiKey: 'storybook-mock-api-key',
-          username: 'storybook',
-          password: 'storybook-mock-password',
         }
-
-        configs[serviceId] = baseConfig
       }
 
       return configs
     }
 
-    // Keep local storage in sync with the services reported
-    // by the mock background.
+    // App.vue reads safe service configurations from local storage.
+    // Keep that storage synchronized with the mock background.
     localStorage.set(SERVICE_STORAGE_KEY, createMockServiceConfigs())
 
     function dispatchWorkspaceMode(mode: WorkspaceMode): void {
@@ -157,7 +159,6 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
 
         remove: async (keys: string | string[]): Promise<void> => {
           const requestedKeys = typeof keys === 'string' ? [keys] : keys
-
           const changes: Record<string, chrome.storage.StorageChange> = {}
 
           for (const key of requestedKeys) {
@@ -187,7 +188,6 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
           }
 
           storage.clear()
-
           notifyStorageChanged(changes, areaName)
         },
       }
@@ -195,7 +195,6 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
 
     function synchronizeServiceStorage(): void {
       const previousConfigs = localStorage.get(SERVICE_STORAGE_KEY)
-
       const nextConfigs = createMockServiceConfigs()
 
       localStorage.set(SERVICE_STORAGE_KEY, nextConfigs)
@@ -226,7 +225,6 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
           ...originalChrome?.storage,
 
           local: createStorageArea(localStorage, 'local'),
-
           session: createStorageArea(sessionStorage, 'session'),
 
           onChanged: {
@@ -300,6 +298,8 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
       },
     })
 
+    // Storybook invokes this cleanup when leaving the story.
+    // Restore browser globals and URL so scenarios remain isolated.
     return () => {
       storageChangeListeners.clear()
 
@@ -349,6 +349,8 @@ function renderWorkspace() {
 
         window.history.replaceState(null, '', url.toString())
 
+        // App.vue reads the workspace query parameter during setup.
+        // Remount it to exercise the real workspace-mode behavior.
         workspaceKey.value += 1
       }
 
@@ -394,28 +396,43 @@ async function openSettings(canvasElement: HTMLElement): Promise<void> {
   const canvas = within(canvasElement)
 
   await userEvent.click(
-    canvas.getByRole('button', {
+    await canvas.findByRole('button', {
       name: 'Open workspace menu',
     }),
   )
 
   await userEvent.click(
-    canvas.getByRole('button', {
+    await canvas.findByRole('button', {
       name: 'Open settings',
     }),
   )
 }
 
-// Existing application stories
+// Application scenarios
 
 export const Default: Story = {
   beforeEach: createStorySetup(),
   render: renderWorkspace,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Default application shell with mocked services. Explore navigation, quick access, ' +
+          'Settings, and the workspace controls.',
+      },
+    },
+  },
 }
 
 export const UpNext: Story = {
   ...Default,
-
+  parameters: {
+    docs: {
+      description: {
+        story: 'Opens the Jellyfin Up Next view through the application navigation.',
+      },
+    },
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
 
@@ -429,7 +446,13 @@ export const UpNext: Story = {
 
 export const Calendar: Story = {
   ...Default,
-
+  parameters: {
+    docs: {
+      description: {
+        story: 'Opens the calendar view with its configured Sonarr and Radarr integrations.',
+      },
+    },
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
 
@@ -443,7 +466,13 @@ export const Calendar: Story = {
 
 export const Downloads: Story = {
   ...Default,
-
+  parameters: {
+    docs: {
+      description: {
+        story: 'Opens the qBittorrent Downloads view through the application navigation.',
+      },
+    },
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
 
@@ -457,7 +486,13 @@ export const Downloads: Story = {
 
 export const Settings: Story = {
   ...Default,
-
+  parameters: {
+    docs: {
+      description: {
+        story: 'Opens Settings on the Connections section to demonstrate service configuration.',
+      },
+    },
+  },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement)
   },
@@ -466,7 +501,15 @@ export const Settings: Story = {
 export const WorkspaceSettings: Story = {
   ...Default,
   name: 'Settings — Workspace',
-
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Opens the Workspace settings section, including default workspace selection ' +
+          'and controls for opening a sidebar or detached window.',
+      },
+    },
+  },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement)
 
@@ -483,7 +526,6 @@ export const WorkspaceSettings: Story = {
 export const SettingsConnected: Story = {
   ...Default,
   name: 'Settings — Connected',
-
   beforeEach: createStorySetup({
     connections: {
       jellyfin: 'connected',
@@ -493,7 +535,13 @@ export const SettingsConnected: Story = {
       qbittorrent: 'connected',
     },
   }),
-
+  parameters: {
+    docs: {
+      description: {
+        story: 'Shows Settings with all five services connected successfully.',
+      },
+    },
+  },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement)
   },
@@ -502,13 +550,18 @@ export const SettingsConnected: Story = {
 export const SettingsConnectionFailed: Story = {
   ...Default,
   name: 'Settings — Connection Failed',
-
   beforeEach: createStorySetup({
     connections: {
       jellyfin: 'error',
     },
   }),
-
+  parameters: {
+    docs: {
+      description: {
+        story: 'Shows how Settings presents a failed Jellyfin connection.',
+      },
+    },
+  },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement)
   },
@@ -519,79 +572,132 @@ export const SettingsConnectionFailed: Story = {
 export const NoServices: Story = {
   ...Default,
   name: 'Navigation — No Services',
-
   beforeEach: createStorySetup({
     configuredServices: [],
   }),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'No services are configured. The app displays its onboarding empty state ' +
+          'and provides a path to Settings.',
+      },
+    },
+  },
 }
 
 export const JellyfinOnly: Story = {
   ...Default,
   name: 'Navigation — Jellyfin Only',
-
   beforeEach: createStorySetup({
     configuredServices: ['jellyfin'],
   }),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Only Jellyfin is configured. Navigation exposes Jellyfin-dependent features.',
+      },
+    },
+  },
 }
 
 export const SeerrOnly: Story = {
   ...Default,
   name: 'Navigation — Seerr Only',
-
   beforeEach: createStorySetup({
     configuredServices: ['seerr'],
   }),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Only Seerr is configured. The Requests view remains available.',
+      },
+    },
+  },
 }
 
 export const SonarrOnly: Story = {
   ...Default,
   name: 'Navigation — Sonarr Only',
-
   beforeEach: createStorySetup({
     configuredServices: ['sonarr'],
   }),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Only Sonarr is configured. Calendar availability follows the feature registry.',
+      },
+    },
+  },
 }
 
 export const RadarrOnly: Story = {
   ...Default,
   name: 'Navigation — Radarr Only',
-
   beforeEach: createStorySetup({
     configuredServices: ['radarr'],
   }),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Only Radarr is configured. Calendar availability follows the feature registry.',
+      },
+    },
+  },
 }
 
 export const QBittorrentOnly: Story = {
   ...Default,
   name: 'Navigation — qBittorrent Only',
-
   beforeEach: createStorySetup({
     configuredServices: ['qbittorrent'],
   }),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Only qBittorrent is configured. The Downloads view remains available.',
+      },
+    },
+  },
 }
 
 export const SharedCalendar: Story = {
   ...Default,
   name: 'Navigation — Sonarr + Radarr',
-
   beforeEach: createStorySetup({
     configuredServices: ['sonarr', 'radarr'],
   }),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Sonarr and Radarr share the Calendar navigation destination rather than ' +
+          'creating duplicate entries.',
+      },
+    },
+  },
 }
 
 export const PartialConfiguration: Story = {
   ...Default,
   name: 'Navigation — Partial Configuration',
-
   beforeEach: createStorySetup({
     configuredServices: ['jellyfin', 'sonarr', 'qbittorrent'],
   }),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A mixed service configuration demonstrates which navigation destinations ' +
+          'remain available when only some integrations are enabled.',
+      },
+    },
+  },
 }
 
 export const ConfiguredButDisconnected: Story = {
   ...Default,
   name: 'Navigation — Configured but Disconnected',
-
   beforeEach: createStorySetup({
     configuredServices: ['jellyfin', 'sonarr'],
     connections: {
@@ -599,4 +705,13 @@ export const ConfiguredButDisconnected: Story = {
       sonarr: 'error',
     },
   }),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Services are configured but their connections are failing. Navigation is ' +
+          'based on configuration availability, not the latest health-check result.',
+      },
+    },
+  },
 }

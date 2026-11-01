@@ -2,34 +2,38 @@
 import { computed } from 'vue'
 import MmCard from '../../atoms/MmCard/MmCard.vue'
 import MmMediaPoster from '../../atoms/MmMediaPoster/MmMediaPoster.vue'
-import type { SeerrRequest, SeerrRequestStatus, SeerrMediaStatus } from '../../../types/seerr'
+
+export type RequestStatus = 'Pending' | 'Approved' | 'Declined' | 'Unknown'
+
+export type RequestMediaStatus =
+  'Pending' | 'Processing' | 'Partially Available' | 'Available' | 'Unknown'
+
+export interface RequestCardData {
+  title: string
+  type: 'movie' | 'tv'
+  posterUrl: string | null
+  status: RequestStatus
+  mediaStatus: RequestMediaStatus
+  requestedBy: string
+  createdAt: string
+}
 
 interface Props {
-  request: SeerrRequest
+  request: RequestCardData
 }
 
 const props = defineProps<Props>()
 
 const mediaTypeLabel = computed(() => (props.request.type === 'movie' ? 'Movie' : 'TV Show'))
 
-const posterUrl = computed(() => {
-  const path = props.request.posterPath
-
-  if (!path || !path.startsWith('/')) {
-    return null
-  }
-
-  return `https://image.tmdb.org/t/p/w185${path}`
-})
-
-const requestStatusClass: Record<SeerrRequestStatus, string> = {
+const requestStatusClass: Record<RequestStatus, string> = {
   Pending: 'pending',
   Approved: 'approved',
   Declined: 'declined',
   Unknown: 'unknown',
 }
 
-const mediaStatusClass: Record<SeerrMediaStatus, string> = {
+const mediaStatusClass: Record<RequestMediaStatus, string> = {
   Pending: 'pending',
   Processing: 'processing',
   'Partially Available': 'partial',
@@ -37,7 +41,7 @@ const mediaStatusClass: Record<SeerrMediaStatus, string> = {
   Unknown: 'unknown',
 }
 
-const displayStatus = computed<SeerrRequestStatus | SeerrMediaStatus>(() => {
+const displayStatus = computed<RequestStatus | RequestMediaStatus>(() => {
   const mediaStatus = props.request.mediaStatus
 
   if (
@@ -80,7 +84,7 @@ const formattedDate = computed(() => {
 <template>
   <mm-card padding="none">
     <div class="request-card">
-      <mm-media-poster :title="request.title" :type="request.type" :image="posterUrl" />
+      <mm-media-poster :title="request.title" :type="request.type" :image="request.posterUrl" />
 
       <div class="request-card__details">
         <div class="request-card__heading">
@@ -112,7 +116,7 @@ const formattedDate = computed(() => {
             {{ formattedDate }}
           </time>
 
-          <span v-else class="request-card__date">Unknown date</span>
+          <span v-else class="request-card__date"> Unknown date </span>
         </div>
       </div>
     </div>

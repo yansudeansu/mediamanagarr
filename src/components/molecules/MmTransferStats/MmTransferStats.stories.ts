@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmTransferStats from './MmTransferStats.vue'
 
@@ -12,11 +13,11 @@ const meta = {
   argTypes: {
     downloadSpeed: {
       control: 'number',
-      description: 'Overall download speed in bytes per second',
+      description: 'Overall download speed in bytes per second.',
     },
     uploadSpeed: {
       control: 'number',
-      description: 'Overall upload speed in bytes per second',
+      description: 'Overall upload speed in bytes per second.',
     },
   },
   decorators: [
@@ -72,4 +73,51 @@ export const InvalidSpeeds: Story = {
     downloadSpeed: -1024,
     uploadSpeed: Number.NaN,
   },
+}
+
+export const ReactiveUpdates: Story = {
+  render: () => ({
+    components: { MmTransferStats },
+    setup() {
+      const downloadSpeed = ref(0)
+      const uploadSpeed = ref(0)
+
+      function setIdle(): void {
+        downloadSpeed.value = 0
+        uploadSpeed.value = 0
+      }
+
+      function setDownloading(): void {
+        downloadSpeed.value = 25 * 1024 * 1024
+        uploadSpeed.value = 512 * 1024
+      }
+
+      function setSeeding(): void {
+        downloadSpeed.value = 0
+        uploadSpeed.value = 8 * 1024 * 1024
+      }
+
+      return {
+        downloadSpeed,
+        uploadSpeed,
+        setIdle,
+        setDownloading,
+        setSeeding,
+      }
+    },
+    template: `
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+          <button type="button" @click="setIdle">Idle</button>
+          <button type="button" @click="setDownloading">Downloading</button>
+          <button type="button" @click="setSeeding">Seeding</button>
+        </div>
+
+        <mm-transfer-stats
+          :download-speed="downloadSpeed"
+          :upload-speed="uploadSpeed"
+        />
+      </div>
+    `,
+  }),
 }

@@ -771,7 +771,7 @@ describe('App', () => {
 
       await openQuickAccess(wrapper)
 
-      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
+      expect(wrapper.get('#quick-access-menu').text()).toContain('No links available')
 
       expect(wrapper.findAll('#quick-access-menu a')).toHaveLength(0)
 

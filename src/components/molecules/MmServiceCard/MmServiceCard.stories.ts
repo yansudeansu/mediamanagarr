@@ -1,16 +1,27 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
+import { fn } from 'storybook/test'
+import { ref } from 'vue'
 import MmServiceCard from './MmServiceCard.vue'
-import { SERVICE_REGISTRY } from '../../../services/registry'
+import type { ServiceState } from '../../../types/service'
 
 const meta = {
   title: 'Molecules/Service Card',
   component: MmServiceCard,
   tags: ['autodocs'],
 
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'A selectable service row with a connection status badge. The parent controls selection and supplies the display name.',
+      },
+    },
+  },
+
   argTypes: {
-    service: {
-      control: 'object',
-      description: 'Service information to display.',
+    name: {
+      control: 'text',
+      description: 'Service display name.',
     },
     status: {
       control: 'select',
@@ -28,97 +39,62 @@ const meta = {
   },
 
   args: {
-    service: SERVICE_REGISTRY.jellyfin,
+    name: 'Example Service',
     status: 'not-configured',
     selected: false,
     disabled: false,
+    onSelect: fn(),
   },
 
-  render: (args) => ({
-    components: { MmServiceCard },
-
-    setup() {
-      return { args }
-    },
-
-    template: `
-      <div
-        style="
-          width: 320px;
-          overflow: hidden;
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          background: var(--background);
-        "
-      >
-        <mm-service-card v-bind="args" />
-      </div>
-    `,
-  }),
+  decorators: [
+    () => ({
+      template: `
+        <div
+          style="
+            width: 320px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--background);
+          "
+        >
+          <story />
+        </div>
+      `,
+    }),
+  ],
 } satisfies Meta<typeof MmServiceCard>
 
 export default meta
 
 type Story = StoryObj<typeof meta>
 
-/**
- * Interactive component playground.
- */
 export const Playground: Story = {}
 
-/**
- * Jellyfin with a successful connection.
- */
-export const Jellyfin: Story = {
+export const Connected: Story = {
   args: {
-    service: SERVICE_REGISTRY.jellyfin,
     status: 'connected',
   },
 }
 
-/**
- * Seerr with saved configuration.
- */
-export const Seerr: Story = {
+export const Configured: Story = {
   args: {
-    service: SERVICE_REGISTRY.seerr,
     status: 'configured',
   },
 }
 
-/**
- * Sonarr without configuration.
- */
-export const Sonarr: Story = {
+export const NotConfigured: Story = {
   args: {
-    service: SERVICE_REGISTRY.sonarr,
     status: 'not-configured',
   },
 }
 
-/**
- * Radarr with a failed connection.
- */
-export const Radarr: Story = {
+export const Failed: Story = {
   args: {
-    service: SERVICE_REGISTRY.radarr,
     status: 'failed',
   },
 }
 
-/**
- * qBittorrent with a successful connection.
- */
-export const QBittorrent: Story = {
-  args: {
-    service: SERVICE_REGISTRY.qbittorrent,
-    status: 'connected',
-  },
-}
-
-/**
- * Selected service row.
- */
 export const Selected: Story = {
   args: {
     selected: true,
@@ -126,64 +102,69 @@ export const Selected: Story = {
   },
 }
 
-/**
- * Disabled service row.
- */
 export const Disabled: Story = {
   args: {
     disabled: true,
   },
 }
 
-/**
- * All five services displayed in a compact, grouped selector.
- *
- * This matches the original MediaManagarr Settings layout.
- */
-export const AllServices: Story = {
-  render: () => ({
+export const LongName: Story = {
+  args: {
+    name: 'Example Service With an Extremely Long Display Name for Layout Testing',
+    status: 'connected',
+  },
+}
+
+export const InteractiveSelection: Story = {
+  render: (args) => ({
     components: { MmServiceCard },
 
     setup() {
-      return { SERVICE_REGISTRY }
+      const selectedId = ref('one')
+
+      const services: Array<{
+        id: string
+        name: string
+        status: ServiceState
+      }> = [
+        {
+          id: 'one',
+          name: 'Example Service One',
+          status: 'connected',
+        },
+        {
+          id: 'two',
+          name: 'Example Service Two',
+          status: 'configured',
+        },
+        {
+          id: 'three',
+          name: 'Example Service Three',
+          status: 'failed',
+        },
+      ]
+
+      function selectService(id: string): void {
+        selectedId.value = id
+        args.onSelect?.()
+      }
+
+      return {
+        selectedId,
+        services,
+        selectService,
+      }
     },
 
     template: `
-      <div
-        style="
-          display: flex;
-          flex-direction: column;
-          width: 320px;
-          overflow: hidden;
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          background: var(--background);
-        "
-      >
+      <div style="display: flex; flex-direction: column;">
         <mm-service-card
-          :service="SERVICE_REGISTRY.jellyfin"
-          status="connected"
-          selected
-        />
-
-        <mm-service-card
-          :service="SERVICE_REGISTRY.seerr"
-          status="configured"
-        />
-
-        <mm-service-card
-          :service="SERVICE_REGISTRY.sonarr"
-          status="not-configured"
-        />
-
-        <mm-service-card
-          :service="SERVICE_REGISTRY.radarr"
-          status="failed"
-        />
-
-        <mm-service-card
-          :service="SERVICE_REGISTRY.qbittorrent"
-          status="not-configured"
+          v-for="service in services"
+          :key="service.id"
+          :name="service.name"
+          :status="service.status"
+          :selected="selectedId === service.id"
+          @select="selectService(service.id)"
         />
       </div>
     `,

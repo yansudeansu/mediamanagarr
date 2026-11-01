@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { defineComponent, h } from 'vue'
 import MmCalendarDetails from './MmCalendarDetails.vue'
 import MmCalendarEvent from '../../molecules/MmCalendarEvent/MmCalendarEvent.vue'
 import type { CalendarItem } from '../../../types/calendar'
@@ -54,9 +55,47 @@ describe('MmCalendarDetails', () => {
   it('labels the section using its heading', () => {
     const wrapper = mountDetails()
 
-    expect(wrapper.get('section').attributes('aria-labelledby')).toBe('calendar-details-heading')
+    const section = wrapper.get('section')
+    const heading = wrapper.get('.calendar-details__title')
 
-    expect(wrapper.find('#calendar-details-heading').exists()).toBe(true)
+    expect(heading.attributes('id')).toBeTruthy()
+    expect(section.attributes('aria-labelledby')).toBe(heading.attributes('id'))
+  })
+
+  it('uses unique heading IDs for multiple instances in the same application', () => {
+    const Parent = defineComponent({
+      setup() {
+        return () =>
+          h('div', [
+            h(MmCalendarDetails, {
+              date: '2026-11-05',
+              items: [tvItem],
+            }),
+            h(MmCalendarDetails, {
+              date: '2026-11-06',
+              items: [movieItem],
+            }),
+          ])
+      },
+    })
+
+    const wrapper = mount(Parent)
+
+    const sections = wrapper.findAll('section.calendar-details')
+    const headings = wrapper.findAll('.calendar-details__title')
+
+    expect(sections).toHaveLength(2)
+    expect(headings).toHaveLength(2)
+
+    const firstId = headings[0]!.attributes('id')
+    const secondId = headings[1]!.attributes('id')
+
+    expect(firstId).toBeTruthy()
+    expect(secondId).toBeTruthy()
+    expect(firstId).not.toBe(secondId)
+
+    expect(sections[0]!.attributes('aria-labelledby')).toBe(firstId)
+    expect(sections[1]!.attributes('aria-labelledby')).toBe(secondId)
   })
 
   it('shows a zero-release count for an empty day', () => {

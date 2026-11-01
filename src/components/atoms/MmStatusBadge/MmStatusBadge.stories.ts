@@ -7,15 +7,20 @@ const meta = {
   tags: ['autodocs'],
 
   argTypes: {
-    status: {
+    variant: {
       control: 'select',
-      options: ['not-configured', 'configured', 'connected', 'failed'],
-      description: 'Current service connection status.',
+      options: ['neutral', 'info', 'success', 'danger'],
+      description: 'Visual appearance of the badge.',
+    },
+    label: {
+      control: 'text',
+      description: 'Text displayed inside the badge.',
     },
   },
 
   args: {
-    status: 'not-configured',
+    variant: 'neutral',
+    label: 'Pending',
   },
 } satisfies Meta<typeof MmStatusBadge>
 
@@ -25,61 +30,72 @@ type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {}
 
-export const NotConfigured: Story = {
+export const Neutral: Story = {
   args: {
-    status: 'not-configured',
+    variant: 'neutral',
+    label: 'Not started',
   },
 }
 
-export const Configured: Story = {
+export const Info: Story = {
   args: {
-    status: 'configured',
+    variant: 'info',
+    label: 'In progress',
   },
 }
 
-export const Connected: Story = {
+export const Success: Story = {
   args: {
-    status: 'connected',
+    variant: 'success',
+    label: 'Completed',
   },
 }
 
-export const Failed: Story = {
+export const Danger: Story = {
   args: {
-    status: 'failed',
+    variant: 'danger',
+    label: 'Failed',
   },
 }
 
-export const AllStatuses: Story = {
+export const CustomLabel: Story = {
+  args: {
+    variant: 'success',
+    label: 'All checks passed',
+  },
+}
+
+export const AllVariants: Story = {
   render: () => ({
     components: { MmStatusBadge },
 
     template: `
       <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 16px;">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <mm-status-badge status="not-configured" />
+          <mm-status-badge variant="neutral" label="Not started" />
           <span style="font-size: 12px; color: var(--muted);">
-            Service has not been configured
+            Neutral state for items awaiting action
           </span>
         </div>
 
         <div style="display: flex; align-items: center; gap: 12px;">
-          <mm-status-badge status="configured" />
+          <mm-status-badge variant="info" label="In progress" />
           <span style="font-size: 12px; color: var(--muted);">
-            Credentials are saved, connection not tested this session
+            Informational state for ongoing work
           </span>
         </div>
 
         <div style="display: flex; align-items: center; gap: 12px;">
-          <mm-status-badge status="connected" />
+          <mm-status-badge variant="success" label="Completed" />
           <span style="font-size: 12px; color: var(--muted);">
-            Service connection was successful
+            Successful completion or positive status
           </span>
         </div>
 
         <div style="display: flex; align-items: center; gap: 12px;">
-          <mm-status-badge status="failed" />
+          <mm-status-badge variant="danger" label="Failed" />
           <span style="font-size: 12px; color: var(--muted);">
-            Service connection failed
+            Error or failure requiring attention
           </span>
         </div>
       </div>

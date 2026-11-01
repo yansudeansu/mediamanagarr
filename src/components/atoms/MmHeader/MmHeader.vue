@@ -1,47 +1,26 @@
 <script setup lang="ts">
-import MmButton from '../../atoms/MmButton/MmButton.vue'
-import MmQuickAccess from '../MmQuickAccess/MmQuickAccess.vue'
-import mmLogo from '../../../assets/mm-logo.svg'
-import type { SafeServiceConfigs } from '../../../types/service'
-
 interface Props {
-  mode?: 'main' | 'settings'
-  services?: SafeServiceConfigs
+  title: string
+  logo?: string | null
 }
 
 withDefaults(defineProps<Props>(), {
-  mode: 'main',
-  services: () => ({}),
+  logo: null,
 })
-
-const emit = defineEmits<{
-  settings: []
-  back: []
-}>()
 </script>
 
 <template>
   <header class="header">
     <div class="header__branding">
-      <img :src="mmLogo" alt="" class="header__logo" width="28" height="28" />
+      <img v-if="logo" :src="logo" alt="" class="header__logo" width="28" height="28" />
 
       <h1 class="header__title">
-        {{ mode === 'settings' ? 'Settings' : 'MediaManagarr' }}
+        {{ title }}
       </h1>
     </div>
 
-    <div class="header__actions">
-      <mm-button
-        v-if="mode === 'settings'"
-        variant="secondary"
-        icon="arrow-left"
-        icon-only
-        aria-label="Back to previous view"
-        title="Back to previous view"
-        @click="emit('back')"
-      />
-
-      <mm-quick-access v-else :services="services" @settings="emit('settings')" />
+    <div v-if="$slots.actions" class="header__actions">
+      <slot name="actions" />
     </div>
   </header>
 </template>

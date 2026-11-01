@@ -3,7 +3,7 @@ import MmCalendarDetails from './MmCalendarDetails.vue'
 import type { CalendarItem } from '../../../types/calendar'
 
 const tvItem: CalendarItem = {
-  id: 'sonarr-101',
+  id: 'episode-101',
   source: 'sonarr',
   type: 'tv',
   title: 'TV Show 1',
@@ -14,7 +14,7 @@ const tvItem: CalendarItem = {
 }
 
 const movieItem: CalendarItem = {
-  id: 'radarr-201',
+  id: 'movie-201',
   source: 'radarr',
   type: 'movie',
   title: 'Movie 1',
@@ -111,13 +111,13 @@ export const MultipleReleases: Story = {
       movieItem,
       {
         ...tvItem,
-        id: 'sonarr-102',
+        id: 'episode-102',
         title: 'TV Show 2',
         subtitle: 'S01E01 · Episode 1',
       },
       {
         ...movieItem,
-        id: 'radarr-202',
+        id: 'movie-202',
         title: 'Movie 2',
         subtitle: '2026',
         releaseType: 'physical',
@@ -132,8 +132,8 @@ export const MultipleReleases: Story = {
 export const WithArtwork: Story = {
   args: {
     images: {
-      'sonarr-101': createPoster('TV Show 1'),
-      'radarr-201': createPoster('Movie 1'),
+      'episode-101': createPoster('TV Show 1'),
+      'movie-201': createPoster('Movie 1'),
     },
   },
 }

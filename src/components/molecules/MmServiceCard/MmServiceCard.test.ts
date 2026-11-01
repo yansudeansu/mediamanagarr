@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmServiceCard from './MmServiceCard.vue'
-import { SERVICE_REGISTRY } from '../../../services/registry'
-import type { ServiceState } from '../../../types/service'
 
 describe('MmServiceCard', () => {
-  const jellyfin = SERVICE_REGISTRY.jellyfin
-
   function createWrapper(props: Partial<InstanceType<typeof MmServiceCard>['$props']> = {}) {
     return mount(MmServiceCard, {
       props: {
-        service: jellyfin,
+        name: 'Example Service',
         status: 'not-configured',
         ...props,
       },
@@ -21,7 +17,7 @@ describe('MmServiceCard', () => {
     it('renders the service name', () => {
       const wrapper = createWrapper()
 
-      expect(wrapper.get('.service-card__name').text()).toBe('Jellyfin')
+      expect(wrapper.get('.service-card__name').text()).toBe('Example Service')
     })
 
     it('renders the connection status', () => {
@@ -33,14 +29,15 @@ describe('MmServiceCard', () => {
     })
 
     it.each([
-      ['not-configured', 'Not set'],
-      ['configured', 'Configured'],
-      ['connected', 'Connected'],
-      ['failed', 'Failed'],
-    ] as const)('renders the %s status', (status: ServiceState, label: string) => {
+      ['not-configured', 'Not set', 'neutral'],
+      ['configured', 'Configured', 'info'],
+      ['connected', 'Connected', 'success'],
+      ['failed', 'Failed', 'danger'],
+    ] as const)('renders the %s status', (status, label, variant) => {
       const wrapper = createWrapper({ status })
 
       expect(wrapper.get('.status-badge__label').text()).toBe(label)
+      expect(wrapper.get('.status-badge').classes()).toContain(`status-badge--${variant}`)
     })
 
     it('renders as a native button', () => {
@@ -50,10 +47,10 @@ describe('MmServiceCard', () => {
       expect(wrapper.attributes('type')).toBe('button')
     })
 
-    it('does not render the service description inside the selector row', () => {
+    it('does not render a service description inside the selector row', () => {
       const wrapper = createWrapper()
 
-      expect(wrapper.text()).not.toContain('Recently added movies and episodes')
+      expect(wrapper.text()).not.toContain('Service description')
     })
 
     it('does not render a chevron', () => {
@@ -62,14 +59,14 @@ describe('MmServiceCard', () => {
       expect(wrapper.find('.service-card__chevron').exists()).toBe(false)
     })
 
-    it('reacts to service changes', async () => {
+    it('reacts to name changes', async () => {
       const wrapper = createWrapper()
 
       await wrapper.setProps({
-        service: SERVICE_REGISTRY.sonarr,
+        name: 'Another Service',
       })
 
-      expect(wrapper.get('.service-card__name').text()).toBe('Sonarr')
+      expect(wrapper.get('.service-card__name').text()).toBe('Another Service')
     })
 
     it('reacts to status changes', async () => {
@@ -189,7 +186,7 @@ describe('MmServiceCard', () => {
         status: 'connected',
       })
 
-      expect(wrapper.text()).toContain('Jellyfin')
+      expect(wrapper.text()).toContain('Example Service')
       expect(wrapper.text()).toContain('Connected')
     })
 
@@ -198,7 +195,7 @@ describe('MmServiceCard', () => {
         status: 'not-configured',
       })
 
-      expect(wrapper.text()).toContain('Jellyfin')
+      expect(wrapper.text()).toContain('Example Service')
       expect(wrapper.text()).toContain('Not set')
     })
 
@@ -216,14 +213,14 @@ describe('MmServiceCard', () => {
       expect(wrapper.text()).toContain('Failed')
     })
 
-    it('updates its visible service name when the service changes', async () => {
+    it('updates its visible service name when the name changes', async () => {
       const wrapper = createWrapper()
 
       await wrapper.setProps({
-        service: SERVICE_REGISTRY.radarr,
+        name: 'Another Service',
       })
 
-      expect(wrapper.text()).toContain('Radarr')
+      expect(wrapper.text()).toContain('Another Service')
     })
 
     it('does not add a custom keyboard role to the native button', () => {

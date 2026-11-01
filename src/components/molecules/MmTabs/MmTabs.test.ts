@@ -117,12 +117,10 @@ describe('MmTabs', () => {
 
   it('marks the selected tab', () => {
     const wrapper = createWrapper()
-
     const tabs = wrapper.findAll('[role="tab"]')
 
     expect(tabs[0]?.attributes('aria-selected')).toBe('true')
     expect(tabs[0]?.attributes('tabindex')).toBe('0')
-
     expect(tabs[1]?.attributes('aria-selected')).toBe('false')
     expect(tabs[1]?.attributes('tabindex')).toBe('-1')
   })
@@ -209,6 +207,72 @@ describe('MmTabs', () => {
     })
 
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('focuses the target tab during keyboard navigation', async () => {
+    const wrapper = createWrapper()
+    const tabs = wrapper.findAll('[role="tab"]')
+    const target = tabs[1]?.element as HTMLElement
+    const focus = vi.spyOn(target, 'focus')
+
+    await tabs[0]?.trigger('keydown', { key: 'ArrowRight' })
+
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['workspace'])
+    expect(focus).toHaveBeenCalledOnce()
+  })
+
+  it('provides a keyboard entry point for an unknown selection', () => {
+    const wrapper = createWrapper({
+      modelValue: 'missing',
+    })
+
+    const tabs = wrapper.findAll('[role="tab"]')
+
+    expect(tabs[0]?.attributes('tabindex')).toBe('0')
+    expect(tabs[1]?.attributes('tabindex')).toBe('-1')
+    expect(tabs[0]?.attributes('aria-selected')).toBe('false')
+    expect(tabs[1]?.attributes('aria-selected')).toBe('false')
+  })
+
+  it('provides a keyboard entry point when the selected tab is disabled', () => {
+    const wrapper = createWrapper({
+      modelValue: 'connections',
+      items: [
+        { id: 'connections', label: 'Connections', disabled: true },
+        { id: 'workspace', label: 'Workspace' },
+      ],
+    })
+
+    const tabs = wrapper.findAll('[role="tab"]')
+
+    expect(tabs[0]?.attributes('tabindex')).toBe('-1')
+    expect(tabs[1]?.attributes('tabindex')).toBe('0')
+  })
+
+  it('does not make disabled tabs keyboard-reachable when all are disabled', () => {
+    const wrapper = createWrapper({
+      items: items.map((item) => ({ ...item, disabled: true })),
+    })
+
+    const tabs = wrapper.findAll('[role="tab"]')
+
+    expect(tabs.every((tab) => tab.attributes('tabindex') === '-1')).toBe(true)
+  })
+
+  it('updates the keyboard entry point when items change', async () => {
+    const wrapper = createWrapper()
+
+    await wrapper.setProps({
+      items: [
+        { id: 'connections', label: 'Connections', disabled: true },
+        { id: 'workspace', label: 'Workspace' },
+      ],
+    })
+
+    const tabs = wrapper.findAll('[role="tab"]')
+
+    expect(tabs[0]?.attributes('tabindex')).toBe('-1')
+    expect(tabs[1]?.attributes('tabindex')).toBe('0')
   })
 
   it('uses navigation semantics when requested', () => {
@@ -298,6 +362,7 @@ describe('MmTabs', () => {
       expect(
         wrapper.get('[aria-label="Scroll navigation left"]').attributes('disabled'),
       ).toBeUndefined()
+
       expect(
         wrapper.get('[aria-label="Scroll navigation right"]').attributes('disabled'),
       ).toBeUndefined()
@@ -308,6 +373,7 @@ describe('MmTabs', () => {
       expect(
         wrapper.get('[aria-label="Scroll navigation left"]').attributes('disabled'),
       ).toBeUndefined()
+
       expect(
         wrapper.get('[aria-label="Scroll navigation right"]').attributes('disabled'),
       ).toBeDefined()
@@ -411,13 +477,13 @@ describe('MmTabs', () => {
       })
 
       await nextTick()
-      await nextTick()
+      await wrapper.get('.tabs__viewport').trigger('scroll')
 
       expect(wrapper.find('[aria-label="Scroll navigation left"]').exists()).toBe(false)
       expect(wrapper.find('[aria-label="Scroll navigation right"]').exists()).toBe(false)
     })
 
-    it('does not add scroll controls to Settings tabs', () => {
+    it('does not add scroll controls to ordinary tabs', () => {
       const wrapper = createWrapper()
 
       expect(wrapper.find('.tabs__viewport--navigation').exists()).toBe(false)
@@ -425,7 +491,7 @@ describe('MmTabs', () => {
       expect(wrapper.find('[aria-label="Scroll navigation right"]').exists()).toBe(false)
     })
 
-    it('disconnects the resize observer when unmounted', async () => {
+    it('observes navigation dimensions and disconnects on unmount', async () => {
       const disconnect = vi.fn()
       const observe = vi.fn()
 
@@ -442,9 +508,69 @@ describe('MmTabs', () => {
 
       expect(observe).toHaveBeenCalledTimes(2)
 
+      const disconnectsBeforeUnmount = disconnect.mock.calls.length
+
       wrapper.unmount()
 
-      expect(disconnect).toHaveBeenCalledOnce()
+      expect(disconnect).toHaveBeenCalledTimes(disconnectsBeforeUnmount + 1)
+    })
+
+    it('attaches the resize observer when switching to navigation', async () => {
+      const observe = vi.fn()
+      const disconnect = vi.fn()
+
+      class ResizeObserverMock {
+        observe = observe
+        disconnect = disconnect
+      }
+
+      vi.stubGlobal('ResizeObserver', ResizeObserverMock)
+
+      const wrapper = createWrapper()
+
+      expect(observe).not.toHaveBeenCalled()
+
+      await wrapper.setProps({ variant: 'navigation' })
+      await nextTick()
+
+      expect(observe).toHaveBeenCalledTimes(2)
+
+      await wrapper.setProps({ variant: 'tabs' })
+      await nextTick()
+
+      expect(disconnect).toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('reattaches the resize observer when navigation items change', async () => {
+      const observe = vi.fn()
+      const disconnect = vi.fn()
+
+      class ResizeObserverMock {
+        observe = observe
+        disconnect = disconnect
+      }
+
+      vi.stubGlobal('ResizeObserver', ResizeObserverMock)
+
+      const wrapper = createNavigationWrapper()
+
+      await nextTick()
+
+      const initialObservations = observe.mock.calls.length
+
+      await wrapper.setProps({
+        items: navigationItems.slice(0, 2),
+      })
+
+      await nextTick()
+      await nextTick()
+
+      expect(disconnect).toHaveBeenCalled()
+      expect(observe.mock.calls.length).toBeGreaterThan(initialObservations)
+
+      wrapper.unmount()
     })
   })
 })

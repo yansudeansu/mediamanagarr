@@ -59,6 +59,12 @@ const activeIndex = ref(-1)
 
 const isDisabled = computed(() => props.disabled || props.loading)
 
+const availableIndexes = computed(() =>
+  props.options.flatMap((option, index) => (option.disabled ? [] : [index])),
+)
+
+const hasAvailableOptions = computed(() => availableIndexes.value.length > 0)
+
 const selectedOption = computed(() =>
   props.options.find((option) => option.value === props.modelValue),
 )
@@ -78,11 +84,7 @@ const describedBy = computed(() => {
   return ids.join(' ') || undefined
 })
 
-const availableIndexes = computed(() =>
-  props.options.flatMap((option, index) => (option.disabled ? [] : [index])),
-)
-
-function getInitialIndex() {
+function getInitialIndex(): number {
   const selectedIndex = props.options.findIndex(
     (option) => option.value === props.modelValue && !option.disabled,
   )
@@ -94,15 +96,19 @@ function focusOption(index: number) {
   activeIndex.value = index
 
   nextTick(() => {
-    optionRefs.value[index]?.focus()
+    if (isOpen.value) {
+      optionRefs.value[index]?.focus()
+    }
   })
 }
 
 function openDropdown(focus = false) {
-  if (isDisabled.value || isOpen.value) return
+  if (isDisabled.value || !hasAvailableOptions.value || isOpen.value) {
+    return
+  }
 
   isOpen.value = true
-  activeIndex.value = focus ? getInitialIndex() : -1
+  activeIndex.value = getInitialIndex()
 
   if (focus && activeIndex.value >= 0) {
     focusOption(activeIndex.value)
@@ -110,6 +116,8 @@ function openDropdown(focus = false) {
 }
 
 function closeDropdown(restoreFocus = false) {
+  if (!isOpen.value) return
+
   isOpen.value = false
   activeIndex.value = -1
 
@@ -127,7 +135,7 @@ function toggleDropdown() {
 }
 
 function selectOption(option: SelectOption) {
-  if (option.disabled) return
+  if (isDisabled.value || option.disabled) return
 
   emit('update:modelValue', option.value)
   closeDropdown(true)
@@ -140,13 +148,12 @@ function moveActive(direction: 1 | -1) {
 
   const currentPosition = indexes.indexOf(activeIndex.value)
 
-  let nextPosition: number
-
-  if (currentPosition === -1) {
-    nextPosition = direction === 1 ? 0 : indexes.length - 1
-  } else {
-    nextPosition = (currentPosition + direction + indexes.length) % indexes.length
-  }
+  const nextPosition =
+    currentPosition === -1
+      ? direction === 1
+        ? 0
+        : indexes.length - 1
+      : (currentPosition + direction + indexes.length) % indexes.length
 
   const nextIndex = indexes[nextPosition]
 
@@ -188,7 +195,10 @@ function handleOptionKeydown(event: KeyboardEvent, index: number) {
 
     const first = availableIndexes.value[0]
 
-    if (first !== undefined) focusOption(first)
+    if (first !== undefined) {
+      focusOption(first)
+    }
+
     return
   }
 
@@ -197,7 +207,10 @@ function handleOptionKeydown(event: KeyboardEvent, index: number) {
 
     const last = availableIndexes.value.at(-1)
 
-    if (last !== undefined) focusOption(last)
+    if (last !== undefined) {
+      focusOption(last)
+    }
+
     return
   }
 
@@ -206,11 +219,17 @@ function handleOptionKeydown(event: KeyboardEvent, index: number) {
 
     const option = props.options[index]
 
-    if (option) selectOption(option)
+    if (option) {
+      selectOption(option)
+    }
+
     return
   }
 
   if (event.key === 'Tab') {
+    // Restore focus synchronously before removing the option.
+    // Do not prevent the browser's normal Tab navigation.
+    triggerRef.value?.focus()
     closeDropdown()
   }
 }
@@ -223,6 +242,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
 
 function handleDocumentKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && isOpen.value) {
+    event.preventDefault()
     closeDropdown(true)
   }
 }
@@ -238,16 +258,35 @@ watch(isOpen, (open) => {
 })
 
 watch(isDisabled, (disabled) => {
-  if (disabled) closeDropdown()
+  if (disabled) {
+    closeDropdown()
+  }
 })
 
 watch(
   () => props.options,
   () => {
-    if (isOpen.value && activeIndex.value >= 0) {
-      activeIndex.value = getInitialIndex()
+    if (!hasAvailableOptions.value) {
+      if (isOpen.value) {
+        triggerRef.value?.focus()
+        closeDropdown()
+      }
+
+      return
+    }
+
+    if (isOpen.value) {
+      const nextIndex = getInitialIndex()
+      activeIndex.value = nextIndex
+
+      // If focus was inside the options, keep it on
+      // a valid option after the options change.
+      if (optionRefs.value.some((option) => option === document.activeElement) && nextIndex >= 0) {
+        focusOption(nextIndex)
+      }
     }
   },
+  { deep: true, flush: 'post' },
 )
 
 onBeforeUnmount(() => {
@@ -307,9 +346,8 @@ onBeforeUnmount(() => {
         class="select-field__dropdown"
         role="listbox"
         :aria-labelledby="labelId"
+        :aria-required="required ? 'true' : undefined"
       >
-        <p v-if="!options.length" class="select-field__empty">No options available</p>
-
         <button
           v-for="(option, index) in options"
           :key="option.value"
@@ -329,7 +367,9 @@ onBeforeUnmount(() => {
           @keydown="handleOptionKeydown($event, index)"
           @focus="activeIndex = index"
         >
-          <span class="select-field__option-label">{{ option.label }}</span>
+          <span class="select-field__option-label">
+            {{ option.label }}
+          </span>
 
           <Check
             v-if="option.value === modelValue"

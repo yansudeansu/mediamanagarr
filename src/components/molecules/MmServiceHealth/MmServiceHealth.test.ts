@@ -1,94 +1,79 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MmServiceHealth from './MmServiceHealth.vue'
-import type { ServiceHealth } from '../../../types/service'
 
 describe('MmServiceHealth', () => {
-  const connectedHealth: ServiceHealth = {
-    status: 'connected',
-    lastCheckedAt: '2026-10-31T12:00:00.000Z',
+  function createWrapper(props: Partial<InstanceType<typeof MmServiceHealth>['$props']> = {}) {
+    return mount(MmServiceHealth, {
+      props,
+    })
   }
 
-  const failedHealth: ServiceHealth = {
-    status: 'failed',
-    lastCheckedAt: '2026-10-31T12:00:00.000Z',
-    error: 'Unable to reach the server.',
-  }
-
-  const unknownHealth: ServiceHealth = {
-    status: 'unknown',
-    lastCheckedAt: null,
-  }
-
-  it('renders connected health using the existing status badge', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: connectedHealth },
+  it('renders connected health using the status badge', () => {
+    const wrapper = createWrapper({
+      status: 'connected',
     })
 
-    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--connected')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--success')
     expect(wrapper.get('.status-badge__label').text()).toBe('Connected')
   })
 
-  it('renders failed health using the existing status badge', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: failedHealth },
+  it('renders failed health using the status badge', () => {
+    const wrapper = createWrapper({
+      status: 'failed',
     })
 
-    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--failed')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--danger')
     expect(wrapper.get('.status-badge__label').text()).toBe('Connection failed')
   })
 
-  it('renders unknown health as not checked yet', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: unknownHealth },
+  it('renders not-checked health as not checked yet', () => {
+    const wrapper = createWrapper({
+      status: 'not-checked',
     })
 
-    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--configured')
+    expect(wrapper.get('.status-badge').classes()).toContain('status-badge--info')
     expect(wrapper.get('.status-badge__label').text()).toBe('Not checked yet')
   })
 
-  it('defaults to unknown health when no health is provided', () => {
-    const wrapper = mount(MmServiceHealth)
+  it('defaults to not checked when no props are provided', () => {
+    const wrapper = createWrapper()
 
     expect(wrapper.get('.status-badge__label').text()).toBe('Not checked yet')
     expect(wrapper.find('.service-health__time').exists()).toBe(false)
     expect(wrapper.find('.service-health__error').exists()).toBe(false)
   })
 
-  it('displays the last checked time in the local format', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: connectedHealth },
+  it('displays the supplied last checked label', () => {
+    const wrapper = createWrapper({
+      status: 'connected',
+      lastCheckedLabel: '31 Oct 2026, 13:00',
     })
 
-    expect(wrapper.get('.service-health__time').text()).toBe(
-      new Date(connectedHealth.lastCheckedAt!).toLocaleString(),
-    )
+    expect(wrapper.get('.service-health__time').text()).toBe('31 Oct 2026, 13:00')
   })
 
-  it('hides the timestamp when it is null', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: unknownHealth },
+  it('hides the timestamp when no label is provided', () => {
+    const wrapper = createWrapper({
+      status: 'not-checked',
     })
 
     expect(wrapper.find('.service-health__time').exists()).toBe(false)
   })
 
-  it('hides an invalid timestamp', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: {
-        health: {
-          status: 'connected',
-          lastCheckedAt: 'not-a-date',
-        },
-      },
+  it('hides the timestamp when the label is empty', () => {
+    const wrapper = createWrapper({
+      status: 'connected',
+      lastCheckedLabel: '',
     })
 
     expect(wrapper.find('.service-health__time').exists()).toBe(false)
   })
 
   it('displays the error message for a failed connection', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: failedHealth },
+    const wrapper = createWrapper({
+      status: 'failed',
+      error: 'Unable to reach the server.',
     })
 
     const error = wrapper.get('.service-health__error')
@@ -98,53 +83,63 @@ describe('MmServiceHealth', () => {
   })
 
   it('hides errors when the connection is healthy', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: {
-        health: {
-          status: 'connected',
-          lastCheckedAt: connectedHealth.lastCheckedAt,
-          error: 'An old connection error.',
-        },
-      },
+    const wrapper = createWrapper({
+      status: 'connected',
+      error: 'An old connection error.',
     })
 
     expect(wrapper.find('.service-health__error').exists()).toBe(false)
   })
 
   it('hides the error element when a failed connection has no error details', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: {
-        health: {
-          status: 'failed',
-          lastCheckedAt: null,
-        },
-      },
+    const wrapper = createWrapper({
+      status: 'failed',
     })
 
     expect(wrapper.find('.service-health__error').exists()).toBe(false)
   })
 
   it('updates when the health status changes', async () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: unknownHealth },
+    const wrapper = createWrapper({
+      status: 'not-checked',
     })
 
     expect(wrapper.get('.status-badge__label').text()).toBe('Not checked yet')
 
-    await wrapper.setProps({ health: failedHealth })
+    await wrapper.setProps({
+      status: 'failed',
+      error: 'Unable to reach the server.',
+    })
 
     expect(wrapper.get('.status-badge__label').text()).toBe('Connection failed')
     expect(wrapper.get('.service-health__error').text()).toBe('Unable to reach the server.')
 
-    await wrapper.setProps({ health: connectedHealth })
+    await wrapper.setProps({
+      status: 'connected',
+    })
 
     expect(wrapper.get('.status-badge__label').text()).toBe('Connected')
     expect(wrapper.find('.service-health__error').exists()).toBe(false)
   })
 
+  it('updates when the last checked label changes', async () => {
+    const wrapper = createWrapper({
+      status: 'connected',
+      lastCheckedLabel: 'Earlier',
+    })
+
+    expect(wrapper.get('.service-health__time').text()).toBe('Earlier')
+
+    await wrapper.setProps({
+      lastCheckedLabel: 'Just now',
+    })
+
+    expect(wrapper.get('.service-health__time').text()).toBe('Just now')
+  })
+
   it('exposes readable status without creating a landmark', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: connectedHealth },
+    const wrapper = createWrapper({
+      status: 'connected',
     })
 
     expect(wrapper.element.tagName).toBe('DIV')
@@ -155,16 +150,17 @@ describe('MmServiceHealth', () => {
   })
 
   it('keeps the decorative status dot hidden from screen readers', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: connectedHealth },
+    const wrapper = createWrapper({
+      status: 'connected',
     })
 
     expect(wrapper.get('.status-badge__dot').attributes('aria-hidden')).toBe('true')
   })
 
   it('does not introduce interactive controls', () => {
-    const wrapper = mount(MmServiceHealth, {
-      props: { health: failedHealth },
+    const wrapper = createWrapper({
+      status: 'failed',
+      error: 'Unable to reach the server.',
     })
 
     expect(wrapper.find('button').exists()).toBe(false)

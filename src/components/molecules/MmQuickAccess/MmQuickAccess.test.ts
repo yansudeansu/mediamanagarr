@@ -2,33 +2,36 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import MmQuickAccess from './MmQuickAccess.vue'
-import type { SafeServiceConfigs } from '../../../types/service'
+import type { QuickAccessItem } from './MmQuickAccess.vue'
 
-const configuredServices: SafeServiceConfigs = {
-  jellyfin: {
-    url: 'https://media.example.com/jellyfin',
-    configured: true,
+const defaultItems: QuickAccessItem[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    href: 'https://example.com/dashboard',
   },
-  seerr: {
-    url: 'https://requests.example.com:5055',
-    configured: true,
+  {
+    id: 'reports',
+    label: 'Reports',
+    href: 'https://example.com:5055/reports',
   },
-  sonarr: {
-    url: 'http://localhost:8989/sonarr',
-    configured: true,
+  {
+    id: 'documentation',
+    label: 'Documentation',
+    href: 'https://docs.example.com/guide',
   },
-}
+]
 
-function mountMenu(services: SafeServiceConfigs = configuredServices) {
+function mountMenu(items: QuickAccessItem[] = defaultItems) {
   return mount(MmQuickAccess, {
-    props: {
-      services,
-    },
+    props: { items },
     attachTo: document.body,
   })
 }
 
-async function openMenu(wrapper: ReturnType<typeof mountMenu>): Promise<void> {
+type MenuWrapper = ReturnType<typeof mountMenu>
+
+async function openMenu(wrapper: MenuWrapper): Promise<void> {
   await wrapper.get('button[aria-label="Open workspace menu"]').trigger('click')
   await nextTick()
 }
@@ -47,7 +50,7 @@ describe('MmQuickAccess', () => {
 
       expect(trigger.attributes('type')).toBe('button')
       expect(trigger.attributes('aria-expanded')).toBe('false')
-      expect(trigger.attributes('aria-controls')).toBe('quick-access-menu')
+      expect(trigger.attributes('aria-controls')).toBeUndefined()
       expect(trigger.find('svg').exists()).toBe(true)
 
       wrapper.unmount()
@@ -67,9 +70,11 @@ describe('MmQuickAccess', () => {
       await openMenu(wrapper)
 
       expect(wrapper.get('#quick-access-menu').isVisible()).toBe(true)
-      expect(
-        wrapper.get('button[aria-label="Open workspace menu"]').attributes('aria-expanded'),
-      ).toBe('true')
+
+      const trigger = wrapper.get('button[aria-label="Open workspace menu"]')
+
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      expect(trigger.attributes('aria-controls')).toBe('quick-access-menu')
 
       wrapper.unmount()
     })
@@ -81,16 +86,18 @@ describe('MmQuickAccess', () => {
       await wrapper.get('button[aria-label="Open workspace menu"]').trigger('click')
 
       expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
-      expect(
-        wrapper.get('button[aria-label="Open workspace menu"]').attributes('aria-expanded'),
-      ).toBe('false')
+
+      const trigger = wrapper.get('button[aria-label="Open workspace menu"]')
+
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      expect(trigger.attributes('aria-controls')).toBeUndefined()
 
       wrapper.unmount()
     })
   })
 
-  describe('configured services', () => {
-    it('displays configured services using registry names', async () => {
+  describe('items', () => {
+    it('displays the supplied links in order', async () => {
       const wrapper = mountMenu()
 
       await openMenu(wrapper)
@@ -98,97 +105,50 @@ describe('MmQuickAccess', () => {
       const links = wrapper.findAll('.quick-access__services a')
 
       expect(links).toHaveLength(3)
-      expect(links.map((link) => link.text())).toEqual(['Jellyfin', 'Seerr', 'Sonarr'])
+      expect(links.map((link) => link.text())).toEqual(['Dashboard', 'Reports', 'Documentation'])
 
       wrapper.unmount()
     })
 
-    it('does not display unconfigured services', async () => {
-      const wrapper = mountMenu({
-        jellyfin: configuredServices.jellyfin,
-        radarr: {
-          url: 'http://localhost:7878',
-          configured: false,
-        },
-      })
+    it('displays only the items supplied by the parent', async () => {
+      const wrapper = mountMenu([defaultItems[0]!])
 
       await openMenu(wrapper)
 
-      expect(wrapper.text()).toContain('Jellyfin')
-      expect(wrapper.text()).not.toContain('Radarr')
-      expect(wrapper.text()).not.toContain('qBittorrent')
+      expect(wrapper.text()).toContain('Dashboard')
+      expect(wrapper.text()).not.toContain('Reports')
+      expect(wrapper.text()).not.toContain('Documentation')
 
       wrapper.unmount()
     })
 
-    it('shows an empty state when no services are configured', async () => {
-      const wrapper = mountMenu({})
+    it('shows an empty state when no links are supplied', async () => {
+      const wrapper = mountMenu([])
 
       await openMenu(wrapper)
 
-      expect(wrapper.text()).toContain('No services configured')
+      expect(wrapper.text()).toContain('No links available')
       expect(wrapper.findAll('.quick-access__services a')).toHaveLength(0)
       expect(wrapper.text()).toContain('Settings')
 
       wrapper.unmount()
     })
 
-    it('ignores malformed service URLs', async () => {
-      const wrapper = mountMenu({
-        jellyfin: {
-          url: 'not-a-url',
-          configured: true,
-        },
-        seerr: configuredServices.seerr,
-      })
-
-      await openMenu(wrapper)
-
-      const links = wrapper.findAll('.quick-access__services a')
-
-      expect(links).toHaveLength(1)
-      expect(links[0]?.text()).toBe('Seerr')
-
-      wrapper.unmount()
-    })
-
-    it.each([
-      'javascript:alert(1)',
-      'ftp://example.com',
-      'https://user:password@example.com',
-      'https://example.com/?token=secret',
-      'https://example.com/#fragment',
-    ])('rejects unsafe service URL %s', async (url) => {
-      const wrapper = mountMenu({
-        jellyfin: {
-          url,
-          configured: true,
-        },
-      })
-
-      await openMenu(wrapper)
-
-      expect(wrapper.findAll('.quick-access__services a')).toHaveLength(0)
-      expect(wrapper.text()).toContain('No services configured')
-
-      wrapper.unmount()
-    })
-
-    it('preserves custom ports and reverse-proxy paths', async () => {
+    it('preserves the supplied link URLs', async () => {
       const wrapper = mountMenu()
 
       await openMenu(wrapper)
 
       const links = wrapper.findAll('.quick-access__services a')
 
-      expect(links[0]?.attributes('href')).toBe('https://media.example.com/jellyfin')
-      expect(links[1]?.attributes('href')).toBe('https://requests.example.com:5055')
-      expect(links[2]?.attributes('href')).toBe('http://localhost:8989/sonarr')
+      expect(links[0]?.attributes('href')).toBe('https://example.com/dashboard')
+      expect(links[1]?.attributes('href')).toBe('https://example.com:5055/reports')
+      expect(links[2]?.attributes('href')).toBe('https://docs.example.com/guide')
 
       wrapper.unmount()
     })
 
-    it('opens service links in new tabs safely', async () => {
+    it('opens links in new tabs safely', async () => {
       const wrapper = mountMenu()
 
       await openMenu(wrapper)
@@ -202,7 +162,7 @@ describe('MmQuickAccess', () => {
       wrapper.unmount()
     })
 
-    it('renders an external-link icon for every service', async () => {
+    it('renders an external-link icon for every item', async () => {
       const wrapper = mountMenu()
 
       await openMenu(wrapper)
@@ -215,28 +175,27 @@ describe('MmQuickAccess', () => {
       wrapper.unmount()
     })
 
-    it('updates when the service configuration changes', async () => {
-      const wrapper = mountMenu({})
+    it('updates when the items prop changes', async () => {
+      const wrapper = mountMenu([])
 
       await openMenu(wrapper)
 
       expect(wrapper.findAll('.quick-access__services a')).toHaveLength(0)
 
       await wrapper.setProps({
-        services: {
-          jellyfin: configuredServices.jellyfin,
-        },
+        items: [defaultItems[0]!],
       })
 
       expect(wrapper.findAll('.quick-access__services a')).toHaveLength(1)
-      expect(wrapper.text()).toContain('Jellyfin')
+      expect(wrapper.text()).toContain('Dashboard')
+      expect(wrapper.text()).not.toContain('No links available')
 
       wrapper.unmount()
     })
   })
 
   describe('interactions', () => {
-    it('moves focus to the first service when opened', async () => {
+    it('moves focus to the first link when opened', async () => {
       const wrapper = mountMenu()
 
       await openMenu(wrapper)
@@ -246,22 +205,19 @@ describe('MmQuickAccess', () => {
       wrapper.unmount()
     })
 
-    it('moves focus to Settings when no services are configured', async () => {
-      const wrapper = mountMenu({})
+    it('moves focus to Settings when there are no links', async () => {
+      const wrapper = mountMenu([])
 
       await openMenu(wrapper)
 
-      const settingsButton = wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'Settings')
+      const settingsButton = wrapper.get('button[aria-label="Open settings"]')
 
-      expect(settingsButton).toBeDefined()
-      expect(document.activeElement).toBe(settingsButton?.element)
+      expect(document.activeElement).toBe(settingsButton.element)
 
       wrapper.unmount()
     })
 
-    it('closes when Escape is pressed', async () => {
+    it('closes when Escape is pressed and restores trigger focus', async () => {
       const wrapper = mountMenu()
 
       await openMenu(wrapper)
@@ -319,7 +275,7 @@ describe('MmQuickAccess', () => {
       wrapper.unmount()
     })
 
-    it('closes when a service shortcut is selected', async () => {
+    it('closes when a link is selected', async () => {
       const wrapper = mountMenu()
 
       await openMenu(wrapper)
@@ -330,18 +286,11 @@ describe('MmQuickAccess', () => {
       wrapper.unmount()
     })
 
-    it('emits settings and closes the menu when Settings is selected', async () => {
+    it('emits settings and closes when Settings is selected', async () => {
       const wrapper = mountMenu()
 
       await openMenu(wrapper)
-
-      const settingsButton = wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'Settings')
-
-      expect(settingsButton).toBeDefined()
-
-      await settingsButton!.trigger('click')
+      await wrapper.get('button[aria-label="Open settings"]').trigger('click')
 
       expect(wrapper.emitted('settings')).toHaveLength(1)
       expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
@@ -356,6 +305,69 @@ describe('MmQuickAccess', () => {
       await wrapper.get('button[aria-label="Open workspace menu"]').trigger('click')
 
       expect(wrapper.emitted('settings')).toBeUndefined()
+
+      wrapper.unmount()
+    })
+
+    it('closes when keyboard focus leaves the component', async () => {
+      const wrapper = mountMenu()
+
+      await openMenu(wrapper)
+
+      const firstLink = wrapper.get('.quick-access__services a').element
+
+      firstLink.dispatchEvent(
+        new FocusEvent('focusout', {
+          bubbles: true,
+          relatedTarget: document.body,
+        }),
+      )
+
+      await nextTick()
+
+      expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('stays open when focus moves between menu items', async () => {
+      const wrapper = mountMenu()
+
+      await openMenu(wrapper)
+
+      const links = wrapper.findAll('.quick-access__services a')
+
+      links[0]!.element.dispatchEvent(
+        new FocusEvent('focusout', {
+          bubbles: true,
+          relatedTarget: links[1]!.element,
+        }),
+      )
+
+      await nextTick()
+
+      expect(wrapper.find('#quick-access-menu').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('stays open when focus returns to the trigger', async () => {
+      const wrapper = mountMenu()
+
+      await openMenu(wrapper)
+
+      const trigger = wrapper.get('button[aria-label="Open workspace menu"]').element
+
+      wrapper.get('.quick-access__services a').element.dispatchEvent(
+        new FocusEvent('focusout', {
+          bubbles: true,
+          relatedTarget: trigger,
+        }),
+      )
+
+      await nextTick()
+
+      expect(wrapper.find('#quick-access-menu').exists()).toBe(true)
 
       wrapper.unmount()
     })

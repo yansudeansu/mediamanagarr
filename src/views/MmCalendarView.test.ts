@@ -415,4 +415,112 @@ describe('MmCalendarView', () => {
 
     expect(wrapper.findComponent(MmCalendarGrid).props('items')).toEqual([movieItem])
   })
+
+  it('does not load the calendar after unmounting during position restoration', async () => {
+    let resolveStorage:
+      | ((value: {
+          mediaManagarrCalendarPosition: {
+            month: string
+            selectedDate: string
+          }
+        }) => void)
+      | undefined
+
+    storageGet.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStorage = resolve
+        }),
+    )
+
+    const wrapper = mountView()
+    wrapper.unmount()
+
+    resolveStorage?.({
+      mediaManagarrCalendarPosition: {
+        month: '2026-12-01',
+        selectedDate: '2026-12-15',
+      },
+    })
+
+    await flushPromises()
+
+    expect(mockedSendMessage).not.toHaveBeenCalled()
+    expect(storageSet).not.toHaveBeenCalled()
+  })
+
+  it('ignores a pending calendar response after unmount', async () => {
+    let resolveRequest: ((value: { success: true; calendar: CalendarResult }) => void) | undefined
+
+    mockedSendMessage.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve as typeof resolveRequest
+        }),
+    )
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(mockedSendMessage).toHaveBeenCalledWith({
+      type: 'GET_CALENDAR',
+      start: '2026-11-01',
+      end: '2026-12-01',
+    })
+
+    wrapper.unmount()
+
+    resolveRequest?.({ success: true, calendar })
+    await flushPromises()
+
+    expect(wrapper.vm.$.isUnmounted).toBe(true)
+    expect(mockedSendMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a pending poster image response after unmount', async () => {
+    const posterItem: CalendarItem = {
+      ...tvItem,
+      posterUrl: '/example-poster.jpg',
+      posterMediaId: 42,
+    }
+
+    let resolveImage: ((value: { success: true; image: string }) => void) | undefined
+
+    mockedSendMessage.mockImplementation((message) => {
+      if (message.type === 'GET_CALENDAR_IMAGE') {
+        return new Promise((resolve) => {
+          resolveImage = resolve as typeof resolveImage
+        })
+      }
+
+      return Promise.resolve({
+        success: true,
+        calendar: {
+          items: [posterItem],
+          services: calendar.services,
+        },
+      })
+    })
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(mockedSendMessage).toHaveBeenCalledWith({
+      type: 'GET_CALENDAR_IMAGE',
+      service: 'sonarr',
+      mediaId: 42,
+    })
+
+    wrapper.unmount()
+
+    resolveImage?.({
+      success: true,
+      image: 'data:image/png;base64,example',
+    })
+
+    await flushPromises()
+
+    expect(wrapper.vm.$.isUnmounted).toBe(true)
+    expect(mockedSendMessage).toHaveBeenCalledTimes(2)
+  })
 })

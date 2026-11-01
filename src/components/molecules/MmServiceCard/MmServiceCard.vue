@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import MmStatusBadge from '../../atoms/MmStatusBadge/MmStatusBadge.vue'
-import type { ServiceInfo, ServiceState } from '../../../types/service'
+import type { ServiceState } from '../../../types/service'
 
 interface Props {
-  service: ServiceInfo
+  name: string
   status: ServiceState
   selected?: boolean
   disabled?: boolean
@@ -18,7 +19,19 @@ const emit = defineEmits<{
   select: []
 }>()
 
-function handleSelect() {
+const statusDisplay: Record<
+  ServiceState,
+  { variant: 'neutral' | 'info' | 'success' | 'danger'; label: string }
+> = {
+  'not-configured': { variant: 'neutral', label: 'Not set' },
+  configured: { variant: 'info', label: 'Configured' },
+  connected: { variant: 'success', label: 'Connected' },
+  failed: { variant: 'danger', label: 'Failed' },
+}
+
+const badge = computed(() => statusDisplay[props.status])
+
+function handleSelect(): void {
   if (props.disabled) return
 
   emit('select')
@@ -35,10 +48,10 @@ function handleSelect() {
     @click="handleSelect"
   >
     <span class="service-card__name">
-      {{ service.name }}
+      {{ name }}
     </span>
 
-    <mm-status-badge :status="status" />
+    <mm-status-badge :variant="badge.variant" :label="badge.label" />
   </button>
 </template>
 

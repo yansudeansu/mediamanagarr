@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmSelect from './MmSelect.vue'
+import { useArgs } from 'storybook/internal/preview-api'
 
 const priorities = [
   { label: 'Low', value: 'low' },
@@ -68,22 +69,30 @@ const meta = {
     name: 'priority',
   },
 
-  render: (args) => ({
-    components: { MmSelect },
+  render: (args) => {
+    const [, updateArgs] = useArgs()
 
-    setup() {
-      return { args }
-    },
+    return {
+      components: { MmSelect },
 
-    template: `
+      setup() {
+        function updateValue(value: string) {
+          updateArgs({ modelValue: value })
+        }
+
+        return { args, updateValue }
+      },
+
+      template: `
       <div style="width: 320px; max-width: 100%;">
         <mm-select
           v-bind="args"
-          @update:model-value="args.modelValue = $event"
+          @update:model-value="updateValue"
         />
       </div>
     `,
-  }),
+    }
+  },
 } satisfies Meta<typeof MmSelect>
 
 export default meta

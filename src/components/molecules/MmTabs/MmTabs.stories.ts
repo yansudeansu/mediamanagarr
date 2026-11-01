@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
-import { ref } from 'vue'
+import { useArgs } from 'storybook/preview-api'
 import MmTabs from './MmTabs.vue'
 import type { TabItem } from './MmTabs.vue'
 
@@ -34,16 +34,38 @@ const meta = {
   title: 'Molecules/Tabs',
   component: MmTabs,
   tags: ['autodocs'],
+  args: {
+    modelValue: 'overview',
+    items: tabItems,
+    variant: 'tabs',
+    label: 'Content sections',
+  },
   argTypes: {
     variant: {
       control: 'select',
       options: ['tabs', 'navigation'],
+      description: 'Tab-list or navigation presentation.',
     },
     modelValue: {
       control: 'text',
+      description: 'ID of the selected item.',
+    },
+    items: {
+      control: 'object',
+      description: 'Items with IDs, labels, and optional disabled states.',
     },
     label: {
       control: 'text',
+      description: 'Accessible label for the tab list or surrounding navigation.',
+    },
+  },
+  parameters: {
+    layout: 'centered',
+    docs: {
+      description: {
+        component:
+          'Reusable tabs and horizontally scrollable navigation. Selection is controlled by modelValue. Parents own tab-panel content or navigation behavior.',
+      },
     },
   },
 } satisfies Meta<typeof MmTabs>
@@ -53,36 +75,42 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 function renderTabs(args: Story['args'], width = '400px') {
+  const [, updateArgs] = useArgs()
+
   return {
     components: { MmTabs },
     setup() {
-      const selected = ref(args?.modelValue ?? '')
+      function updateSelection(value: string): void {
+        updateArgs({ modelValue: value })
+      }
 
-      return { args, selected, width }
+      return { args, width, updateSelection }
     },
     template: `
-      <div :style="{ width, maxWidth: '100%' }">
+      <div :style="{ width, maxWidth: '90vw' }">
         <nav
           v-if="args.variant === 'navigation'"
           :aria-label="args.label"
         >
           <mm-tabs
-            v-model="selected"
+            :model-value="args.modelValue"
             :items="args.items"
             variant="navigation"
+            @update:model-value="updateSelection"
           />
         </nav>
 
         <mm-tabs
           v-else
-          v-model="selected"
+          :model-value="args.modelValue"
           :items="args.items"
           variant="tabs"
           :label="args.label"
+          @update:model-value="updateSelection"
         />
 
         <div style="padding: 16px;">
-          <p>Selected: {{ selected }}</p>
+          <p>Selected: {{ args.modelValue }}</p>
         </div>
       </div>
     `,
@@ -90,12 +118,6 @@ function renderTabs(args: Story['args'], width = '400px') {
 }
 
 export const Default: Story = {
-  args: {
-    modelValue: 'overview',
-    items: tabItems,
-    variant: 'tabs',
-    label: 'Content sections',
-  },
   render: (args) => renderTabs(args),
 }
 
@@ -147,4 +169,24 @@ export const ActiveItemAtEnd: Story = {
     label: 'Primary navigation',
   },
   render: (args) => renderTabs(args, '360px'),
+}
+
+export const InvalidSelection: Story = {
+  args: {
+    modelValue: 'missing',
+    items: tabItems,
+    variant: 'tabs',
+    label: 'Content sections',
+  },
+  render: (args) => renderTabs(args),
+}
+
+export const AllDisabled: Story = {
+  args: {
+    modelValue: 'overview',
+    items: tabItems.map((item) => ({ ...item, disabled: true })),
+    variant: 'tabs',
+    label: 'Unavailable sections',
+  },
+  render: (args) => renderTabs(args),
 }
