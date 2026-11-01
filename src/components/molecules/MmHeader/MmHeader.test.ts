@@ -23,7 +23,6 @@ const configuredServices: SafeServiceConfigs = {
 function mountHeader(
   props: {
     mode?: 'main' | 'settings'
-    windowMode?: 'popup' | 'detached' | 'sidebar'
     services?: SafeServiceConfigs
   } = {},
 ) {
@@ -131,37 +130,27 @@ describe('MmHeader', () => {
   })
 
   describe('header actions', () => {
-    it('renders three action buttons in popup main and settings modes', () => {
-      const main = mountHeader()
-      const settings = mountHeader({ mode: 'settings' })
+    it('renders only the quick access trigger in main mode', () => {
+      const wrapper = mountHeader()
 
-      expect(main.findAll('button')).toHaveLength(3)
-      expect(settings.findAll('button')).toHaveLength(3)
-    })
-
-    it('renders three action buttons in detached mode', () => {
-      const wrapper = mountHeader({ windowMode: 'detached' })
-
-      expect(wrapper.findAll('button')).toHaveLength(3)
-    })
-
-    it('renders two action buttons in sidebar main mode', () => {
-      const wrapper = mountHeader({ windowMode: 'sidebar' })
-
-      expect(wrapper.findAll('button')).toHaveLength(2)
-      expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(true)
+      expect(wrapper.findAll('button')).toHaveLength(1)
       expect(wrapper.find('[aria-label="Open workspace menu"]').exists()).toBe(true)
     })
 
-    it('renders two action buttons in sidebar settings mode', () => {
-      const wrapper = mountHeader({
-        mode: 'settings',
-        windowMode: 'sidebar',
-      })
+    it('renders only the back button in settings mode', () => {
+      const wrapper = mountHeader({ mode: 'settings' })
 
-      expect(wrapper.findAll('button')).toHaveLength(2)
-      expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(true)
+      expect(wrapper.findAll('button')).toHaveLength(1)
       expect(wrapper.find('[aria-label="Back to previous view"]').exists()).toBe(true)
+    })
+
+    it('does not render workspace controls', () => {
+      const wrapper = mountHeader()
+
+      expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(false)
+      expect(wrapper.find('[aria-label="Attach workspace to toolbar"]').exists()).toBe(false)
+      expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(false)
+      expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(false)
     })
   })
 
@@ -381,238 +370,6 @@ describe('MmHeader', () => {
       const backIcon = wrapper.get('[aria-label="Back to previous view"] svg').html()
 
       expect(backIcon).not.toBe(menuIcon)
-    })
-  })
-
-  describe('detachable workspace', () => {
-    it('renders the detach button by default', () => {
-      const wrapper = mountHeader()
-
-      const button = wrapper.get('[aria-label="Detach workspace into a window"]')
-
-      expect(button.attributes('title')).toBe('Detach workspace into a window')
-      expect(button.classes()).toContain('button--icon-only')
-      expect(button.classes()).toContain('button--secondary')
-      expect(button.find('svg').exists()).toBe(true)
-    })
-
-    it('renders the attach button in detached mode', () => {
-      const wrapper = mountHeader({ windowMode: 'detached' })
-
-      const button = wrapper.get('[aria-label="Attach workspace to toolbar"]')
-
-      expect(button.attributes('title')).toBe('Attach workspace to toolbar')
-      expect(button.classes()).toContain('button--icon-only')
-      expect(button.classes()).toContain('button--secondary')
-      expect(button.find('svg').exists()).toBe(true)
-    })
-
-    it('emits detach when the detach button is clicked', async () => {
-      const wrapper = mountHeader()
-
-      await wrapper.get('[aria-label="Detach workspace into a window"]').trigger('click')
-
-      expect(wrapper.emitted('detach')).toHaveLength(1)
-      expect(wrapper.emitted('attach')).toBeUndefined()
-    })
-
-    it('emits attach when the attach button is clicked', async () => {
-      const wrapper = mountHeader({ windowMode: 'detached' })
-
-      await wrapper.get('[aria-label="Attach workspace to toolbar"]').trigger('click')
-
-      expect(wrapper.emitted('attach')).toHaveLength(1)
-      expect(wrapper.emitted('detach')).toBeUndefined()
-    })
-
-    it('updates the workspace button when switching window modes', async () => {
-      const wrapper = mountHeader()
-
-      expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(true)
-
-      await wrapper.setProps({ windowMode: 'detached' })
-
-      expect(wrapper.find('[aria-label="Attach workspace to toolbar"]').exists()).toBe(true)
-      expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(false)
-    })
-
-    it('keeps the workspace button visible in settings mode', () => {
-      const wrapper = mountHeader({ mode: 'settings' })
-
-      expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(true)
-      expect(wrapper.find('[aria-label="Back to previous view"]').exists()).toBe(true)
-    })
-
-    it('renders different icons for detach and attach', async () => {
-      const wrapper = mountHeader()
-
-      const detachIcon = wrapper.get('[aria-label="Detach workspace into a window"] svg').html()
-
-      await wrapper.setProps({ windowMode: 'detached' })
-
-      const attachIcon = wrapper.get('[aria-label="Attach workspace to toolbar"] svg').html()
-
-      expect(attachIcon).not.toBe(detachIcon)
-    })
-
-    it('keeps quick access when switching window modes', async () => {
-      const wrapper = mountHeader()
-
-      await wrapper.setProps({ windowMode: 'detached' })
-
-      expect(wrapper.find('[aria-label="Open workspace menu"]').exists()).toBe(true)
-      expect(wrapper.find('[aria-label="Attach workspace to toolbar"]').exists()).toBe(true)
-    })
-  })
-
-  describe('native sidebar workspace', () => {
-    it('renders the sidebar button in popup mode', () => {
-      const wrapper = mountHeader()
-
-      const button = wrapper.get('[aria-label="Open workspace in browser sidebar"]')
-
-      expect(button.attributes('title')).toBe('Open workspace in browser sidebar')
-      expect(button.classes()).toContain('button--icon-only')
-      expect(button.classes()).toContain('button--secondary')
-      expect(button.find('svg').exists()).toBe(true)
-    })
-
-    it('renders the sidebar button in detached mode', () => {
-      const wrapper = mountHeader({ windowMode: 'detached' })
-
-      expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(true)
-    })
-
-    it('renders the close sidebar button in sidebar mode', () => {
-      const wrapper = mountHeader({ windowMode: 'sidebar' })
-
-      const button = wrapper.get('[aria-label="Close browser sidebar"]')
-
-      expect(button.attributes('title')).toBe('Close browser sidebar')
-      expect(button.classes()).toContain('button--icon-only')
-      expect(button.classes()).toContain('button--secondary')
-      expect(button.find('svg').exists()).toBe(true)
-    })
-
-    it('hides the open sidebar button in sidebar mode', () => {
-      const wrapper = mountHeader({ windowMode: 'sidebar' })
-
-      expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(false)
-    })
-
-    it('hides the close sidebar button outside sidebar mode', () => {
-      const popup = mountHeader()
-      const detached = mountHeader({ windowMode: 'detached' })
-
-      expect(popup.find('[aria-label="Close browser sidebar"]').exists()).toBe(false)
-      expect(detached.find('[aria-label="Close browser sidebar"]').exists()).toBe(false)
-    })
-
-    it('hides detach and attach buttons in sidebar mode', () => {
-      const wrapper = mountHeader({ windowMode: 'sidebar' })
-
-      expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(false)
-      expect(wrapper.find('[aria-label="Attach workspace to toolbar"]').exists()).toBe(false)
-    })
-
-    it('emits sidebar when the sidebar button is clicked', async () => {
-      const wrapper = mountHeader()
-
-      await wrapper.get('[aria-label="Open workspace in browser sidebar"]').trigger('click')
-
-      expect(wrapper.emitted('sidebar')).toHaveLength(1)
-      expect(wrapper.emitted('sidebarClose')).toBeUndefined()
-      expect(wrapper.emitted('detach')).toBeUndefined()
-      expect(wrapper.emitted('attach')).toBeUndefined()
-    })
-
-    it('emits sidebarClose when the close sidebar button is clicked', async () => {
-      const wrapper = mountHeader({ windowMode: 'sidebar' })
-
-      await wrapper.get('[aria-label="Close browser sidebar"]').trigger('click')
-
-      expect(wrapper.emitted('sidebarClose')).toHaveLength(1)
-      expect(wrapper.emitted('sidebar')).toBeUndefined()
-      expect(wrapper.emitted('detach')).toBeUndefined()
-      expect(wrapper.emitted('attach')).toBeUndefined()
-    })
-
-    it('keeps the sidebar button available in settings mode', () => {
-      const wrapper = mountHeader({ mode: 'settings' })
-
-      expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(true)
-      expect(wrapper.find('[aria-label="Back to previous view"]').exists()).toBe(true)
-    })
-
-    it('keeps the close sidebar button available in sidebar settings mode', () => {
-      const wrapper = mountHeader({
-        mode: 'settings',
-        windowMode: 'sidebar',
-      })
-
-      expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(true)
-      expect(wrapper.find('[aria-label="Back to previous view"]').exists()).toBe(true)
-    })
-
-    it('updates workspace buttons when switching to sidebar mode', async () => {
-      const wrapper = mountHeader()
-
-      expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(true)
-      expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(true)
-
-      await wrapper.setProps({ windowMode: 'sidebar' })
-
-      expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(false)
-      expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(false)
-      expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(true)
-      expect(wrapper.find('[aria-label="Open workspace menu"]').exists()).toBe(true)
-    })
-
-    it('restores workspace buttons when switching from sidebar to popup mode', async () => {
-      const wrapper = mountHeader({ windowMode: 'sidebar' })
-
-      await wrapper.setProps({ windowMode: 'popup' })
-
-      expect(wrapper.find('[aria-label="Detach workspace into a window"]').exists()).toBe(true)
-      expect(wrapper.find('[aria-label="Open workspace in browser sidebar"]').exists()).toBe(true)
-      expect(wrapper.find('[aria-label="Close browser sidebar"]').exists()).toBe(false)
-    })
-
-    it('renders a different icon for sidebar and detach', () => {
-      const wrapper = mountHeader()
-
-      const detachIcon = wrapper.get('[aria-label="Detach workspace into a window"] svg').html()
-      const sidebarIcon = wrapper.get('[aria-label="Open workspace in browser sidebar"] svg').html()
-
-      expect(sidebarIcon).not.toBe(detachIcon)
-    })
-
-    it('renders different icons for opening and closing the sidebar', async () => {
-      const wrapper = mountHeader()
-
-      const openIcon = wrapper.get('[aria-label="Open workspace in browser sidebar"] svg').html()
-
-      await wrapper.setProps({ windowMode: 'sidebar' })
-
-      const closeIcon = wrapper.get('[aria-label="Close browser sidebar"] svg').html()
-
-      expect(closeIcon).not.toBe(openIcon)
-    })
-
-    it('hides decorative sidebar icons from assistive technology', async () => {
-      const wrapper = mountHeader()
-
-      const openIcon = wrapper.get('[aria-label="Open workspace in browser sidebar"] svg')
-
-      expect(openIcon.attributes('aria-hidden')).toBe('true')
-      expect(openIcon.attributes('focusable')).toBe('false')
-
-      await wrapper.setProps({ windowMode: 'sidebar' })
-
-      const closeIcon = wrapper.get('[aria-label="Close browser sidebar"] svg')
-
-      expect(closeIcon.attributes('aria-hidden')).toBe('true')
-      expect(closeIcon.attributes('focusable')).toBe('false')
     })
   })
 })

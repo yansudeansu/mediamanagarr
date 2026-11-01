@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import MmButton from '../../atoms/MmButton/MmButton.vue'
 import MmInput from '../../atoms/MmInput/MmInput.vue'
+import MmPanel from '../../atoms/MmPanel/MmPanel.vue'
 import MmSelect from '../../atoms/MmSelect/MmSelect.vue'
 import MmServiceHealth from '../../molecules/MmServiceHealth/MmServiceHealth.vue'
 import { SERVICE_REGISTRY } from '../../../services/registry'
@@ -189,7 +190,7 @@ function confirmRemoval() {
 </script>
 
 <template>
-  <section class="service-form" :aria-label="`${service.name} configuration`">
+  <mm-panel class="service-form" :aria-label="`${service.name} configuration`">
     <div class="service-form__heading">
       <h2 class="service-form__title">{{ service.name }}</h2>
       <p class="service-form__description">{{ service.description }}</p>
@@ -320,20 +321,10 @@ function confirmRemoval() {
         </mm-button>
       </template>
     </form>
-  </section>
+  </mm-panel>
 </template>
 
 <style scoped>
-.service-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--background);
-}
-
 .service-form__heading {
   display: flex;
   flex-direction: column;

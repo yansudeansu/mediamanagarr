@@ -2,7 +2,6 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import MmHeader from './components/molecules/MmHeader/MmHeader.vue'
 import MmNavigation from './components/molecules/MmNavigation/MmNavigation.vue'
-import type { NavigationView } from './components/molecules/MmNavigation/MmNavigation.vue'
 import MmFooter from './components/atoms/MmFooter/MmFooter.vue'
 import MmRequestView from './views/MmRequestView.vue'
 import MmUpNextView from './views/MmUpNextView.vue'
@@ -10,13 +9,21 @@ import MmCalendarView from './views/MmCalendarView.vue'
 import MmDownloadsView from './views/MmDownloadsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import { sendBackgroundMessage } from './utils/background-messaging'
-import { openWorkspaceSidebar, closeWorkspaceSidebar } from './utils/workspace-sidebar'
+import { openWorkspaceSidebar } from './utils/workspace-sidebar'
 import { getSafeServiceConfigs } from './utils/service-storage'
 import { getAppVersion } from './utils/version'
 import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
+import type { NavigationView } from './utils/workspace-state'
+import type { TabItem } from './components/molecules/MmTabs/MmTabs.vue'
 import type { SafeServiceConfigs } from './types/service'
+import type { WorkspaceMode } from './types/workspace'
 
-type WorkspaceMode = 'popup' | 'detached' | 'sidebar'
+const navigationItems: TabItem[] = [
+  { id: 'requests', label: 'Requests' },
+  { id: 'up-next', label: 'Up Next' },
+  { id: 'calendar', label: 'Calendar' },
+  { id: 'downloads', label: 'Downloads' },
+]
 
 const settingsOpen = ref(false)
 const activeView = ref<NavigationView>('requests')
@@ -132,6 +139,12 @@ watch([activeView, settingsOpen], async () => {
   }
 })
 
+function handleNavigate(view: string): void {
+  if (navigationItems.some((item) => item.id === view)) {
+    activeView.value = view as NavigationView
+  }
+}
+
 async function detachWorkspace(): Promise<void> {
   if (workspaceLoading.value) {
     return
@@ -195,28 +208,6 @@ async function openSidebar(): Promise<void> {
     workspaceLoading.value = false
   }
 }
-
-async function closeSidebar(): Promise<void> {
-  if (workspaceLoading.value) {
-    return
-  }
-
-  workspaceError.value = ''
-  workspaceLoading.value = true
-
-  try {
-    await closeWorkspaceSidebar()
-  } catch (error) {
-    workspaceError.value =
-      error instanceof Error ? error.message : 'Unable to close the browser sidebar.'
-  } finally {
-    workspaceLoading.value = false
-  }
-}
-
-function attachWorkspace(): void {
-  window.close()
-}
 </script>
 
 <template>
@@ -233,20 +224,25 @@ function attachWorkspace(): void {
       :services="safeServices"
       @settings="settingsOpen = true"
       @back="settingsOpen = false"
-      @detach="detachWorkspace"
-      @attach="attachWorkspace"
-      @sidebar="openSidebar"
-      @sidebar-close="closeSidebar"
     />
 
     <p v-if="workspaceError" class="workspace-error" role="alert">
       {{ workspaceError }}
     </p>
 
-    <mm-navigation v-if="!settingsOpen" :active-view="activeView" @navigate="activeView = $event" />
+    <mm-navigation
+      v-if="!settingsOpen"
+      :active-view="activeView"
+      :items="navigationItems"
+      @navigate="handleNavigate"
+    />
 
     <main class="app-content" :class="{ 'app-content--settings': settingsOpen }">
-      <settings-view v-if="settingsOpen" />
+      <settings-view
+        v-if="settingsOpen"
+        @open-sidebar="openSidebar"
+        @open-detached="detachWorkspace"
+      />
 
       <mm-request-view v-else-if="activeView === 'requests'" />
 

@@ -1,6 +1,7 @@
 interface FirefoxSidebarAction {
   open(): Promise<void>
   close?(): Promise<void>
+  toggle?(): Promise<void>
 }
 
 interface FirefoxBrowser {
@@ -15,7 +16,7 @@ function getFirefoxBrowser(): FirefoxBrowser | undefined {
   return browserGlobal.browser
 }
 
-export async function openWorkspaceSidebar(): Promise<void> {
+export async function openWorkspaceSidebar(windowId?: number): Promise<void> {
   const firefoxBrowser = getFirefoxBrowser()
 
   if (firefoxBrowser?.sidebarAction?.open) {
@@ -24,6 +25,11 @@ export async function openWorkspaceSidebar(): Promise<void> {
   }
 
   if (typeof chrome !== 'undefined' && chrome.sidePanel?.open) {
+    if (windowId !== undefined) {
+      await chrome.sidePanel.open({ windowId })
+      return
+    }
+
     const currentWindow = await chrome.windows.getCurrent()
 
     if (currentWindow.id === undefined) {
@@ -63,4 +69,15 @@ export async function closeWorkspaceSidebar(): Promise<void> {
   }
 
   throw new Error('Closing the sidebar programmatically is unavailable in this browser.')
+}
+
+export async function toggleWorkspaceSidebar(windowId?: number): Promise<void> {
+  const firefoxSidebar = getFirefoxBrowser()?.sidebarAction
+
+  if (firefoxSidebar?.toggle) {
+    await firefoxSidebar.toggle()
+    return
+  }
+
+  await openWorkspaceSidebar(windowId)
 }

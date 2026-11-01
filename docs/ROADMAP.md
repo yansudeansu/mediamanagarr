@@ -29,14 +29,14 @@ The intended project structure separates integration definitions, API communicat
     │   ├── services/        # External APIs and service-specific operations
     │   ├── index.ts
     │   └── messages.ts
-    ├── components/          # Reusable UI components
+    ├── components/          # Reusable, primarily presentational UI components
     ├── composables/         # Shared Vue behavior, when needed
     ├── navigation/          # Navigation features and capability requirements
     ├── services/            # Service registry and integration definitions
     ├── types/               # Shared TypeScript types
     ├── utils/               # Configuration, storage, and shared utilities
-    ├── views/               # Application views
-    ├── App.vue
+    ├── views/               # Feature state and application view coordination
+    ├── App.vue              # Application-level state and workspace transitions
     └── main.ts
 
 This is a target structure, not a required migration. New directories and abstractions should only be introduced when they serve an actual purpose.
@@ -47,6 +47,10 @@ This is a target structure, not a required migration. New directories and abstra
 - **Clear responsibilities:** Separate service metadata, API communication, configuration, navigation, and UI logic.
 - **Capability-driven:** Allow compatible integrations to contribute to existing features rather than requiring service-specific views.
 - **Provider-independent:** Design shared features to support alternatives such as Plex, Emby, and Transmission.
+- **Presentation-focused components:** Keep reusable UI components primarily driven by props, slots, and events.
+- **View-owned feature logic:** Keep feature state, data loading, and user workflows in the views that coordinate them.
+- **App-owned application state:** Keep global navigation, workspace transitions, and application-level coordination in App.
+- **Shared infrastructure:** Keep persistence, browser APIs, and external service communication in appropriate utilities and background services.
 - **Backward-compatible:** Preserve existing configurations, storage formats, integrations, and workspace behavior.
 - **Developer-friendly:** Use predictable file locations, clear naming, and straightforward TypeScript interfaces.
 - **Incremental:** Introduce provider interfaces and other abstractions only when real requirements justify them.
@@ -61,67 +65,17 @@ Each pull request should contribute toward the target architecture while remaini
 - Avoid speculative infrastructure, unnecessary dependencies, and unrelated rewrites.
 - Keep service definitions separate from navigation features and connection health.
 - Preserve the existing Vue component structure unless a change provides a clear benefit.
+- Keep reusable components independent of application-specific state and browser APIs wherever practical.
+- Prefer props and events over components directly accessing application services.
+- Keep feature-specific state and workflows in views rather than reusable components.
+- Keep App focused on application-level coordination rather than individual feature implementations.
+- Extract shared behavior into composables or utilities only when there is a demonstrated need.
 - Include appropriate tests and documentation alongside new functionality.
 - Keep behavior consistent across popup, sidebar, and detached window workspaces.
 - Prefer consolidating related controls over adding more buttons to an already compact interface.
 - Keep major features in separate, focused pull requests.
 
-## 1. Workspace Preferences & Header Simplification
-
-**Priority: High**
-
-Allow users to choose how MediaManagarr opens while simplifying the application header.
-
-### Workspace Preferences
-
-Allow users to choose how MediaManagarr opens when they click its browser toolbar button.
-
-Supported workspace modes:
-
-- **Popup:** Open MediaManagarr as a browser extension popup.
-- **Sidebar:** Open MediaManagarr in the browser's native sidebar where supported.
-- **Detached window:** Open MediaManagarr in a separate window.
-
-Implementation goals:
-
-- Add a **Default workspace mode** preference in Settings.
-- Persist the selected mode across browser sessions.
-- Use the preference to determine toolbar-button behavior where supported.
-- Preserve the existing popup, sidebar, and detached workspace implementations.
-- Move manual workspace controls into Settings.
-- Allow users to open a different workspace mode without permanently changing their preference.
-- Provide appropriate actions for opening or closing the sidebar and opening a detached window.
-- Preserve navigation state when switching workspaces where practical.
-- Handle unsupported workspace modes gracefully.
-- Avoid unexpectedly opening duplicate workspaces.
-- Document browser-specific behavior and limitations.
-
-**Technical investigation required:** Browser extension toolbar-click behavior differs depending on whether an action popup is configured. Investigate the relevant Manifest V3 APIs and supported browser behavior before finalizing the implementation.
-
-Do not assume identical toolbar behavior across Firefox, Zen Browser, and Chrome without verification.
-
-### Minimal Application Header
-
-Complete the header simplification after workspace preferences are implemented.
-
-- Keep MediaManagarr branding visible.
-- Retain the unified Quick Access menu for service shortcuts and Settings.
-- Move Sidebar and Detach controls out of the header once replacement controls are available in Settings.
-- Avoid introducing additional permanent header buttons.
-- Preserve appropriate navigation back from Settings.
-- Ensure the header remains usable at narrow popup widths.
-- Keep the menu consistent across popup, sidebar, and detached window workspaces.
-
-The intended result is a minimal header rather than an expanding toolbar.
-
-### Implementation Boundaries
-
-- Implement and verify workspace preferences before removing existing Sidebar and Detach buttons.
-- Preserve a usable way to access Settings and switch workspace modes throughout the transition.
-- Keep the existing Quick Access menu and configured service shortcuts intact.
-- Avoid redesigning individual content views as part of this work.
-
-## 2. Dynamic & Scrollable Navigation
+## 1. Dynamic & Scrollable Navigation
 
 **Priority: High**
 
@@ -152,7 +106,7 @@ Prepare navigation for additional integrations and features while improving usab
 
 Dynamic navigation and scrollable navigation should be implemented in separate pull requests.
 
-## 3. Direct Media Links
+## 2. Direct Media Links
 
 **Priority: High**
 
@@ -171,6 +125,63 @@ Unlike Quick Access shortcuts, direct media links should open a specific item ra
 
 Keep direct media links separate from the global Quick Access menu.
 
+## 3. Component Cleanup & Responsibility Boundaries
+
+**Priority: Medium / Incremental**
+
+Review the existing Vue components and simplify their responsibilities.
+
+The goal is to make reusable components primarily presentational and data-driven, while keeping feature behavior in views and application-level coordination in App.
+
+This is an incremental cleanup effort, not a requirement to rewrite the component library.
+
+### Reusable Components
+
+- Review atoms, molecules, organisms, and templates for unnecessary application-specific logic.
+- Prefer components that receive data through props and slots.
+- Communicate user interactions through clearly defined events.
+- Keep components independent of service configuration, background messaging, and browser storage wherever practical.
+- Avoid components directly opening workspaces, navigating application views, or communicating with external services.
+- Keep local UI behavior inside components when appropriate, such as dropdown visibility, keyboard interaction, focus management, and presentation state.
+- Avoid moving every small interaction into a view when doing so would make components harder to reuse.
+- Remove obsolete props, events, controls, and component-specific workarounds.
+- Consolidate duplicated presentation logic and CSS where it provides a clear benefit.
+- Prefer existing shared components over introducing near-duplicates.
+- Keep component APIs small, predictable, and appropriately typed.
+
+### Views & Application Logic
+
+- Let views own feature-specific state, data loading, and user workflows.
+- Let views coordinate reusable components and translate their events into feature actions.
+- Keep App responsible for application-level navigation, Settings visibility, workspace transitions, and shared application state.
+- Avoid moving feature-specific implementation details into App.
+- Keep persistence, browser-specific operations, and external API communication in shared utilities or background services.
+- Extract composables when behavior is genuinely shared or a view becomes difficult to maintain.
+- Avoid introducing composables solely to make components appear smaller.
+- Prefer clear ownership over rigid rules about file size or component complexity.
+
+### Component Testing
+
+- Focus component tests on observable behavior, rendered output, accessibility, props, and emitted events.
+- Avoid coupling parent component tests to the implementation details of their children.
+- Introduce reusable selector objects to make component tests easier to read and maintain.
+- Prefer stable, meaningful selectors over fragile DOM structure assumptions.
+- Keep tests independent of unrelated child component implementations where practical.
+- Preserve existing useful coverage while improving test structure incrementally.
+- Avoid rewriting working tests solely to adopt a new testing convention.
+- Continue using Storybook to document component states and interactions.
+
+### Cleanup Boundaries
+
+- Review components as related features are updated rather than migrating everything at once.
+- Keep cleanup pull requests focused and independently reviewable.
+- Preserve existing behavior, accessibility, and visual consistency.
+- Avoid unnecessary component splitting, wrapper components, and speculative abstractions.
+- Do not introduce a new state management library without a demonstrated need.
+- Treat simple, understandable code as the preferred outcome.
+
+The intended result is a component library that is easy to reuse, views that clearly own feature behavior, and an App component that coordinates the application without becoming responsible for every feature.
+
 ## 4. Testing & Accessibility
 
 **Priority: Ongoing / Pre-release**
@@ -187,6 +198,9 @@ Build on the existing Vitest and Storybook coverage with browser-level testing a
 - Test popup, native sidebar, and detached window behavior.
 - Verify toolbar-button behavior for each supported default workspace mode.
 - Test workspace preference persistence and manual workspace switching.
+- Verify navigation state restoration when switching workspaces.
+- Verify detached window reuse and behavior when a workspace is already open.
+- Document browser-specific workspace limitations discovered during testing.
 - Integrate suitable automated checks into CI.
 
 ### Accessibility
@@ -275,19 +289,7 @@ Future features will be prioritized based on user feedback and practical value r
 
 ## Implementation Plan
 
-### Phase 1 — Workspace Preferences & Header Simplification
-
-- Investigate toolbar-click and workspace-opening APIs across supported browsers.
-- Add a persistent default workspace mode preference.
-- Support Popup, Sidebar, and Detached opening modes where available.
-- Move manual workspace controls into Settings.
-- Remove redundant Sidebar and Detach buttons from the header.
-- Finalize the minimal header design.
-- Test workspace transitions, persistence, and browser compatibility.
-
-**Suggested PR:** `feat/workspace-preferences`
-
-### Phase 2 — Dynamic Navigation
+### Phase 1 — Dynamic Navigation
 
 - Introduce a central navigation feature registry.
 - Show navigation views based on configured service capabilities.
@@ -296,7 +298,7 @@ Future features will be prioritized based on user feedback and practical value r
 
 **Suggested PR:** `feat/dynamic-navigation`
 
-### Phase 3 — Scrollable Navigation
+### Phase 2 — Scrollable Navigation
 
 - Implement horizontal navigation scrolling.
 - Add conditional overflow controls.
@@ -305,11 +307,23 @@ Future features will be prioritized based on user feedback and practical value r
 
 **Suggested PR:** `feat/scrollable-navigation`
 
-### Phase 4 — Direct Media Links
+### Phase 3 — Direct Media Links
 
 - Add direct Jellyfin links to Up Next, Requests, and Calendar.
 - Verify media matching and link generation.
 - Prepare the implementation for additional media providers.
+
+### Phase 4 — Component Cleanup
+
+- Review reusable components for unnecessary feature-specific logic.
+- Clarify ownership between components, views, App, utilities, and background services.
+- Remove obsolete component APIs and duplicated presentation logic.
+- Introduce selector objects for component tests.
+- Preserve behavior and existing useful test coverage.
+
+**Suggested PR:** `refactor/component-cleanup`
+
+Component cleanup may also be performed incrementally alongside earlier phases when directly relevant.
 
 ### Phase 5 — Testing & Accessibility
 
@@ -317,6 +331,7 @@ Future features will be prioritized based on user feedback and practical value r
 - Introduce browser-level end-to-end testing.
 - Add automated accessibility checks.
 - Complete cross-browser and manual accessibility audits.
+- Verify workspace behavior in supported browsers.
 
 ### Phase 6 — Extensibility & Documentation
 
@@ -336,6 +351,9 @@ Future features will be prioritized based on user feedback and practical value r
 - **Scalable:** New services and views should not require UI redesigns.
 - **Configuration-aware:** Only show features users can actually use.
 - **Reusable:** Centralize common integration and navigation logic.
+- **Presentation-focused:** Keep reusable components primarily driven by props, slots, and events.
+- **Clear ownership:** Components handle presentation, views coordinate features, and App coordinates application-level behavior.
+- **Appropriate local state:** Keep reusable UI interactions inside components when they do not depend on application-specific behavior.
 - **Accessible:** Support keyboard navigation and different screen sizes.
 - **Maintainable:** Prefer simple, typed interfaces over complex abstractions.
 - **Backward-compatible:** Preserve existing settings, integrations, and workspace behavior.
@@ -349,15 +367,16 @@ Future features will be prioritized based on user feedback and practical value r
 
 ## Suggested GitHub Issues
 
-1. `feat: add workspace opening preferences and simplify header`
-2. `feat: add capability-driven dynamic navigation`
-3. `feat: add horizontally scrollable navigation`
-4. `feat: add direct Jellyfin media links`
-5. `test: introduce browser-level end-to-end testing`
-6. `test: expand automated accessibility checks`
-7. `refactor: introduce extensible provider interfaces`
-8. `docs: improve integration and contributor documentation`
-9. `chore: prepare browser store releases`
+1. `feat: add capability-driven dynamic navigation`
+2. `feat: add horizontally scrollable navigation`
+3. `feat: add direct Jellyfin media links`
+4. `refactor: simplify component responsibilities and remove obsolete APIs`
+5. `test: introduce reusable component selector objects`
+6. `test: introduce browser-level end-to-end testing`
+7. `test: expand automated accessibility checks`
+8. `refactor: introduce extensible provider interfaces`
+9. `docs: improve integration and contributor documentation`
+10. `chore: prepare browser store releases`
 
 ---
 

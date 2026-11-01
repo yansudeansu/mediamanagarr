@@ -441,6 +441,20 @@ export const Settings: Story = {
   },
 }
 
+export const WorkspaceSettings: Story = {
+  ...Default,
+
+  name: 'Settings — Workspace',
+
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement)
+
+    const canvas = within(canvasElement)
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Workspace' }))
+  },
+}
+
 export const SettingsConnected: Story = {
   ...Default,
 

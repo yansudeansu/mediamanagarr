@@ -1,72 +1,29 @@
 <script setup lang="ts">
-import MmButton from '../../atoms/MmButton/MmButton.vue'
-
-export type NavigationView = 'requests' | 'up-next' | 'calendar' | 'downloads'
+import MmTabs from '../MmTabs/MmTabs.vue'
+import type { TabItem } from '../MmTabs/MmTabs.vue'
 
 interface Props {
-  activeView: NavigationView
+  activeView: string
+  items: TabItem[]
+  label?: string
 }
 
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  label: 'Main navigation',
+})
 
 const emit = defineEmits<{
-  navigate: [view: NavigationView]
+  navigate: [view: string]
 }>()
-
-const items: { id: NavigationView; label: string }[] = [
-  { id: 'requests', label: 'Requests' },
-  { id: 'up-next', label: 'Up Next' },
-  { id: 'calendar', label: 'Calendar' },
-  { id: 'downloads', label: 'Downloads' },
-]
 </script>
 
 <template>
-  <nav class="navigation" aria-label="Main navigation">
-    <mm-button
-      v-for="item in items"
-      :key="item.id"
-      variant="ghost"
-      size="small"
-      class="navigation__item"
-      :aria-current="activeView === item.id ? 'page' : undefined"
-      @click="emit('navigate', item.id)"
-    >
-      {{ item.label }}
-    </mm-button>
+  <nav :aria-label="label">
+    <mm-tabs
+      :model-value="activeView"
+      :items="items"
+      variant="navigation"
+      @update:model-value="emit('navigate', $event)"
+    />
   </nav>
 </template>
-
-<style scoped>
-.navigation {
-  display: flex;
-  align-items: stretch;
-  background: var(--background);
-  border-bottom: 1px solid var(--border);
-}
-
-.navigation__item {
-  flex: 1;
-  min-width: 0;
-  min-height: 42px;
-  padding: 10px var(--space-1);
-  border-radius: 0;
-  background: var(--background);
-}
-
-.navigation__item:hover:not(:disabled) {
-  background: var(--surface-hover);
-}
-
-.navigation__item:focus-visible {
-  position: relative;
-  z-index: 1;
-  outline-offset: -2px;
-}
-
-.navigation__item[aria-current='page'] {
-  color: var(--primary);
-  font-weight: var(--font-weight-semibold);
-  box-shadow: inset 0 -2px 0 var(--primary);
-}
-</style>
