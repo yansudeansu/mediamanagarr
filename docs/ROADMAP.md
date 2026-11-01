@@ -24,20 +24,22 @@ The goal is to make adding services and features straightforward without introdu
 
 The intended project structure separates integration definitions, API communication, navigation, and UI responsibilities.
 
-    src/
-    ├── background/
-    │   ├── services/        # External APIs and service-specific operations
-    │   ├── index.ts
-    │   └── messages.ts
-    ├── components/          # Reusable, primarily presentational UI components
-    ├── composables/         # Shared Vue behavior, when needed
-    ├── navigation/          # Navigation features and capability requirements
-    ├── services/            # Service registry and integration definitions
-    ├── types/               # Shared TypeScript types
-    ├── utils/               # Configuration, storage, and shared utilities
-    ├── views/               # Feature state and application view coordination
-    ├── App.vue              # Application-level state and workspace transitions
-    └── main.ts
+```text
+src/
+├── background/
+│   ├── services/        # External APIs and service-specific operations
+│   ├── index.ts
+│   └── messages.ts
+├── components/          # Reusable, primarily presentational UI components
+├── composables/         # Shared Vue behavior, when needed
+├── navigation/          # Navigation features and capability requirements
+├── services/            # Service registry and integration definitions
+├── types/               # Shared TypeScript types
+├── utils/               # Configuration, storage, and shared utilities
+├── views/               # Feature state and application view coordination
+├── App.vue              # Application-level state and workspace transitions
+└── main.ts
+```
 
 This is a target structure, not a required migration. New directories and abstractions should only be introduced when they serve an actual purpose.
 
@@ -75,25 +77,11 @@ Each pull request should contribute toward the target architecture while remaini
 - Prefer consolidating related controls over adding more buttons to an already compact interface.
 - Keep major features in separate, focused pull requests.
 
-## 1. Dynamic & Scrollable Navigation
+## 1. Scrollable Navigation
 
 **Priority: High**
 
-Prepare navigation for additional integrations and features while improving usability in narrow workspaces.
-
-### Dynamic Navigation
-
-- Define navigation views through a central feature registry.
-- Show or hide views based on available service capabilities.
-- Allow future integrations to introduce additional views.
-- Avoid hardcoded navigation items in components.
-- Gracefully handle saved navigation states when a view becomes unavailable.
-- Provide a helpful setup experience when no services are configured.
-- Allow compatible services to contribute to existing views.
-- Keep navigation independent of service connection health.
-- Preserve existing navigation behavior wherever possible.
-
-### Scrollable Navigation
+Improve navigation usability when the available tabs exceed the width of a compact workspace.
 
 - Support horizontal scrolling when navigation tabs exceed available space.
 - Show left/right arrows only when needed.
@@ -103,8 +91,7 @@ Prepare navigation for additional integrations and features while improving usab
 - Consider subtle edge fades or other visual overflow indicators.
 - Prevent navigation labels from being unintentionally clipped or becoming inaccessible.
 - Avoid unnecessary controls when all navigation items fit.
-
-Dynamic navigation and scrollable navigation should be implemented in separate pull requests.
+- Preserve the existing behavior of hiding navigation when only one view is available.
 
 ## 2. Direct Media Links
 
@@ -223,7 +210,7 @@ Testing and accessibility remain ongoing requirements throughout every milestone
 Make it easier for contributors to add new integrations without rewriting existing features.
 
 - Design around capabilities rather than specific service names.
-- Separate service definitions from navigation features.
+- Maintain the separation between service definitions and navigation features.
 - Introduce shared provider interfaces where appropriate.
 - Support alternatives such as Plex, Emby, or Transmission in the future.
 - Prepare for additional integrations such as Lidarr, Readarr, Bazarr, and other *arr services.
@@ -289,31 +276,23 @@ Future features will be prioritized based on user feedback and practical value r
 
 ## Implementation Plan
 
-### Phase 1 — Dynamic Navigation
-
-- Introduce a central navigation feature registry.
-- Show navigation views based on configured service capabilities.
-- Handle unavailable views and persisted navigation state.
-- Provide an appropriate experience when no services are configured.
-
-**Suggested PR:** `feat/dynamic-navigation`
-
-### Phase 2 — Scrollable Navigation
+### Phase 1 — Scrollable Navigation
 
 - Implement horizontal navigation scrolling.
 - Add conditional overflow controls.
 - Ensure active tabs remain visible.
 - Verify keyboard, mouse, touch, and trackpad behavior.
+- Preserve the existing single-view behavior.
 
 **Suggested PR:** `feat/scrollable-navigation`
 
-### Phase 3 — Direct Media Links
+### Phase 2 — Direct Media Links
 
 - Add direct Jellyfin links to Up Next, Requests, and Calendar.
 - Verify media matching and link generation.
 - Prepare the implementation for additional media providers.
 
-### Phase 4 — Component Cleanup
+### Phase 3 — Component Cleanup
 
 - Review reusable components for unnecessary feature-specific logic.
 - Clarify ownership between components, views, App, utilities, and background services.
@@ -325,7 +304,7 @@ Future features will be prioritized based on user feedback and practical value r
 
 Component cleanup may also be performed incrementally alongside earlier phases when directly relevant.
 
-### Phase 5 — Testing & Accessibility
+### Phase 4 — Testing & Accessibility
 
 - Expand existing tests to cover new functionality.
 - Introduce browser-level end-to-end testing.
@@ -333,13 +312,13 @@ Component cleanup may also be performed incrementally alongside earlier phases w
 - Complete cross-browser and manual accessibility audits.
 - Verify workspace behavior in supported browsers.
 
-### Phase 6 — Extensibility & Documentation
+### Phase 5 — Extensibility & Documentation
 
 - Introduce shared provider interfaces where needed.
 - Document how to add integrations and navigation features.
 - Refine branding, configuration guides, and troubleshooting documentation.
 
-### Phase 7 — Release & Distribution
+### Phase 6 — Release & Distribution
 
 - Validate release automation and extension packages.
 - Complete installation and upgrade testing.
@@ -367,16 +346,15 @@ Component cleanup may also be performed incrementally alongside earlier phases w
 
 ## Suggested GitHub Issues
 
-1. `feat: add capability-driven dynamic navigation`
-2. `feat: add horizontally scrollable navigation`
-3. `feat: add direct Jellyfin media links`
-4. `refactor: simplify component responsibilities and remove obsolete APIs`
-5. `test: introduce reusable component selector objects`
-6. `test: introduce browser-level end-to-end testing`
-7. `test: expand automated accessibility checks`
-8. `refactor: introduce extensible provider interfaces`
-9. `docs: improve integration and contributor documentation`
-10. `chore: prepare browser store releases`
+1. `feat: add horizontally scrollable navigation`
+2. `feat: add direct Jellyfin media links`
+3. `refactor: simplify component responsibilities and remove obsolete APIs`
+4. `test: introduce reusable component selector objects`
+5. `test: introduce browser-level end-to-end testing`
+6. `test: expand automated accessibility checks`
+7. `refactor: introduce extensible provider interfaces`
+8. `docs: improve integration and contributor documentation`
+9. `chore: prepare browser store releases`
 
 ---
 

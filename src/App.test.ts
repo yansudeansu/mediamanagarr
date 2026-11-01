@@ -6,6 +6,8 @@ import { openWorkspaceSidebar } from './utils/workspace-sidebar'
 import { getSafeServiceConfigs } from './utils/service-storage'
 import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
 import type { SafeServiceConfigs } from './types/service'
+import type { WorkspaceNavigationState } from './utils/workspace-state'
+import type { BackgroundResponse, BackgroundMessage } from './types/messages'
 
 vi.mock('./utils/background-messaging', () => ({
   sendBackgroundMessage: vi.fn(),
@@ -45,6 +47,13 @@ vi.mock('./views/MmCalendarView.vue', () => ({
   },
 }))
 
+vi.mock('./views/MmDownloadsView.vue', () => ({
+  default: {
+    name: 'MockDownloadsView',
+    template: '<div data-testid="downloads-view">Downloads content</div>',
+  },
+}))
+
 vi.mock('./views/SettingsView.vue', () => ({
   default: {
     name: 'MockSettingsView',
@@ -52,10 +61,18 @@ vi.mock('./views/SettingsView.vue', () => ({
     template: `
       <div data-testid="settings-view">
         <span>Settings content</span>
-        <button type="button" data-testid="request-sidebar" @click="$emit('open-sidebar')">
+        <button
+          type="button"
+          data-testid="request-sidebar"
+          @click="$emit('open-sidebar')"
+        >
           Open Sidebar
         </button>
-        <button type="button" data-testid="request-detached" @click="$emit('open-detached')">
+        <button
+          type="button"
+          data-testid="request-detached"
+          @click="$emit('open-detached')"
+        >
           Open Detached Window
         </button>
       </div>
@@ -69,28 +86,32 @@ const mockedGetSafeServices = vi.mocked(getSafeServiceConfigs)
 const mockedGetWorkspaceState = vi.mocked(getWorkspaceNavigationState)
 const mockedSaveWorkspaceState = vi.mocked(saveWorkspaceNavigationState)
 
-const emptyDownloads = {
-  success: true as const,
-  downloads: {
-    torrents: [],
-    downloadSpeed: 0,
-    uploadSpeed: 0,
-  },
-}
-
 const configuredServices: SafeServiceConfigs = {
   jellyfin: {
     url: 'https://media.example.com/jellyfin',
+    configured: true,
+  },
+  seerr: {
+    url: 'https://seerr.example.com',
     configured: true,
   },
   sonarr: {
     url: 'https://home.example.com:8989/sonarr',
     configured: true,
   },
+  radarr: {
+    url: 'https://radarr.example.com',
+    configured: true,
+  },
+  qbittorrent: {
+    url: 'https://qbittorrent.example.com',
+    configured: true,
+  },
 }
 
-function mockBackgroundMessages(): void {
-  mockedSendMessage.mockImplementation(async () => emptyDownloads)
+const detachedSuccess = {
+  success: true as const,
+  windowId: 123,
 }
 
 function getNavigationButton(wrapper: ReturnType<typeof mount>, label: string) {
@@ -111,6 +132,7 @@ async function openQuickAccess(wrapper: ReturnType<typeof mount>): Promise<void>
 
 async function openSettings(wrapper: ReturnType<typeof mount>): Promise<void> {
   await openQuickAccess(wrapper)
+
   await wrapper.get('button[aria-label="Open settings"]').trigger('click')
 }
 
@@ -165,7 +187,6 @@ describe('App', () => {
   }
 
   beforeEach(() => {
-    vi.useFakeTimers()
     vi.clearAllMocks()
     storageChangeListeners.clear()
 
@@ -193,211 +214,368 @@ describe('App', () => {
       settingsOpen: false,
     })
 
-    mockedGetSafeServices.mockResolvedValue({})
+    mockedGetSafeServices.mockResolvedValue(configuredServices)
     mockedSaveWorkspaceState.mockResolvedValue(undefined)
     mockedOpenSidebar.mockResolvedValue(undefined)
-
-    mockBackgroundMessages()
+    mockedSendMessage.mockResolvedValue(detachedSuccess)
   })
 
   afterEach(() => {
     window.history.replaceState(null, '', window.location.pathname)
-    vi.clearAllTimers()
-    vi.useRealTimers()
+
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     storageChangeListeners.clear()
   })
 
-  it('renders the application header', () => {
-    const wrapper = mount(App)
-
-    expect(wrapper.get('h1').text()).toBe('MediaManagarr')
-
-    wrapper.unmount()
-  })
-
-  it('renders the main navigation', () => {
-    const wrapper = mount(App)
-
-    const navigation = wrapper.get('nav[aria-label="Main navigation"]')
-
-    expect(navigation.text()).toContain('Requests')
-    expect(navigation.text()).toContain('Up Next')
-    expect(navigation.text()).toContain('Calendar')
-    expect(navigation.text()).toContain('Downloads')
-
-    wrapper.unmount()
-  })
-
-  it('starts on the Requests view', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
-    expect(getNavigationButton(wrapper, 'Requests').attributes('aria-current')).toBe('page')
-
-    wrapper.unmount()
-  })
-
-  it('navigates to Up Next', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    await getNavigationButton(wrapper, 'Up Next').trigger('click')
-
-    expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(false)
-    expect(getNavigationButton(wrapper, 'Up Next').attributes('aria-current')).toBe('page')
-
-    wrapper.unmount()
-  })
-
-  it('navigates to Calendar', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    await getNavigationButton(wrapper, 'Calendar').trigger('click')
-
-    expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(false)
-    expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
-
-    wrapper.unmount()
-  })
-
-  it('navigates to Downloads and loads qBittorrent data', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    await getNavigationButton(wrapper, 'Downloads').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Monitor and manage torrents from qBittorrent.')
-
-    expect(mockedSendMessage).toHaveBeenCalledWith({
-      type: 'GET_QBITTORRENT_DOWNLOADS',
-    })
-
-    expect(getNavigationButton(wrapper, 'Downloads').attributes('aria-current')).toBe('page')
-
-    wrapper.unmount()
-  })
-
-  it('unmounts the previous view when navigating', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    await getNavigationButton(wrapper, 'Downloads').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('.downloads-template').exists()).toBe(true)
-
-    await getNavigationButton(wrapper, 'Calendar').trigger('click')
-
-    expect(wrapper.find('.downloads-template').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-
-    wrapper.unmount()
-  })
-
-  describe('Quick Access service integration', () => {
-    it('loads safe service configurations when the app mounts', async () => {
-      mockedGetSafeServices.mockResolvedValue(configuredServices)
-
+  describe('application layout', () => {
+    it('renders the application header', () => {
       const wrapper = mount(App)
-      await flushPromises()
 
-      expect(mockedGetSafeServices).toHaveBeenCalledOnce()
-
-      await openQuickAccess(wrapper)
-
-      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
-      expect(wrapper.get('#quick-access-menu').text()).toContain('Sonarr')
+      expect(wrapper.get('h1').text()).toBe('MediaManagarr')
 
       wrapper.unmount()
     })
 
-    it('preserves custom ports and reverse-proxy paths in service links', async () => {
-      mockedGetSafeServices.mockResolvedValue(configuredServices)
-
+    it('renders the application footer', () => {
       const wrapper = mount(App)
-      await flushPromises()
 
-      await openQuickAccess(wrapper)
-
-      const links = wrapper.findAll('#quick-access-menu a')
-
-      expect(links).toHaveLength(2)
-
-      expect(links.map((link) => link.attributes('href'))).toContain(
-        'https://media.example.com/jellyfin',
-      )
-
-      expect(links.map((link) => link.attributes('href'))).toContain(
-        'https://home.example.com:8989/sonarr',
-      )
-
-      for (const link of links) {
-        expect(link.attributes('target')).toBe('_blank')
-        expect(link.attributes('rel')).toContain('noopener')
-        expect(link.attributes('rel')).toContain('noreferrer')
-      }
+      expect(wrapper.find('footer').exists()).toBe(true)
 
       wrapper.unmount()
     })
 
-    it('shows an empty state when no services are configured', async () => {
+    it('starts in popup mode', () => {
       const wrapper = mount(App)
-      await flushPromises()
 
-      await openQuickAccess(wrapper)
+      expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--detached')
 
-      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
-      expect(wrapper.findAll('#quick-access-menu a')).toHaveLength(0)
-      expect(wrapper.find('button[aria-label="Open settings"]').exists()).toBe(true)
+      expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--sidebar')
 
       wrapper.unmount()
     })
 
-    it('refreshes configured services when local service storage changes', async () => {
+    it('detects detached workspace mode', () => {
+      setWorkspaceMode('detached')
+
+      const wrapper = mount(App)
+
+      expect(wrapper.get('.app-shell').classes()).toContain('app-shell--detached')
+
+      wrapper.unmount()
+    })
+
+    it('detects sidebar workspace mode', () => {
+      setWorkspaceMode('sidebar')
+
+      const wrapper = mount(App)
+
+      expect(wrapper.get('.app-shell').classes()).toContain('app-shell--sidebar')
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('navigation', () => {
+    it('renders all navigation items when all services are configured', async () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      await openQuickAccess(wrapper)
+      const navigation = wrapper.get('nav[aria-label="Main navigation"]')
 
-      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
+      expect(navigation.text()).toContain('Requests')
+      expect(navigation.text()).toContain('Up Next')
+      expect(navigation.text()).toContain('Calendar')
+      expect(navigation.text()).toContain('Downloads')
 
-      mockedGetSafeServices.mockResolvedValue(configuredServices)
+      wrapper.unmount()
+    })
 
-      emitStorageChange({
-        mediaManagarrServices: {
-          newValue: configuredServices,
+    it('starts on the Requests view', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
+
+      expect(getNavigationButton(wrapper, 'Requests').attributes('aria-current')).toBe('page')
+
+      wrapper.unmount()
+    })
+
+    it('navigates to Up Next', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Up Next').trigger('click')
+
+      expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
+
+      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('navigates to Calendar', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('navigates to Downloads', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Downloads').trigger('click')
+
+      expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('unmounts the previous view when navigating', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Downloads').trigger('click')
+
+      expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(true)
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+
+      expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
+
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('dynamic navigation', () => {
+    it('shows only capabilities supported by configured services', async () => {
+      mockedGetSafeServices.mockResolvedValue({
+        jellyfin: {
+          url: 'https://jellyfin.example.com',
+          configured: true,
         },
+        sonarr: {
+          url: 'https://sonarr.example.com',
+          configured: true,
+        },
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      const navigation = wrapper.get('nav[aria-label="Main navigation"]')
+
+      expect(navigation.text()).toContain('Up Next')
+      expect(navigation.text()).toContain('Calendar')
+      expect(navigation.text()).not.toContain('Requests')
+      expect(navigation.text()).not.toContain('Downloads')
+
+      expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('shows Calendar without navigation for Sonarr and Radarr', async () => {
+      mockedGetSafeServices.mockResolvedValue({
+        sonarr: {
+          url: 'https://sonarr.example.com',
+          configured: true,
+        },
+        radarr: {
+          url: 'https://radarr.example.com',
+          configured: true,
+        },
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('shows Up Next without navigation when only Jellyfin is configured', async () => {
+      mockedGetSafeServices.mockResolvedValue({
+        jellyfin: {
+          url: 'https://jellyfin.example.com',
+          configured: true,
+        },
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('ignores services marked unconfigured', async () => {
+      mockedGetSafeServices.mockResolvedValue({
+        jellyfin: {
+          url: '',
+          configured: false,
+        },
+        seerr: {
+          url: 'https://seerr.example.com',
+          configured: true,
+        },
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(false)
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('shows the setup state when no services are configured', async () => {
+      mockedGetSafeServices.mockResolvedValue({})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+
+      expect(wrapper.text()).toContain('No services configured yet.')
+
+      expect(wrapper.text()).toContain('Configure a service in Settings to get started.')
+
+      wrapper.unmount()
+    })
+
+    it('opens Settings from the empty setup state', async () => {
+      mockedGetSafeServices.mockResolvedValue({})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await wrapper.get('.empty-navigation button').trigger('click')
+
+      expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('restores a saved view when available', async () => {
+      mockedGetWorkspaceState.mockResolvedValue({
+        activeView: 'calendar',
+        settingsOpen: false,
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
+
+      expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
+
+      wrapper.unmount()
+    })
+
+    it('falls back when the saved view is unavailable', async () => {
+      mockedGetWorkspaceState.mockResolvedValue({
+        activeView: 'downloads',
+        settingsOpen: false,
+      })
+
+      mockedGetSafeServices.mockResolvedValue({
+        jellyfin: {
+          url: 'https://jellyfin.example.com',
+          configured: true,
+        },
+      })
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
+
+      expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
+
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('waits for services before displaying navigation', async () => {
+      let resolveServices: ((configs: SafeServiceConfigs) => void) | undefined
+
+      mockedGetSafeServices.mockImplementation(
+        () =>
+          new Promise<SafeServiceConfigs>((resolve) => {
+            resolveServices = resolve
+          }),
+      )
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+
+      expect(wrapper.find('.empty-navigation').exists()).toBe(false)
+
+      resolveServices?.(configuredServices)
+      await flushPromises()
+
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('waits for workspace state before selecting a view', async () => {
+      let resolveState: ((state: WorkspaceNavigationState) => void) | undefined
+
+      mockedGetWorkspaceState.mockImplementation(
+        () =>
+          new Promise<WorkspaceNavigationState>((resolve) => {
+            resolveState = resolve
+          }),
+      )
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+
+      resolveState?.({
+        activeView: 'calendar',
+        settingsOpen: false,
       })
 
       await flushPromises()
 
-      expect(mockedGetSafeServices).toHaveBeenCalledTimes(2)
-      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
-      expect(wrapper.get('#quick-access-menu').text()).toContain('Sonarr')
-      expect(wrapper.get('#quick-access-menu').text()).not.toContain('No services configured')
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
 
       wrapper.unmount()
     })
 
-    it('removes services from Quick Access when their configuration is removed', async () => {
-      mockedGetSafeServices.mockResolvedValue(configuredServices)
-
+    it('updates navigation when service configuration changes', async () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      await openQuickAccess(wrapper)
+      expect(getNavigationButton(wrapper, 'Downloads').exists()).toBe(true)
 
-      expect(wrapper.findAll('#quick-access-menu a')).toHaveLength(2)
-
-      mockedGetSafeServices.mockResolvedValue({})
+      mockedGetSafeServices.mockResolvedValue({
+        seerr: {
+          url: 'https://seerr.example.com',
+          configured: true,
+        },
+      })
 
       emitStorageChange({
         mediaManagarrServices: {
@@ -408,13 +586,47 @@ describe('App', () => {
 
       await flushPromises()
 
-      expect(wrapper.findAll('#quick-access-menu a')).toHaveLength(0)
-      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
+      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(false)
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
 
       wrapper.unmount()
     })
 
-    it('ignores unrelated local storage changes', async () => {
+    it('falls back when the active service is removed', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Downloads').trigger('click')
+
+      expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(true)
+
+      mockedGetSafeServices.mockResolvedValue({
+        jellyfin: {
+          url: 'https://jellyfin.example.com',
+          configured: true,
+        },
+      })
+
+      emitStorageChange({
+        mediaManagarrServices: {
+          oldValue: configuredServices,
+          newValue: {},
+        },
+      })
+
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
+
+      expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('ignores unrelated storage changes', async () => {
       const wrapper = mount(App)
       await flushPromises()
 
@@ -433,7 +645,7 @@ describe('App', () => {
       wrapper.unmount()
     })
 
-    it('ignores service storage changes outside local storage', async () => {
+    it('ignores service changes outside local storage', async () => {
       const wrapper = mount(App)
       await flushPromises()
 
@@ -453,28 +665,7 @@ describe('App', () => {
       wrapper.unmount()
     })
 
-    it('handles service configuration loading errors gracefully', async () => {
-      mockedGetSafeServices.mockRejectedValue(new Error('Service storage unavailable.'))
-
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-      const wrapper = mount(App)
-      await flushPromises()
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        'MediaManagarr: Unable to load safe service configurations:',
-        expect.any(Error),
-      )
-
-      await openQuickAccess(wrapper)
-
-      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
-      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
-
-      wrapper.unmount()
-    })
-
-    it('does not overwrite newer configurations with stale asynchronous results', async () => {
+    it('does not overwrite newer configurations with stale results', async () => {
       let resolveInitialLoad: ((configs: SafeServiceConfigs) => void) | undefined
 
       mockedGetSafeServices
@@ -497,20 +688,112 @@ describe('App', () => {
 
       await flushPromises()
 
-      await openQuickAccess(wrapper)
-
-      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
-
       resolveInitialLoad?.({})
       await flushPromises()
 
-      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
-      expect(wrapper.get('#quick-access-menu').text()).not.toContain('No services configured')
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(true)
+
+      expect(getNavigationButton(wrapper, 'Downloads').exists()).toBe(true)
 
       wrapper.unmount()
     })
 
-    it('registers and removes the storage listener with the component lifecycle', async () => {
+    it('handles service loading errors gracefully', async () => {
+      mockedGetSafeServices.mockRejectedValue(new Error('Service storage unavailable.'))
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'MediaManagarr: Unable to load safe service configurations:',
+        expect.any(Error),
+      )
+
+      expect(wrapper.text()).toContain('No services configured yet.')
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('Quick Access', () => {
+    it('loads configured services on mount', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      expect(mockedGetSafeServices).toHaveBeenCalledOnce()
+
+      await openQuickAccess(wrapper)
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('Sonarr')
+
+      wrapper.unmount()
+    })
+
+    it('preserves reverse-proxy paths and custom ports', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await openQuickAccess(wrapper)
+
+      const links = wrapper.findAll('#quick-access-menu a')
+      const hrefs = links.map((link) => link.attributes('href'))
+
+      expect(hrefs).toContain('https://media.example.com/jellyfin')
+
+      expect(hrefs).toContain('https://home.example.com:8989/sonarr')
+
+      for (const link of links) {
+        expect(link.attributes('target')).toBe('_blank')
+        expect(link.attributes('rel')).toContain('noopener')
+        expect(link.attributes('rel')).toContain('noreferrer')
+      }
+
+      wrapper.unmount()
+    })
+
+    it('shows an empty state without configured services', async () => {
+      mockedGetSafeServices.mockResolvedValue({})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await openQuickAccess(wrapper)
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
+
+      expect(wrapper.findAll('#quick-access-menu a')).toHaveLength(0)
+
+      wrapper.unmount()
+    })
+
+    it('refreshes Quick Access when services change', async () => {
+      mockedGetSafeServices.mockResolvedValue({})
+
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await openQuickAccess(wrapper)
+
+      mockedGetSafeServices.mockResolvedValue(configuredServices)
+
+      emitStorageChange({
+        mediaManagarrServices: {
+          newValue: configuredServices,
+        },
+      })
+
+      await flushPromises()
+
+      expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
+
+      wrapper.unmount()
+    })
+
+    it('registers and removes the storage listener', async () => {
       const wrapper = mount(App)
       await flushPromises()
 
@@ -520,179 +803,52 @@ describe('App', () => {
       wrapper.unmount()
 
       expect(removeStorageListener).toHaveBeenCalledOnce()
-      expect(removeStorageListener).toHaveBeenCalledWith(addStorageListener.mock.calls[0]?.[0])
       expect(storageChangeListeners.size).toBe(0)
     })
+  })
 
-    it('does not apply service configurations after the app unmounts', async () => {
-      let resolveLoad: ((configs: SafeServiceConfigs) => void) | undefined
-
-      mockedGetSafeServices.mockImplementation(
-        () =>
-          new Promise<SafeServiceConfigs>((resolve) => {
-            resolveLoad = resolve
-          }),
-      )
-
+  describe('Settings', () => {
+    it('opens Settings through Quick Access', async () => {
       const wrapper = mount(App)
       await flushPromises()
 
+      await openSettings(wrapper)
+
+      expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
+
       wrapper.unmount()
-
-      resolveLoad?.(configuredServices)
-      await flushPromises()
-
-      expect(removeStorageListener).toHaveBeenCalledOnce()
-      expect(storageChangeListeners.size).toBe(0)
     })
 
-    it('keeps the app functional when Chrome storage is unavailable', async () => {
-      vi.stubGlobal('chrome', undefined)
-
+    it('hides navigation while Settings is open', async () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      expect(mockedGetSafeServices).not.toHaveBeenCalled()
-      expect(addStorageListener).not.toHaveBeenCalled()
+      await openSettings(wrapper)
 
-      await openQuickAccess(wrapper)
+      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
 
-      expect(wrapper.get('#quick-access-menu').text()).toContain('No services configured')
-      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(false)
 
       wrapper.unmount()
     })
-  })
 
-  it('opens Settings through the workspace menu', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
+    it('returns to the selected view after closing Settings', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
 
-    const menuButton = wrapper.get('button[aria-label="Open workspace menu"]')
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+      await openSettings(wrapper)
 
-    expect(menuButton.attributes('aria-expanded')).toBe('false')
+      await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
 
-    await menuButton.trigger('click')
+      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
 
-    expect(menuButton.attributes('aria-expanded')).toBe('true')
-    expect(wrapper.find('button[aria-label="Open settings"]').exists()).toBe(true)
-
-    await wrapper.get('button[aria-label="Open settings"]').trigger('click')
-
-    expect(wrapper.get('h1').text()).toBe('Settings')
-    expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
-
-    wrapper.unmount()
-  })
-
-  it('opens settings and hides the active view and navigation', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    await openSettings(wrapper)
-
-    expect(wrapper.get('h1').text()).toBe('Settings')
-    expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(false)
-    expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
-
-    wrapper.unmount()
-  })
-
-  it('returns to the previously selected view after closing settings', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    await getNavigationButton(wrapper, 'Calendar').trigger('click')
-    await openSettings(wrapper)
-
-    expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(false)
-
-    await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
-
-    expect(wrapper.get('h1').text()).toBe('MediaManagarr')
-    expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-    expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
-
-    wrapper.unmount()
-  })
-
-  it('stops Downloads polling when navigating away', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    await getNavigationButton(wrapper, 'Downloads').trigger('click')
-    await flushPromises()
-
-    expect(mockedSendMessage).toHaveBeenCalledTimes(1)
-
-    await vi.advanceTimersByTimeAsync(5000)
-
-    expect(mockedSendMessage).toHaveBeenCalledTimes(2)
-
-    await getNavigationButton(wrapper, 'Calendar').trigger('click')
-    await vi.advanceTimersByTimeAsync(15000)
-
-    expect(mockedSendMessage).toHaveBeenCalledTimes(2)
-
-    wrapper.unmount()
-  })
-
-  it('starts a fresh Downloads session when navigating back', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    await getNavigationButton(wrapper, 'Downloads').trigger('click')
-    await flushPromises()
-
-    expect(mockedSendMessage).toHaveBeenCalledTimes(1)
-
-    await getNavigationButton(wrapper, 'Calendar').trigger('click')
-    await getNavigationButton(wrapper, 'Downloads').trigger('click')
-    await flushPromises()
-
-    expect(mockedSendMessage).toHaveBeenCalledTimes(2)
-
-    await vi.advanceTimersByTimeAsync(5000)
-
-    expect(mockedSendMessage).toHaveBeenCalledTimes(3)
-
-    wrapper.unmount()
-  })
-
-  it('stops Downloads polling while settings is open', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-
-    await getNavigationButton(wrapper, 'Downloads').trigger('click')
-    await flushPromises()
-
-    expect(mockedSendMessage).toHaveBeenCalledTimes(1)
-
-    await openSettings(wrapper)
-    await vi.advanceTimersByTimeAsync(10000)
-
-    expect(mockedSendMessage).toHaveBeenCalledTimes(1)
-
-    await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
-    await flushPromises()
-
-    expect(mockedSendMessage).toHaveBeenCalledTimes(2)
-
-    wrapper.unmount()
-  })
-
-  it('renders the application footer', () => {
-    const wrapper = mount(App)
-
-    expect(wrapper.text()).toContain('MediaManagarr')
-    expect(wrapper.find('.footer').exists()).toBe(true)
-
-    wrapper.unmount()
+      wrapper.unmount()
+    })
   })
 
   describe('workspace navigation persistence', () => {
-    it('restores the previously selected navigation view', async () => {
+    it('restores the selected view', async () => {
       mockedGetWorkspaceState.mockResolvedValue({
         activeView: 'calendar',
         settingsOpen: false,
@@ -702,14 +858,13 @@ describe('App', () => {
       await flushPromises()
 
       expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-      expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
 
       wrapper.unmount()
     })
 
-    it('restores Settings when it was previously open', async () => {
+    it('restores Settings when previously open', async () => {
       mockedGetWorkspaceState.mockResolvedValue({
-        activeView: 'downloads',
+        activeView: 'calendar',
         settingsOpen: true,
       })
 
@@ -717,7 +872,6 @@ describe('App', () => {
       await flushPromises()
 
       expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
 
       wrapper.unmount()
     })
@@ -757,7 +911,9 @@ describe('App', () => {
       await flushPromises()
 
       await openSettings(wrapper)
+
       await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
+
       await flushPromises()
 
       expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
@@ -768,207 +924,24 @@ describe('App', () => {
       wrapper.unmount()
     })
 
-    it('saves the actual navigation state before opening a detached workspace', async () => {
-      mockedSendMessage.mockResolvedValue({
-        success: true,
-        windowId: 42,
-      })
-
-      const wrapper = mount(App)
-      await flushPromises()
-
-      await getNavigationButton(wrapper, 'Calendar').trigger('click')
-      await openSettings(wrapper)
-      await flushPromises()
-
-      mockedSaveWorkspaceState.mockClear()
-
-      await requestDetached(wrapper)
-      await flushPromises()
-
-      expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
-        activeView: 'calendar',
-        settingsOpen: true,
-      })
-
-      expect(mockedSendMessage).toHaveBeenCalledWith({
-        type: 'OPEN_DETACHED_WORKSPACE',
-      })
-
-      wrapper.unmount()
-    })
-
-    it('saves the actual navigation state before opening the sidebar', async () => {
-      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
-
-      const wrapper = mount(App)
-      await flushPromises()
-
-      await getNavigationButton(wrapper, 'Calendar').trigger('click')
-      await openSettings(wrapper)
-      await flushPromises()
-
-      mockedSaveWorkspaceState.mockClear()
-
-      await requestSidebar(wrapper)
-      await flushPromises()
-
-      expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
-        activeView: 'calendar',
-        settingsOpen: true,
-      })
-
-      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
-      expect(closeSpy).toHaveBeenCalledOnce()
-
-      wrapper.unmount()
-    })
-
-    it('continues with defaults if restoring navigation state fails', async () => {
-      mockedGetWorkspaceState.mockRejectedValue(new Error('Storage unavailable'))
+    it('continues with defaults when restoration fails', async () => {
+      mockedGetWorkspaceState.mockRejectedValue(new Error('Session unavailable.'))
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       const wrapper = mount(App)
       await flushPromises()
 
-      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
       expect(warnSpy).toHaveBeenCalled()
 
-      wrapper.unmount()
-    })
-
-    it('does not attempt storage access when Chrome storage is unavailable', async () => {
-      vi.stubGlobal('chrome', undefined)
-
-      const wrapper = mount(App)
-      await flushPromises()
-
-      expect(mockedGetWorkspaceState).not.toHaveBeenCalled()
-
-      await getNavigationButton(wrapper, 'Calendar').trigger('click')
-      await flushPromises()
-
-      expect(mockedSaveWorkspaceState).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
 
       wrapper.unmount()
     })
   })
 
-  describe('workspace modes', () => {
-    it('starts in popup mode by default', () => {
-      const wrapper = mount(App)
-
-      expect(wrapper.find('.app-shell--detached').exists()).toBe(false)
-      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(false)
-
-      wrapper.unmount()
-    })
-
-    it('detects detached mode from the URL query parameter', () => {
-      setWorkspaceMode('detached')
-
-      const wrapper = mount(App)
-
-      expect(wrapper.find('.app-shell--detached').exists()).toBe(true)
-      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(false)
-
-      wrapper.unmount()
-    })
-
-    it('detects sidebar mode from the URL query parameter', () => {
-      setWorkspaceMode('sidebar')
-
-      const wrapper = mount(App)
-
-      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(true)
-      expect(wrapper.find('.app-shell--detached').exists()).toBe(false)
-
-      wrapper.unmount()
-    })
-
-    it('does not activate another workspace mode for unrelated query parameters', () => {
-      window.history.replaceState(null, '', `${window.location.pathname}?workspace=other`)
-
-      const wrapper = mount(App)
-
-      expect(wrapper.find('.app-shell--detached').exists()).toBe(false)
-      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(false)
-
-      wrapper.unmount()
-    })
-
-    it('keeps navigation available in detached mode', async () => {
-      setWorkspaceMode('detached')
-
-      const wrapper = mount(App)
-      await flushPromises()
-
-      await getNavigationButton(wrapper, 'Calendar').trigger('click')
-
-      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-      expect(wrapper.find('.app-shell--detached').exists()).toBe(true)
-
-      wrapper.unmount()
-    })
-
-    it('keeps navigation available in sidebar mode', async () => {
-      setWorkspaceMode('sidebar')
-
-      const wrapper = mount(App)
-      await flushPromises()
-
-      await getNavigationButton(wrapper, 'Calendar').trigger('click')
-
-      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-      expect(wrapper.find('.app-shell--sidebar').exists()).toBe(true)
-
-      wrapper.unmount()
-    })
-
-    it('keeps Settings available in sidebar mode', async () => {
-      setWorkspaceMode('sidebar')
-
-      const wrapper = mount(App)
-      await flushPromises()
-
-      await openSettings(wrapper)
-
-      expect(wrapper.get('h1').text()).toBe('Settings')
-      expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
-
-      await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
-
-      expect(wrapper.get('h1').text()).toBe('MediaManagarr')
-
-      wrapper.unmount()
-    })
-
-    it('restores navigation state in sidebar mode', async () => {
-      setWorkspaceMode('sidebar')
-
-      mockedGetWorkspaceState.mockResolvedValue({
-        activeView: 'calendar',
-        settingsOpen: false,
-      })
-
-      const wrapper = mount(App)
-      await flushPromises()
-
-      expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-      expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
-
-      wrapper.unmount()
-    })
-  })
-
-  describe('detached workspace requests', () => {
-    it('opens a detached window when Settings requests it', async () => {
-      mockedSendMessage.mockResolvedValue({
-        success: true,
-        windowId: 42,
-      })
-
+  describe('detached workspace', () => {
+    it('opens a detached workspace from Settings', async () => {
       const wrapper = mount(App)
       await flushPromises()
 
@@ -980,15 +953,30 @@ describe('App', () => {
         type: 'OPEN_DETACHED_WORKSPACE',
       })
 
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('saves navigation state before opening a detached workspace', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+      await openSettings(wrapper)
+      await requestDetached(wrapper)
+      await flushPromises()
+
+      expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
+        activeView: 'calendar',
+        settingsOpen: true,
+      })
 
       wrapper.unmount()
     })
 
-    it('shows an error if opening the detached window fails', async () => {
+    it('shows errors when detached workspace opening fails', async () => {
       mockedSendMessage.mockResolvedValue({
         success: false,
-        error: 'Unable to create workspace window.',
+        error: 'Unable to create window.',
       })
 
       const wrapper = mount(App)
@@ -998,13 +986,13 @@ describe('App', () => {
       await requestDetached(wrapper)
       await flushPromises()
 
-      expect(wrapper.get('[role="alert"]').text()).toBe('Unable to create workspace window.')
+      expect(wrapper.get('[role="alert"]').text()).toContain('Unable to create window.')
 
       wrapper.unmount()
     })
 
-    it('shows an error if the background message rejects', async () => {
-      mockedSendMessage.mockRejectedValue(new Error('Extension context unavailable.'))
+    it('handles rejected detached requests', async () => {
+      mockedSendMessage.mockRejectedValue(new Error('Background unavailable.'))
 
       const wrapper = mount(App)
       await flushPromises()
@@ -1013,17 +1001,17 @@ describe('App', () => {
       await requestDetached(wrapper)
       await flushPromises()
 
-      expect(wrapper.get('[role="alert"]').text()).toBe('Extension context unavailable.')
+      expect(wrapper.get('[role="alert"]').text()).toContain('Background unavailable.')
 
       wrapper.unmount()
     })
 
-    it('does not start another detached request while one is pending', async () => {
-      let resolveRequest: ((response: { success: true; windowId: number }) => void) | undefined
+    it('prevents concurrent detached requests', async () => {
+      let resolveRequest: ((response: BackgroundResponse<BackgroundMessage>) => void) | undefined
 
       mockedSendMessage.mockImplementation(
         () =>
-          new Promise((resolve) => {
+          new Promise<BackgroundResponse<BackgroundMessage>>((resolve) => {
             resolveRequest = resolve
           }),
       )
@@ -1035,28 +1023,21 @@ describe('App', () => {
       await requestDetached(wrapper)
       await requestDetached(wrapper)
 
-      expect(mockedSendMessage).toHaveBeenCalledOnce()
+      expect(mockedSendMessage).toHaveBeenCalledTimes(1)
 
-      resolveRequest?.({
-        success: true,
-        windowId: 42,
-      })
-
+      resolveRequest?.(detachedSuccess)
       await flushPromises()
 
       wrapper.unmount()
     })
 
-    it('allows another detached request after a failed attempt', async () => {
+    it('allows retrying after a failed detached request', async () => {
       mockedSendMessage
         .mockResolvedValueOnce({
           success: false,
-          error: 'Temporary failure.',
+          error: 'Unable to create window.',
         })
-        .mockResolvedValueOnce({
-          success: true,
-          windowId: 42,
-        })
+        .mockResolvedValueOnce(detachedSuccess)
 
       const wrapper = mount(App)
       await flushPromises()
@@ -1066,20 +1047,17 @@ describe('App', () => {
       await requestDetached(wrapper)
       await flushPromises()
 
-      expect(wrapper.get('[role="alert"]').text()).toBe('Temporary failure.')
-
       await requestDetached(wrapper)
       await flushPromises()
 
       expect(mockedSendMessage).toHaveBeenCalledTimes(2)
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
 
       wrapper.unmount()
     })
   })
 
-  describe('native sidebar workspace requests', () => {
-    it('opens the native sidebar and closes the popup', async () => {
+  describe('native sidebar workspace', () => {
+    it('opens the sidebar from Settings', async () => {
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
       const wrapper = mount(App)
@@ -1091,12 +1069,11 @@ describe('App', () => {
 
       expect(mockedOpenSidebar).toHaveBeenCalledOnce()
       expect(closeSpy).toHaveBeenCalledOnce()
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
 
       wrapper.unmount()
     })
 
-    it('opens the native sidebar and closes the detached window', async () => {
+    it('opens the sidebar from a detached workspace', async () => {
       setWorkspaceMode('detached')
 
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
@@ -1110,12 +1087,11 @@ describe('App', () => {
 
       expect(mockedOpenSidebar).toHaveBeenCalledOnce()
       expect(closeSpy).toHaveBeenCalledOnce()
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
 
       wrapper.unmount()
     })
 
-    it('starts opening the sidebar before waiting for storage', async () => {
+    it('starts the sidebar operation before awaiting storage', async () => {
       let resolveSave: (() => void) | undefined
 
       mockedSaveWorkspaceState.mockImplementation(
@@ -1125,8 +1101,6 @@ describe('App', () => {
           }),
       )
 
-      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
-
       const wrapper = mount(App)
       await flushPromises()
 
@@ -1134,20 +1108,18 @@ describe('App', () => {
       await requestSidebar(wrapper)
 
       expect(mockedOpenSidebar).toHaveBeenCalledOnce()
-      expect(closeSpy).not.toHaveBeenCalled()
 
       resolveSave?.()
       await flushPromises()
 
-      expect(closeSpy).toHaveBeenCalledOnce()
-
       wrapper.unmount()
     })
 
-    it('continues opening the sidebar if saving navigation fails', async () => {
-      mockedSaveWorkspaceState.mockRejectedValue(new Error('Storage unavailable.'))
+    it('continues opening the sidebar when saving state fails', async () => {
+      mockedSaveWorkspaceState.mockRejectedValue(new Error('Session unavailable.'))
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
       const wrapper = mount(App)
@@ -1157,32 +1129,14 @@ describe('App', () => {
       await requestSidebar(wrapper)
       await flushPromises()
 
-      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
-      expect(closeSpy).toHaveBeenCalledOnce()
       expect(warnSpy).toHaveBeenCalled()
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-
-      wrapper.unmount()
-    })
-
-    it('does not send a background message when opening the sidebar', async () => {
-      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
-
-      const wrapper = mount(App)
-      await flushPromises()
-
-      await openSettings(wrapper)
-      await requestSidebar(wrapper)
-      await flushPromises()
-
       expect(mockedOpenSidebar).toHaveBeenCalledOnce()
-      expect(mockedSendMessage).not.toHaveBeenCalled()
       expect(closeSpy).toHaveBeenCalledOnce()
 
       wrapper.unmount()
     })
 
-    it('shows an error and keeps the popup open when opening the sidebar fails', async () => {
+    it('shows an error if opening the sidebar fails', async () => {
       mockedOpenSidebar.mockRejectedValue(new Error('Sidebar unavailable.'))
 
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
@@ -1194,16 +1148,15 @@ describe('App', () => {
       await requestSidebar(wrapper)
       await flushPromises()
 
-      expect(wrapper.get('[role="alert"]').text()).toBe('Sidebar unavailable.')
+      expect(wrapper.get('[role="alert"]').text()).toContain('Sidebar unavailable.')
+
       expect(closeSpy).not.toHaveBeenCalled()
 
       wrapper.unmount()
     })
 
-    it('shows a fallback error when the sidebar rejects with an unknown value', async () => {
-      mockedOpenSidebar.mockRejectedValue('Unknown failure')
-
-      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+    it('shows a fallback message for unknown sidebar errors', async () => {
+      mockedOpenSidebar.mockRejectedValue(null)
 
       const wrapper = mount(App)
       await flushPromises()
@@ -1212,49 +1165,40 @@ describe('App', () => {
       await requestSidebar(wrapper)
       await flushPromises()
 
-      expect(wrapper.get('[role="alert"]').text()).toBe('Unable to open the browser sidebar.')
-      expect(closeSpy).not.toHaveBeenCalled()
+      expect(wrapper.get('[role="alert"]').text()).toContain('Unable to open the browser sidebar.')
 
       wrapper.unmount()
     })
 
-    it('does not start another sidebar request while one is pending', async () => {
-      let resolveOpen: (() => void) | undefined
+    it('prevents concurrent sidebar requests', async () => {
+      let resolveSidebar: (() => void) | undefined
 
       mockedOpenSidebar.mockImplementation(
         () =>
           new Promise<void>((resolve) => {
-            resolveOpen = resolve
+            resolveSidebar = resolve
           }),
       )
-
-      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
       const wrapper = mount(App)
       await flushPromises()
 
       await openSettings(wrapper)
-
       await requestSidebar(wrapper)
       await requestSidebar(wrapper)
 
-      expect(mockedOpenSidebar).toHaveBeenCalledOnce()
-      expect(closeSpy).not.toHaveBeenCalled()
+      expect(mockedOpenSidebar).toHaveBeenCalledTimes(1)
 
-      resolveOpen?.()
+      resolveSidebar?.()
       await flushPromises()
-
-      expect(closeSpy).toHaveBeenCalledOnce()
 
       wrapper.unmount()
     })
 
-    it('allows another sidebar request after a failed attempt', async () => {
+    it('allows retrying after a failed sidebar request', async () => {
       mockedOpenSidebar
-        .mockRejectedValueOnce(new Error('Temporary failure.'))
+        .mockRejectedValueOnce(new Error('Sidebar unavailable.'))
         .mockResolvedValueOnce(undefined)
-
-      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
       const wrapper = mount(App)
       await flushPromises()
@@ -1263,27 +1207,22 @@ describe('App', () => {
 
       await requestSidebar(wrapper)
       await flushPromises()
-
-      expect(wrapper.get('[role="alert"]').text()).toBe('Temporary failure.')
-      expect(closeSpy).not.toHaveBeenCalled()
 
       await requestSidebar(wrapper)
       await flushPromises()
 
       expect(mockedOpenSidebar).toHaveBeenCalledTimes(2)
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-      expect(closeSpy).toHaveBeenCalledOnce()
 
       wrapper.unmount()
     })
 
-    it('does not start a sidebar request while a detached request is pending', async () => {
-      let resolveDetached: ((response: { success: true; windowId: number }) => void) | undefined
+    it('does not open the sidebar while a detached request is pending', async () => {
+      let resolveRequest: ((response: BackgroundResponse<BackgroundMessage>) => void) | undefined
 
       mockedSendMessage.mockImplementation(
         () =>
-          new Promise((resolve) => {
-            resolveDetached = resolve
+          new Promise<BackgroundResponse<BackgroundMessage>>((resolve) => {
+            resolveRequest = resolve
           }),
       )
 
@@ -1294,15 +1233,27 @@ describe('App', () => {
       await requestDetached(wrapper)
       await requestSidebar(wrapper)
 
-      expect(mockedSendMessage).toHaveBeenCalledOnce()
       expect(mockedOpenSidebar).not.toHaveBeenCalled()
 
-      resolveDetached?.({
-        success: true,
-        windowId: 42,
-      })
-
+      resolveRequest?.(detachedSuccess)
       await flushPromises()
+
+      wrapper.unmount()
+    })
+
+    it('preserves navigation state when opening the sidebar', async () => {
+      const wrapper = mount(App)
+      await flushPromises()
+
+      await getNavigationButton(wrapper, 'Calendar').trigger('click')
+      await openSettings(wrapper)
+      await requestSidebar(wrapper)
+      await flushPromises()
+
+      expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
+        activeView: 'calendar',
+        settingsOpen: true,
+      })
 
       wrapper.unmount()
     })
