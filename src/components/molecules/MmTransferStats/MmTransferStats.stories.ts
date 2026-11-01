@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import MmTransferStats from './MmTransferStats.vue'
 
 const meta = {
-  title: 'Molecules/MmTransferStats',
+  title: 'Molecules/TransferStats',
   component: MmTransferStats,
   tags: ['autodocs'],
   args: {
