@@ -7,6 +7,15 @@ import MmFilterGroup from '../components/molecules/MmFilterGroup/MmFilterGroup.v
 import MmButton from '../components/atoms/MmButton/MmButton.vue'
 import type { JellyfinArrival, JellyfinArrivalFilter } from '../types/jellyfin'
 import { sendBackgroundMessage } from '../utils/background-messaging'
+import { getJellyfinMediaUrl } from '../utils/jellyfin-media-links'
+
+interface Props {
+  jellyfinUrl?: string | null
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  jellyfinUrl: null,
+})
 
 const PAGE_SIZE = 10
 
@@ -40,6 +49,10 @@ let requestSequence = 0
 
 function getErrorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : 'An unexpected error occurred.'
+}
+
+function getMediaUrl(arrival: JellyfinArrival): string | null {
+  return getJellyfinMediaUrl(props.jellyfinUrl, arrival.id)
 }
 
 async function loadImage(arrival: JellyfinArrival, sequence: number): Promise<void> {
@@ -297,6 +310,7 @@ onMounted(() => {
         :arrival="arrival"
         :image="images[arrival.imageId]"
         :busy="busyItems.includes(arrival.id)"
+        :media-url="getMediaUrl(arrival)"
         @toggle-unread="toggleUnread"
       />
     </template>

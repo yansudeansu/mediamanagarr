@@ -9,11 +9,13 @@ interface Props {
   arrival: JellyfinArrival
   image?: string | null
   busy?: boolean
+  mediaUrl?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   image: null,
   busy: false,
+  mediaUrl: null,
 })
 
 const emit = defineEmits<{
@@ -57,7 +59,19 @@ function toggleUnread(): void {
       <div class="arrival-card__details">
         <div class="arrival-card__heading">
           <h3 class="arrival-card__title" :title="arrival.title">
-            {{ arrival.title }}
+            <a
+              v-if="mediaUrl"
+              class="arrival-card__link"
+              :href="mediaUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ arrival.title }}
+            </a>
+
+            <template v-else>
+              {{ arrival.title }}
+            </template>
           </h3>
 
           <span class="arrival-card__type">
@@ -140,6 +154,21 @@ function toggleUnread(): void {
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.arrival-card__link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.arrival-card__link:hover {
+  text-decoration: underline;
+}
+
+.arrival-card__link:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .arrival-card__type {

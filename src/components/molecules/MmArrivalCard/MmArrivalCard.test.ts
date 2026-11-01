@@ -15,6 +15,12 @@ const movieArrival: JellyfinArrival = {
   unread: false,
 }
 
+const movieUrl =
+  'https://media.example.com/jellyfin/web/#/details?id=0123456789abcdef0123456789abcdef'
+
+const episodeUrl =
+  'https://media.example.com/jellyfin/web/#/details?id=abcdef0123456789abcdef0123456789'
+
 function createArrival(overrides: Partial<JellyfinArrival> = {}): JellyfinArrival {
   return {
     ...movieArrival,
@@ -24,7 +30,11 @@ function createArrival(overrides: Partial<JellyfinArrival> = {}): JellyfinArriva
 
 function mountArrival(
   overrides: Partial<JellyfinArrival> = {},
-  options: { image?: string | null; busy?: boolean } = {},
+  options: {
+    image?: string | null
+    busy?: boolean
+    mediaUrl?: string | null
+  } = {},
 ) {
   return mount(MmArrivalCard, {
     props: {
@@ -306,5 +316,93 @@ describe('MmArrivalCard', () => {
     const wrapper = mountArrival()
 
     expect(wrapper.findAll('button')).toHaveLength(1)
+  })
+
+  describe('direct media links', () => {
+    it('renders a plain title when no media URL is provided', () => {
+      const wrapper = mountArrival()
+
+      expect(wrapper.get('.arrival-card__title').text()).toBe('Example Movie')
+      expect(wrapper.find('.arrival-card__link').exists()).toBe(false)
+    })
+
+    it('renders a direct link when a media URL is provided', () => {
+      const wrapper = mountArrival({}, { mediaUrl: movieUrl })
+
+      const link = wrapper.get('.arrival-card__link')
+
+      expect(link.element.tagName).toBe('A')
+      expect(link.text()).toBe('Example Movie')
+      expect(link.attributes('href')).toBe(movieUrl)
+    })
+
+    it('opens direct links in a new tab safely', () => {
+      const wrapper = mountArrival({}, { mediaUrl: movieUrl })
+
+      const link = wrapper.get('.arrival-card__link')
+
+      expect(link.attributes('target')).toBe('_blank')
+      expect(link.attributes('rel')).toContain('noopener')
+      expect(link.attributes('rel')).toContain('noreferrer')
+    })
+
+    it('supports direct links for episodes', () => {
+      const wrapper = mountArrival(
+        {
+          id: 'episode-42',
+          type: 'Episode',
+          title: 'The Beginning',
+        },
+        { mediaUrl: episodeUrl },
+      )
+
+      const link = wrapper.get('.arrival-card__link')
+
+      expect(link.text()).toBe('The Beginning')
+      expect(link.attributes('href')).toBe(episodeUrl)
+    })
+
+    it('does not render a link for an explicitly null URL', () => {
+      const wrapper = mountArrival({}, { mediaUrl: null })
+
+      expect(wrapper.find('.arrival-card__link').exists()).toBe(false)
+      expect(wrapper.get('.arrival-card__title').text()).toBe('Example Movie')
+    })
+
+    it('updates the link when the media URL changes', async () => {
+      const wrapper = mountArrival()
+
+      expect(wrapper.find('.arrival-card__link').exists()).toBe(false)
+
+      await wrapper.setProps({ mediaUrl: movieUrl })
+
+      expect(wrapper.get('.arrival-card__link').attributes('href')).toBe(movieUrl)
+
+      await wrapper.setProps({ mediaUrl: episodeUrl })
+
+      expect(wrapper.get('.arrival-card__link').attributes('href')).toBe(episodeUrl)
+
+      await wrapper.setProps({ mediaUrl: null })
+
+      expect(wrapper.find('.arrival-card__link').exists()).toBe(false)
+    })
+
+    it('keeps the unread action separate from the media link', async () => {
+      const wrapper = mountArrival({}, { mediaUrl: movieUrl })
+
+      expect(wrapper.findAll('.arrival-card__link')).toHaveLength(1)
+      expect(wrapper.findAll('button')).toHaveLength(1)
+
+      await wrapper.get('button').trigger('click')
+
+      expect(wrapper.emitted('toggleUnread')).toEqual([['movie-42', true]])
+    })
+
+    it('keeps the media link available while the unread action is busy', () => {
+      const wrapper = mountArrival({}, { mediaUrl: movieUrl, busy: true })
+
+      expect(wrapper.get('.arrival-card__link').attributes('href')).toBe(movieUrl)
+      expect(wrapper.get('button').attributes('disabled')).toBeDefined()
+    })
   })
 })

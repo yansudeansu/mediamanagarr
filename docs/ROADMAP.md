@@ -77,26 +77,7 @@ Each pull request should contribute toward the target architecture while remaini
 - Prefer consolidating related controls over adding more buttons to an already compact interface.
 - Keep major features in separate, focused pull requests.
 
-## 1. Direct Media Links
-
-**Priority: High**
-
-Make it easier to jump directly from MediaManagarr to available media.
-
-Unlike Quick Access shortcuts, direct media links should open a specific item rather than a service homepage.
-
-- Add direct links from MediaManagarr to media in Jellyfin.
-- **Up Next:** Open the specific episode directly in Jellyfin.
-- **Requests:** Link to the requested movie or show when available in Jellyfin.
-- **Calendar:** Link to episodes already available in the media library.
-- Use the user's configured server URL and the correct media item ID.
-- Hide playback links when media is unavailable or cannot be reliably matched.
-- Open links in a new browser tab without closing the extension.
-- Design the feature to support future providers such as Plex and Emby.
-
-Keep direct media links separate from the global Quick Access menu.
-
-## 2. Component Cleanup & Responsibility Boundaries
+## 1. Component Cleanup & Responsibility Boundaries
 
 **Priority: Medium / Incremental**
 
@@ -153,7 +134,7 @@ This is an incremental cleanup effort, not a requirement to rewrite the componen
 
 The intended result is a component library that is easy to reuse, views that clearly own feature behavior, and an App component that coordinates the application without becoming responsible for every feature.
 
-## 3. Testing & Accessibility
+## 2. Testing & Accessibility
 
 **Priority: Ongoing / Pre-release**
 
@@ -187,7 +168,7 @@ Build on the existing Vitest and Storybook coverage with browser-level testing a
 
 Testing and accessibility remain ongoing requirements throughout every milestone.
 
-## 4. Extensible Integrations
+## 3. Extensible Integrations
 
 **Priority: Medium / Incremental**
 
@@ -206,7 +187,7 @@ Make it easier for contributors to add new integrations without rewriting existi
 
 Introduce provider abstractions incrementally as real integrations require them.
 
-## 5. Branding & Documentation
+## 4. Branding & Documentation
 
 **Priority: Pre-release**
 
@@ -222,7 +203,7 @@ Prepare MediaManagarr for a wider audience.
 - Document the service registry and integration architecture.
 - Review screenshots and other release materials.
 
-## 6. Release & Distribution
+## 5. Release & Distribution
 
 **Priority: Pre-release**
 
@@ -237,7 +218,7 @@ Prepare and publish MediaManagarr for supported browsers.
 - Prepare Firefox Add-ons and Chrome Web Store submissions.
 - Document release and distribution procedures.
 
-## 7. Future Possibilities
+## 6. Future Possibilities
 
 Ideas that may be explored after the initial release or when there is sufficient demand.
 
@@ -247,7 +228,6 @@ Ideas that may be explored after the initial release or when there is sufficient
 - **Service management:** Let users enable or disable integrations.
 - **Additional views:** Music, Books, Subtitles, Activity, or other service-specific features.
 - **Unified calendar:** Combine upcoming releases from different supported media types.
-- **Media provider links:** Extend direct playback links beyond Jellyfin.
 - **Advanced filtering:** More filtering and sorting options.
 - **Expanded media details:** Display additional information where useful.
 - **Notifications:** More notification options and customization.
@@ -260,13 +240,7 @@ Future features will be prioritized based on user feedback and practical value r
 
 ## Implementation Plan
 
-### Phase 1 — Direct Media Links
-
-- Add direct Jellyfin links to Up Next, Requests, and Calendar.
-- Verify media matching and link generation.
-- Prepare the implementation for additional media providers.
-
-### Phase 2 — Component Cleanup
+### Phase 1 — Component Cleanup
 
 - Review reusable components for unnecessary feature-specific logic.
 - Clarify ownership between components, views, App, utilities, and background services.
@@ -276,9 +250,9 @@ Future features will be prioritized based on user feedback and practical value r
 
 **Suggested PR:** `refactor/component-cleanup`
 
-Component cleanup may also be performed incrementally alongside earlier phases when directly relevant.
+Component cleanup may also be performed incrementally alongside other phases when directly relevant.
 
-### Phase 3 — Testing & Accessibility
+### Phase 2 — Testing & Accessibility
 
 - Expand existing tests to cover new functionality.
 - Introduce browser-level end-to-end testing.
@@ -286,13 +260,13 @@ Component cleanup may also be performed incrementally alongside earlier phases w
 - Complete cross-browser and manual accessibility audits.
 - Verify workspace behavior in supported browsers.
 
-### Phase 4 — Extensibility & Documentation
+### Phase 3 — Extensibility & Documentation
 
 - Introduce shared provider interfaces where needed.
 - Document how to add integrations and navigation features.
 - Refine branding, configuration guides, and troubleshooting documentation.
 
-### Phase 5 — Release & Distribution
+### Phase 4 — Release & Distribution
 
 - Validate release automation and extension packages.
 - Complete installation and upgrade testing.
@@ -320,14 +294,13 @@ Component cleanup may also be performed incrementally alongside earlier phases w
 
 ## Suggested GitHub Issues
 
-1. `feat: add direct Jellyfin media links`
-2. `refactor: simplify component responsibilities and remove obsolete APIs`
-3. `test: introduce reusable component selector objects`
-4. `test: introduce browser-level end-to-end testing`
-5. `test: expand automated accessibility checks`
-6. `refactor: introduce extensible provider interfaces`
-7. `docs: improve integration and contributor documentation`
-8. `chore: prepare browser store releases`
+1. `refactor: simplify component responsibilities and remove obsolete APIs`
+2. `test: introduce reusable component selector objects`
+3. `test: introduce browser-level end-to-end testing`
+4. `test: expand automated accessibility checks`
+5. `refactor: introduce extensible provider interfaces`
+6. `docs: improve integration and contributor documentation`
+7. `chore: prepare browser store releases`
 
 ---
 
