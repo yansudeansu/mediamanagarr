@@ -77,23 +77,7 @@ Each pull request should contribute toward the target architecture while remaini
 - Prefer consolidating related controls over adding more buttons to an already compact interface.
 - Keep major features in separate, focused pull requests.
 
-## 1. Scrollable Navigation
-
-**Priority: High**
-
-Improve navigation usability when the available tabs exceed the width of a compact workspace.
-
-- Support horizontal scrolling when navigation tabs exceed available space.
-- Show left/right arrows only when needed.
-- Automatically scroll the active tab into view.
-- Support mouse, trackpad, touch, and keyboard navigation.
-- Keep the design consistent across popup, sidebar, and detached window.
-- Consider subtle edge fades or other visual overflow indicators.
-- Prevent navigation labels from being unintentionally clipped or becoming inaccessible.
-- Avoid unnecessary controls when all navigation items fit.
-- Preserve the existing behavior of hiding navigation when only one view is available.
-
-## 2. Direct Media Links
+## 1. Direct Media Links
 
 **Priority: High**
 
@@ -112,7 +96,7 @@ Unlike Quick Access shortcuts, direct media links should open a specific item ra
 
 Keep direct media links separate from the global Quick Access menu.
 
-## 3. Component Cleanup & Responsibility Boundaries
+## 2. Component Cleanup & Responsibility Boundaries
 
 **Priority: Medium / Incremental**
 
@@ -169,7 +153,7 @@ This is an incremental cleanup effort, not a requirement to rewrite the componen
 
 The intended result is a component library that is easy to reuse, views that clearly own feature behavior, and an App component that coordinates the application without becoming responsible for every feature.
 
-## 4. Testing & Accessibility
+## 3. Testing & Accessibility
 
 **Priority: Ongoing / Pre-release**
 
@@ -203,7 +187,7 @@ Build on the existing Vitest and Storybook coverage with browser-level testing a
 
 Testing and accessibility remain ongoing requirements throughout every milestone.
 
-## 5. Extensible Integrations
+## 4. Extensible Integrations
 
 **Priority: Medium / Incremental**
 
@@ -222,7 +206,7 @@ Make it easier for contributors to add new integrations without rewriting existi
 
 Introduce provider abstractions incrementally as real integrations require them.
 
-## 6. Branding & Documentation
+## 5. Branding & Documentation
 
 **Priority: Pre-release**
 
@@ -238,7 +222,7 @@ Prepare MediaManagarr for a wider audience.
 - Document the service registry and integration architecture.
 - Review screenshots and other release materials.
 
-## 7. Release & Distribution
+## 6. Release & Distribution
 
 **Priority: Pre-release**
 
@@ -253,7 +237,7 @@ Prepare and publish MediaManagarr for supported browsers.
 - Prepare Firefox Add-ons and Chrome Web Store submissions.
 - Document release and distribution procedures.
 
-## 8. Future Possibilities
+## 7. Future Possibilities
 
 Ideas that may be explored after the initial release or when there is sufficient demand.
 
@@ -276,23 +260,13 @@ Future features will be prioritized based on user feedback and practical value r
 
 ## Implementation Plan
 
-### Phase 1 — Scrollable Navigation
-
-- Implement horizontal navigation scrolling.
-- Add conditional overflow controls.
-- Ensure active tabs remain visible.
-- Verify keyboard, mouse, touch, and trackpad behavior.
-- Preserve the existing single-view behavior.
-
-**Suggested PR:** `feat/scrollable-navigation`
-
-### Phase 2 — Direct Media Links
+### Phase 1 — Direct Media Links
 
 - Add direct Jellyfin links to Up Next, Requests, and Calendar.
 - Verify media matching and link generation.
 - Prepare the implementation for additional media providers.
 
-### Phase 3 — Component Cleanup
+### Phase 2 — Component Cleanup
 
 - Review reusable components for unnecessary feature-specific logic.
 - Clarify ownership between components, views, App, utilities, and background services.
@@ -304,7 +278,7 @@ Future features will be prioritized based on user feedback and practical value r
 
 Component cleanup may also be performed incrementally alongside earlier phases when directly relevant.
 
-### Phase 4 — Testing & Accessibility
+### Phase 3 — Testing & Accessibility
 
 - Expand existing tests to cover new functionality.
 - Introduce browser-level end-to-end testing.
@@ -312,13 +286,13 @@ Component cleanup may also be performed incrementally alongside earlier phases w
 - Complete cross-browser and manual accessibility audits.
 - Verify workspace behavior in supported browsers.
 
-### Phase 5 — Extensibility & Documentation
+### Phase 4 — Extensibility & Documentation
 
 - Introduce shared provider interfaces where needed.
 - Document how to add integrations and navigation features.
 - Refine branding, configuration guides, and troubleshooting documentation.
 
-### Phase 6 — Release & Distribution
+### Phase 5 — Release & Distribution
 
 - Validate release automation and extension packages.
 - Complete installation and upgrade testing.
@@ -346,15 +320,14 @@ Component cleanup may also be performed incrementally alongside earlier phases w
 
 ## Suggested GitHub Issues
 
-1. `feat: add horizontally scrollable navigation`
-2. `feat: add direct Jellyfin media links`
-3. `refactor: simplify component responsibilities and remove obsolete APIs`
-4. `test: introduce reusable component selector objects`
-5. `test: introduce browser-level end-to-end testing`
-6. `test: expand automated accessibility checks`
-7. `refactor: introduce extensible provider interfaces`
-8. `docs: improve integration and contributor documentation`
-9. `chore: prepare browser store releases`
+1. `feat: add direct Jellyfin media links`
+2. `refactor: simplify component responsibilities and remove obsolete APIs`
+3. `test: introduce reusable component selector objects`
+4. `test: introduce browser-level end-to-end testing`
+5. `test: expand automated accessibility checks`
+6. `refactor: introduce extensible provider interfaces`
+7. `docs: improve integration and contributor documentation`
+8. `chore: prepare browser store releases`
 
 ---
 
