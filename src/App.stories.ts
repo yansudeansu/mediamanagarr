@@ -21,10 +21,8 @@ const meta = {
   title: 'App/MediaManagarr',
   component: App,
   tags: ['autodocs'],
-
   parameters: {
     layout: 'centered',
-
     docs: {
       source: {
         type: 'code',
@@ -81,8 +79,8 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
       return configs
     }
 
-    // Seed local storage with the same services that the mock
-    // background reports to Settings.
+    // Keep local storage in sync with the services reported
+    // by the mock background.
     localStorage.set(SERVICE_STORAGE_KEY, createMockServiceConfigs())
 
     function dispatchWorkspaceMode(mode: WorkspaceMode): void {
@@ -159,6 +157,7 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
 
         remove: async (keys: string | string[]): Promise<void> => {
           const requestedKeys = typeof keys === 'string' ? [keys] : keys
+
           const changes: Record<string, chrome.storage.StorageChange> = {}
 
           for (const key of requestedKeys) {
@@ -196,6 +195,7 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
 
     function synchronizeServiceStorage(): void {
       const previousConfigs = localStorage.get(SERVICE_STORAGE_KEY)
+
       const nextConfigs = createMockServiceConfigs()
 
       localStorage.set(SERVICE_STORAGE_KEY, nextConfigs)
@@ -218,9 +218,7 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
 
         permissions: {
           ...originalChrome?.permissions,
-
           request: async () => true,
-
           contains: async () => true,
         },
 
@@ -246,7 +244,6 @@ function createStorySetup(options: MockBackgroundOptions = {}) {
 
         windows: {
           ...originalChrome?.windows,
-
           getCurrent: async () => ({ id: 1 }),
         },
 
@@ -377,7 +374,9 @@ function renderWorkspace() {
             : workspaceMode === 'sidebar'
               ? '340px'
               : '380px',
-          height: workspaceMode === 'popup' ? '480px' : '700px',
+          height: workspaceMode === 'popup'
+            ? '480px'
+            : '700px',
           maxWidth: '100%',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
@@ -394,9 +393,20 @@ function renderWorkspace() {
 async function openSettings(canvasElement: HTMLElement): Promise<void> {
   const canvas = within(canvasElement)
 
-  await userEvent.click(canvas.getByRole('button', { name: 'Open workspace menu' }))
-  await userEvent.click(canvas.getByRole('button', { name: 'Open settings' }))
+  await userEvent.click(
+    canvas.getByRole('button', {
+      name: 'Open workspace menu',
+    }),
+  )
+
+  await userEvent.click(
+    canvas.getByRole('button', {
+      name: 'Open settings',
+    }),
+  )
 }
+
+// Existing application stories
 
 export const Default: Story = {
   beforeEach: createStorySetup(),
@@ -409,7 +419,11 @@ export const UpNext: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Up Next' }))
+    await userEvent.click(
+      await canvas.findByRole('button', {
+        name: 'Up Next',
+      }),
+    )
   },
 }
 
@@ -419,7 +433,11 @@ export const Calendar: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Calendar' }))
+    await userEvent.click(
+      await canvas.findByRole('button', {
+        name: 'Calendar',
+      }),
+    )
   },
 }
 
@@ -429,7 +447,11 @@ export const Downloads: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Downloads' }))
+    await userEvent.click(
+      await canvas.findByRole('button', {
+        name: 'Downloads',
+      }),
+    )
   },
 }
 
@@ -443,7 +465,6 @@ export const Settings: Story = {
 
 export const WorkspaceSettings: Story = {
   ...Default,
-
   name: 'Settings — Workspace',
 
   play: async ({ canvasElement }) => {
@@ -451,13 +472,16 @@ export const WorkspaceSettings: Story = {
 
     const canvas = within(canvasElement)
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Workspace' }))
+    await userEvent.click(
+      canvas.getByRole('button', {
+        name: 'Workspace',
+      }),
+    )
   },
 }
 
 export const SettingsConnected: Story = {
   ...Default,
-
   name: 'Settings — Connected',
 
   beforeEach: createStorySetup({
@@ -477,7 +501,6 @@ export const SettingsConnected: Story = {
 
 export const SettingsConnectionFailed: Story = {
   ...Default,
-
   name: 'Settings — Connection Failed',
 
   beforeEach: createStorySetup({
@@ -489,4 +512,91 @@ export const SettingsConnectionFailed: Story = {
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement)
   },
+}
+
+// Dynamic navigation scenarios
+
+export const NoServices: Story = {
+  ...Default,
+  name: 'Navigation — No Services',
+
+  beforeEach: createStorySetup({
+    configuredServices: [],
+  }),
+}
+
+export const JellyfinOnly: Story = {
+  ...Default,
+  name: 'Navigation — Jellyfin Only',
+
+  beforeEach: createStorySetup({
+    configuredServices: ['jellyfin'],
+  }),
+}
+
+export const SeerrOnly: Story = {
+  ...Default,
+  name: 'Navigation — Seerr Only',
+
+  beforeEach: createStorySetup({
+    configuredServices: ['seerr'],
+  }),
+}
+
+export const SonarrOnly: Story = {
+  ...Default,
+  name: 'Navigation — Sonarr Only',
+
+  beforeEach: createStorySetup({
+    configuredServices: ['sonarr'],
+  }),
+}
+
+export const RadarrOnly: Story = {
+  ...Default,
+  name: 'Navigation — Radarr Only',
+
+  beforeEach: createStorySetup({
+    configuredServices: ['radarr'],
+  }),
+}
+
+export const QBittorrentOnly: Story = {
+  ...Default,
+  name: 'Navigation — qBittorrent Only',
+
+  beforeEach: createStorySetup({
+    configuredServices: ['qbittorrent'],
+  }),
+}
+
+export const SharedCalendar: Story = {
+  ...Default,
+  name: 'Navigation — Sonarr + Radarr',
+
+  beforeEach: createStorySetup({
+    configuredServices: ['sonarr', 'radarr'],
+  }),
+}
+
+export const PartialConfiguration: Story = {
+  ...Default,
+  name: 'Navigation — Partial Configuration',
+
+  beforeEach: createStorySetup({
+    configuredServices: ['jellyfin', 'sonarr', 'qbittorrent'],
+  }),
+}
+
+export const ConfiguredButDisconnected: Story = {
+  ...Default,
+  name: 'Navigation — Configured but Disconnected',
+
+  beforeEach: createStorySetup({
+    configuredServices: ['jellyfin', 'sonarr'],
+    connections: {
+      jellyfin: 'error',
+      sonarr: 'error',
+    },
+  }),
 }

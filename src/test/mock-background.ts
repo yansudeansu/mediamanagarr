@@ -17,6 +17,7 @@ export type MockConnectionScenario = 'connected' | 'error'
 export interface MockBackgroundOptions {
   downloads?: MockDownloadsScenario
   connections?: Partial<Record<ServiceId, MockConnectionScenario>>
+  configuredServices?: ServiceId[]
 }
 
 export interface MockBackgroundAction {
@@ -30,7 +31,6 @@ function dateOffset(days: number): string {
   const date = new Date()
   date.setHours(12, 0, 0, 0)
   date.setDate(date.getDate() + days)
-
   return date.toISOString()
 }
 
@@ -166,6 +166,7 @@ function paginate<T>(items: T[], page = 1, pageSize = 10): { items: T[]; total: 
 export function createMockBackground(options: MockBackgroundOptions = {}) {
   const downloadsScenario = options.downloads ?? 'populated'
   const connectionScenarios = options.connections ?? {}
+  const configuredServices = options.configuredServices ?? [...SERVICES]
 
   const requests = createRequests()
   const calendarItems = createCalendarItems()
@@ -180,7 +181,7 @@ export function createMockBackground(options: MockBackgroundOptions = {}) {
   ]
 
   const configs: SafeServiceConfigs = Object.fromEntries(
-    SERVICES.map((serviceId) => [
+    configuredServices.map((serviceId) => [
       serviceId,
       {
         url: `https://${serviceId}.storybook.invalid`,
@@ -387,7 +388,6 @@ export function createMockBackground(options: MockBackgroundOptions = {}) {
         const calendar: CalendarResult = {
           items: calendarItems.filter((item) => {
             const date = new Date(item.date).getTime()
-
             return date >= start && date <= end
           }),
           services: [

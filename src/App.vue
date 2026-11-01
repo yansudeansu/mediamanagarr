@@ -1,33 +1,44 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import MmHeader from './components/molecules/MmHeader/MmHeader.vue'
 import MmNavigation from './components/molecules/MmNavigation/MmNavigation.vue'
 import MmFooter from './components/atoms/MmFooter/MmFooter.vue'
+import MmButton from './components/atoms/MmButton/MmButton.vue'
 import MmRequestView from './views/MmRequestView.vue'
 import MmUpNextView from './views/MmUpNextView.vue'
 import MmCalendarView from './views/MmCalendarView.vue'
 import MmDownloadsView from './views/MmDownloadsView.vue'
 import SettingsView from './views/SettingsView.vue'
+import { getAvailableNavigationItems } from './navigation/features'
 import { sendBackgroundMessage } from './utils/background-messaging'
 import { openWorkspaceSidebar } from './utils/workspace-sidebar'
 import { getSafeServiceConfigs } from './utils/service-storage'
 import { getAppVersion } from './utils/version'
 import { getWorkspaceNavigationState, saveWorkspaceNavigationState } from './utils/workspace-state'
 import type { NavigationView } from './utils/workspace-state'
-import type { TabItem } from './components/molecules/MmTabs/MmTabs.vue'
 import type { SafeServiceConfigs } from './types/service'
 import type { WorkspaceMode } from './types/workspace'
-
-const navigationItems: TabItem[] = [
-  { id: 'requests', label: 'Requests' },
-  { id: 'up-next', label: 'Up Next' },
-  { id: 'calendar', label: 'Calendar' },
-  { id: 'downloads', label: 'Downloads' },
-]
 
 const settingsOpen = ref(false)
 const activeView = ref<NavigationView>('requests')
 const safeServices = ref<SafeServiceConfigs>({})
+
+const navigationItems = computed(() => getAvailableNavigationItems(safeServices.value))
+const servicesReady = ref(false)
+
+const navigationReady = computed(() => workspaceStateReady.value && servicesReady.value)
+
+const availableActiveView = computed<NavigationView | null>(() => {
+  if (!navigationReady.value) return null
+
+  const available = navigationItems.value
+
+  if (available.some((item) => item.id === activeView.value)) {
+    return activeView.value
+  }
+
+  return (available[0]?.id as NavigationView | undefined) ?? null
+})
 
 const workspaceParameter = new URLSearchParams(window.location.search).get('workspace')
 
@@ -65,6 +76,7 @@ async function refreshSafeServices(): Promise<void> {
 
   if (!hasServiceStorage()) {
     safeServices.value = {}
+    servicesReady.value = true
     return
   }
 
@@ -79,6 +91,10 @@ async function refreshSafeServices(): Promise<void> {
 
     if (!isUnmounted && loadVersion === serviceLoadVersion) {
       safeServices.value = {}
+    }
+  } finally {
+    if (!isUnmounted && loadVersion === serviceLoadVersion) {
+      servicesReady.value = true
     }
   }
 }
@@ -97,8 +113,9 @@ function handleStorageChange(
 onMounted(async () => {
   if (hasServiceStorage()) {
     void refreshSafeServices()
-
     chrome.storage.onChanged?.addListener(handleStorageChange)
+  } else {
+    servicesReady.value = true
   }
 
   try {
@@ -140,7 +157,7 @@ watch([activeView, settingsOpen], async () => {
 })
 
 function handleNavigate(view: string): void {
-  if (navigationItems.some((item) => item.id === view)) {
+  if (navigationItems.value.some((item) => item.id === view)) {
     activeView.value = view as NavigationView
   }
 }
@@ -220,7 +237,6 @@ async function openSidebar(): Promise<void> {
   >
     <mm-header
       :mode="settingsOpen ? 'settings' : 'main'"
-      :window-mode="windowMode"
       :services="safeServices"
       @settings="settingsOpen = true"
       @back="settingsOpen = false"
@@ -231,8 +247,8 @@ async function openSidebar(): Promise<void> {
     </p>
 
     <mm-navigation
-      v-if="!settingsOpen"
-      :active-view="activeView"
+      v-if="!settingsOpen && navigationReady && navigationItems.length > 1"
+      :active-view="availableActiveView ?? ''"
       :items="navigationItems"
       @navigate="handleNavigate"
     />
@@ -244,13 +260,21 @@ async function openSidebar(): Promise<void> {
         @open-detached="detachWorkspace"
       />
 
-      <mm-request-view v-else-if="activeView === 'requests'" />
+      <template v-else-if="navigationReady">
+        <mm-request-view v-if="availableActiveView === 'requests'" />
 
-      <mm-up-next-view v-else-if="activeView === 'up-next'" />
+        <mm-up-next-view v-else-if="availableActiveView === 'up-next'" />
 
-      <mm-calendar-view v-else-if="activeView === 'calendar'" />
+        <mm-calendar-view v-else-if="availableActiveView === 'calendar'" />
 
-      <mm-downloads-view v-else-if="activeView === 'downloads'" />
+        <mm-downloads-view v-else-if="availableActiveView === 'downloads'" />
+
+        <div v-else class="empty-navigation">
+          <p>No services configured yet.</p>
+          <p>Configure a service in Settings to get started.</p>
+          <mm-button variant="primary" @click="settingsOpen = true"> Open Settings </mm-button>
+        </div>
+      </template>
     </main>
 
     <mm-footer :version="version" />
@@ -286,5 +310,16 @@ async function openSidebar(): Promise<void> {
   border-bottom: 1px solid var(--border);
   color: var(--danger);
   font-size: var(--font-size-sm);
+}
+
+.empty-navigation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.empty-navigation p {
+  margin: 0;
 }
 </style>
