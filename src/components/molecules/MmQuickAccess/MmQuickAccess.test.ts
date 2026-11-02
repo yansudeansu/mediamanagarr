@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import MmQuickAccess from './MmQuickAccess.vue'
 import type { QuickAccessItem } from './MmQuickAccess.vue'
+import { mmQuickAccessSelectors } from '../../../test/selectors/molecules/mmQuickAccess.selectors'
 
 const defaultItems: QuickAccessItem[] = [
   {
@@ -22,17 +23,23 @@ const defaultItems: QuickAccessItem[] = [
   },
 ]
 
+let wrapper: VueWrapper
+
+const menu = mmQuickAccessSelectors((selector) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^\.quick-access /, ''))
+})
+
 function mountMenu(items: QuickAccessItem[] = defaultItems) {
-  return mount(MmQuickAccess, {
+  wrapper = mount(MmQuickAccess, {
     props: { items },
     attachTo: document.body,
   })
+  return wrapper
 }
 
-type MenuWrapper = ReturnType<typeof mountMenu>
-
-async function openMenu(wrapper: MenuWrapper): Promise<void> {
-  await wrapper.get('button[aria-label="Open workspace menu"]').trigger('click')
+async function openMenu(): Promise<void> {
+  await menu.trigger().trigger('click')
   await nextTick()
 }
 
@@ -44,53 +51,46 @@ afterEach(() => {
 describe('MmQuickAccess', () => {
   describe('trigger', () => {
     it('renders an accessible menu trigger', () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      const trigger = wrapper.get('button[aria-label="Open workspace menu"]')
-
-      expect(trigger.attributes('type')).toBe('button')
-      expect(trigger.attributes('aria-expanded')).toBe('false')
-      expect(trigger.attributes('aria-controls')).toBeUndefined()
-      expect(trigger.find('svg').exists()).toBe(true)
+      expect(menu.trigger().attributes('type')).toBe('button')
+      expect(menu.trigger().attributes('aria-expanded')).toBe('false')
+      expect(menu.trigger().attributes('aria-controls')).toBeUndefined()
+      expect(menu.triggerIcon().exists()).toBe(true)
 
       wrapper.unmount()
     })
 
     it('starts with the menu closed', () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
+      expect(menu.menu().exists()).toBe(false)
 
       wrapper.unmount()
     })
 
     it('opens when the trigger is clicked', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      expect(wrapper.get('#quick-access-menu').isVisible()).toBe(true)
-
-      const trigger = wrapper.get('button[aria-label="Open workspace menu"]')
-
-      expect(trigger.attributes('aria-expanded')).toBe('true')
-      expect(trigger.attributes('aria-controls')).toBe('quick-access-menu')
+      expect(menu.menu().isVisible()).toBe(true)
+      expect(menu.opened().exists()).toBe(true)
+      expect(menu.trigger().attributes('aria-expanded')).toBe('true')
+      expect(menu.trigger().attributes('aria-controls')).toBe('quick-access-menu')
 
       wrapper.unmount()
     })
 
     it('closes when the trigger is clicked again', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
-      await wrapper.get('button[aria-label="Open workspace menu"]').trigger('click')
+      await openMenu()
+      await menu.trigger().trigger('click')
 
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
-
-      const trigger = wrapper.get('button[aria-label="Open workspace menu"]')
-
-      expect(trigger.attributes('aria-expanded')).toBe('false')
-      expect(trigger.attributes('aria-controls')).toBeUndefined()
+      expect(menu.menu().exists()).toBe(false)
+      expect(menu.closed().exists()).toBe(true)
+      expect(menu.trigger().attributes('aria-controls')).toBeUndefined()
 
       wrapper.unmount()
     })
@@ -98,60 +98,58 @@ describe('MmQuickAccess', () => {
 
   describe('items', () => {
     it('displays the supplied links in order', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      const links = wrapper.findAll('.quick-access__services a')
-
-      expect(links).toHaveLength(3)
-      expect(links.map((link) => link.text())).toEqual(['Dashboard', 'Reports', 'Documentation'])
+      expect(wrapper.findAll('.quick-access__services a')).toHaveLength(3)
+      expect(menu.link(0).text()).toBe('Dashboard')
+      expect(menu.link(1).text()).toBe('Reports')
+      expect(menu.link(2).text()).toBe('Documentation')
 
       wrapper.unmount()
     })
 
     it('displays only the items supplied by the parent', async () => {
-      const wrapper = mountMenu([defaultItems[0]!])
+      mountMenu([defaultItems[0]!])
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      expect(wrapper.text()).toContain('Dashboard')
-      expect(wrapper.text()).not.toContain('Reports')
-      expect(wrapper.text()).not.toContain('Documentation')
+      expect(menu.linkNamed('Dashboard').exists()).toBe(true)
+      expect(menu.linkNamed('Reports').exists()).toBe(false)
+      expect(menu.linkNamed('Documentation').exists()).toBe(false)
 
       wrapper.unmount()
     })
 
     it('shows an empty state when no links are supplied', async () => {
-      const wrapper = mountMenu([])
+      mountMenu([])
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      expect(wrapper.text()).toContain('No links available')
-      expect(wrapper.findAll('.quick-access__services a')).toHaveLength(0)
-      expect(wrapper.text()).toContain('Settings')
+      expect(menu.empty().text()).toBe('No links available')
+      expect(menu.links().exists()).toBe(false)
+      expect(menu.settings().text()).toBe('Settings')
 
       wrapper.unmount()
     })
 
     it('preserves the supplied link URLs', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      const links = wrapper.findAll('.quick-access__services a')
-
-      expect(links[0]?.attributes('href')).toBe('https://example.com/dashboard')
-      expect(links[1]?.attributes('href')).toBe('https://example.com:5055/reports')
-      expect(links[2]?.attributes('href')).toBe('https://docs.example.com/guide')
+      expect(menu.link(0).attributes('href')).toBe('https://example.com/dashboard')
+      expect(menu.link(1).attributes('href')).toBe('https://example.com:5055/reports')
+      expect(menu.link(2).attributes('href')).toBe('https://docs.example.com/guide')
 
       wrapper.unmount()
     })
 
     it('opens links in new tabs safely', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
       for (const link of wrapper.findAll('.quick-access__services a')) {
         expect(link.attributes('target')).toBe('_blank')
@@ -163,32 +161,33 @@ describe('MmQuickAccess', () => {
     })
 
     it('renders an external-link icon for every item', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
       for (const link of wrapper.findAll('.quick-access__services a')) {
         expect(link.findAll('svg')).toHaveLength(1)
         expect(link.get('svg').attributes('aria-hidden')).toBe('true')
       }
 
+      expect(menu.decorativeIcons().exists()).toBe(true)
+
       wrapper.unmount()
     })
 
     it('updates when the items prop changes', async () => {
-      const wrapper = mountMenu([])
+      mountMenu([])
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      expect(wrapper.findAll('.quick-access__services a')).toHaveLength(0)
+      expect(menu.links().exists()).toBe(false)
 
-      await wrapper.setProps({
-        items: [defaultItems[0]!],
-      })
+      await wrapper.setProps({ items: [defaultItems[0]!] })
 
-      expect(wrapper.findAll('.quick-access__services a')).toHaveLength(1)
-      expect(wrapper.text()).toContain('Dashboard')
-      expect(wrapper.text()).not.toContain('No links available')
+      expect(menu.link(0).exists()).toBe(true)
+      expect(menu.link(1).exists()).toBe(false)
+      expect(menu.link(0).text()).toBe('Dashboard')
+      expect(menu.empty().exists()).toBe(false)
 
       wrapper.unmount()
     })
@@ -196,31 +195,29 @@ describe('MmQuickAccess', () => {
 
   describe('interactions', () => {
     it('moves focus to the first link when opened', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      expect(document.activeElement).toBe(wrapper.get('.quick-access__services a').element)
+      expect(document.activeElement).toBe(menu.link(0).element)
 
       wrapper.unmount()
     })
 
     it('moves focus to Settings when there are no links', async () => {
-      const wrapper = mountMenu([])
+      mountMenu([])
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      const settingsButton = wrapper.get('button[aria-label="Open settings"]')
-
-      expect(document.activeElement).toBe(settingsButton.element)
+      expect(document.activeElement).toBe(menu.settings().element)
 
       wrapper.unmount()
     })
 
     it('closes when Escape is pressed and restores trigger focus', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
       document.dispatchEvent(
         new KeyboardEvent('keydown', {
@@ -231,18 +228,16 @@ describe('MmQuickAccess', () => {
 
       await nextTick()
 
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
-      expect(document.activeElement).toBe(
-        wrapper.get('button[aria-label="Open workspace menu"]').element,
-      )
+      expect(menu.menu().exists()).toBe(false)
+      expect(document.activeElement).toBe(menu.trigger().element)
 
       wrapper.unmount()
     })
 
     it('closes when clicking outside', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
       document.body.dispatchEvent(
         new Event('pointerdown', {
@@ -252,17 +247,17 @@ describe('MmQuickAccess', () => {
 
       await nextTick()
 
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
+      expect(menu.menu().exists()).toBe(false)
 
       wrapper.unmount()
     })
 
     it('does not close when clicking inside the menu', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      wrapper.get('.quick-access__heading').element.dispatchEvent(
+      menu.heading().element.dispatchEvent(
         new Event('pointerdown', {
           bubbles: true,
         }),
@@ -270,39 +265,39 @@ describe('MmQuickAccess', () => {
 
       await nextTick()
 
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(true)
+      expect(menu.menu().exists()).toBe(true)
 
       wrapper.unmount()
     })
 
     it('closes when a link is selected', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
-      await wrapper.get('.quick-access__services a').trigger('click')
+      await openMenu()
+      await menu.link(0).trigger('click')
 
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
+      expect(menu.menu().exists()).toBe(false)
 
       wrapper.unmount()
     })
 
     it('emits settings and closes when Settings is selected', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
-      await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+      await openMenu()
+      await menu.settings().trigger('click')
 
       expect(wrapper.emitted('settings')).toHaveLength(1)
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
+      expect(menu.menu().exists()).toBe(false)
 
       wrapper.unmount()
     })
 
     it('does not emit settings when opening or closing the menu', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
-      await wrapper.get('button[aria-label="Open workspace menu"]').trigger('click')
+      await openMenu()
+      await menu.trigger().trigger('click')
 
       expect(wrapper.emitted('settings')).toBeUndefined()
 
@@ -310,13 +305,11 @@ describe('MmQuickAccess', () => {
     })
 
     it('closes when keyboard focus leaves the component', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      const firstLink = wrapper.get('.quick-access__services a').element
-
-      firstLink.dispatchEvent(
+      menu.link(0).element.dispatchEvent(
         new FocusEvent('focusout', {
           bubbles: true,
           relatedTarget: document.body,
@@ -325,49 +318,45 @@ describe('MmQuickAccess', () => {
 
       await nextTick()
 
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(false)
+      expect(menu.menu().exists()).toBe(false)
 
       wrapper.unmount()
     })
 
     it('stays open when focus moves between menu items', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      const links = wrapper.findAll('.quick-access__services a')
-
-      links[0]!.element.dispatchEvent(
+      menu.link(0).element.dispatchEvent(
         new FocusEvent('focusout', {
           bubbles: true,
-          relatedTarget: links[1]!.element,
+          relatedTarget: menu.link(1).element,
         }),
       )
 
       await nextTick()
 
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(true)
+      expect(menu.menu().exists()).toBe(true)
 
       wrapper.unmount()
     })
 
     it('stays open when focus returns to the trigger', async () => {
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
 
-      const trigger = wrapper.get('button[aria-label="Open workspace menu"]').element
-
-      wrapper.get('.quick-access__services a').element.dispatchEvent(
+      menu.link(0).element.dispatchEvent(
         new FocusEvent('focusout', {
           bubbles: true,
-          relatedTarget: trigger,
+          relatedTarget: menu.trigger().element,
         }),
       )
 
       await nextTick()
 
-      expect(wrapper.find('#quick-access-menu').exists()).toBe(true)
+      expect(menu.menu().exists()).toBe(true)
 
       wrapper.unmount()
     })
@@ -376,9 +365,9 @@ describe('MmQuickAccess', () => {
   describe('cleanup', () => {
     it('removes document listeners when the component unmounts', async () => {
       const removeEventListener = vi.spyOn(document, 'removeEventListener')
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
+      await openMenu()
       wrapper.unmount()
 
       expect(removeEventListener).toHaveBeenCalledWith('pointerdown', expect.any(Function))
@@ -387,10 +376,10 @@ describe('MmQuickAccess', () => {
 
     it('removes document listeners when the menu closes', async () => {
       const removeEventListener = vi.spyOn(document, 'removeEventListener')
-      const wrapper = mountMenu()
+      mountMenu()
 
-      await openMenu(wrapper)
-      await wrapper.get('button[aria-label="Open workspace menu"]').trigger('click')
+      await openMenu()
+      await menu.trigger().trigger('click')
 
       expect(removeEventListener).toHaveBeenCalledWith('pointerdown', expect.any(Function))
       expect(removeEventListener).toHaveBeenCalledWith('keydown', expect.any(Function))

@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import MmRequestView from './MmRequestView.vue'
-import MmRequestsTemplate from '../components/templates/MmRequestsTemplate/MmRequestsTemplate.vue'
 import MmRequestCard from '../components/molecules/MmRequestCard/MmRequestCard.vue'
 import MmPagination from '../components/molecules/MmPagination/MmPagination.vue'
 import { sendBackgroundMessage } from '../utils/background-messaging'
 import type { SeerrRequest, SeerrRequestsPage } from '../types/seerr'
+import { mmRequestViewSelectors } from '../test/selectors/views/mmRequestView.selectors'
 
 vi.mock('../utils/background-messaging', () => ({
   sendBackgroundMessage: vi.fn(),
 }))
+
+const mockedSendMessage = vi.mocked(sendBackgroundMessage)
 
 const mockRequests: SeerrRequest[] = [
   {
@@ -42,20 +44,27 @@ function requestsPage(
 }
 
 function mockSuccessfulLoad(requests: SeerrRequestsPage = requestsPage()) {
-  vi.mocked(sendBackgroundMessage).mockResolvedValue({
-    success: true,
-    requests,
-  })
+  mockedSendMessage.mockResolvedValue({ success: true, requests })
 }
 
 function deferredResponse<T>() {
   let resolve!: (value: T) => void
-
   const promise = new Promise<T>((resolver) => {
     resolve = resolver
   })
-
   return { promise, resolve }
+}
+
+let wrapper: VueWrapper
+
+const view = mmRequestViewSelectors((selector) => {
+  if (wrapper.element instanceof Element && wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^\.requests-template /, ''))
+})
+
+function mountView() {
+  wrapper = mount(MmRequestView)
+  return wrapper
 }
 
 describe('MmRequestView', () => {
@@ -65,14 +74,14 @@ describe('MmRequestView', () => {
   })
 
   it('renders the requests template', async () => {
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    expect(wrapper.findComponent(MmRequestsTemplate).exists()).toBe(true)
+    expect(view.get().exists()).toBe(true)
   })
 
   it('loads the first page of all requests on mount', async () => {
-    mount(MmRequestView)
+    mountView()
     await flushPromises()
 
     expect(sendBackgroundMessage).toHaveBeenCalledWith({
@@ -84,16 +93,17 @@ describe('MmRequestView', () => {
   })
 
   it('renders requests returned by the background', async () => {
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
+    expect(view.cards().exists()).toBe(true)
+    expect(view.content().text()).toContain('Dune: Part Two')
+    expect(view.content().text()).toContain('The Last of Us')
     expect(wrapper.findAllComponents(MmRequestCard)).toHaveLength(2)
-    expect(wrapper.text()).toContain('Dune: Part Two')
-    expect(wrapper.text()).toContain('The Last of Us')
   })
 
   it('maps Seerr request fields to the generic card data', async () => {
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
     const cards = wrapper.findAllComponents(MmRequestCard)
@@ -107,7 +117,6 @@ describe('MmRequestView', () => {
       requestedBy: 'Alice',
       createdAt: '2026-10-20T12:00:00.000Z',
     })
-
     expect(cards[1]?.props('request')).toEqual({
       title: 'The Last of Us',
       type: 'tv',
@@ -120,16 +129,8 @@ describe('MmRequestView', () => {
   })
 
   it('converts a relative poster path into a TMDB image URL', async () => {
-    mockSuccessfulLoad(
-      requestsPage([
-        {
-          ...mockRequests[0]!,
-          posterPath: '/example-poster.jpg',
-        },
-      ]),
-    )
-
-    const wrapper = mount(MmRequestView)
+    mockSuccessfulLoad(requestsPage([{ ...mockRequests[0]!, posterPath: '/example-poster.jpg' }]))
+    mountView()
     await flushPromises()
 
     expect(wrapper.getComponent(MmRequestCard).props('request').posterUrl).toBe(
@@ -138,7 +139,7 @@ describe('MmRequestView', () => {
   })
 
   it('passes null when the poster path is missing', async () => {
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
     const cards = wrapper.findAllComponents(MmRequestCard)
@@ -154,116 +155,87 @@ describe('MmRequestView', () => {
     ['relative path without leading slash', 'poster.jpg'],
     ['backslash-prefixed path', '\\untrusted.example.com\\poster.jpg'],
   ])('rejects an unsafe %s', async (_description, posterPath) => {
-    mockSuccessfulLoad(
-      requestsPage([
-        {
-          ...mockRequests[0]!,
-          posterPath,
-        },
-      ]),
-    )
-
-    const wrapper = mount(MmRequestView)
+    mockSuccessfulLoad(requestsPage([{ ...mockRequests[0]!, posterPath }]))
+    mountView()
     await flushPromises()
 
     expect(wrapper.getComponent(MmRequestCard).props('request').posterUrl).toBeNull()
   })
 
   it('shows a loading state while fetching requests', async () => {
-    const pending = deferredResponse<{
-      success: true
-      requests: SeerrRequestsPage
-    }>()
+    const pending = deferredResponse<{ success: true; requests: SeerrRequestsPage }>()
+    mockedSendMessage.mockReturnValue(pending.promise)
 
-    vi.mocked(sendBackgroundMessage).mockReturnValue(pending.promise)
-
-    const wrapper = mount(MmRequestView)
+    mountView()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('[role="status"]').text()).toBe('Loading requests…')
+    expect(view.loading().text()).toBe('Loading requests…')
     expect(wrapper.findAllComponents(MmRequestCard)).toHaveLength(0)
 
-    pending.resolve({
-      success: true,
-      requests: requestsPage(),
-    })
-
+    pending.resolve({ success: true, requests: requestsPage() })
     await flushPromises()
 
-    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    expect(view.loading().exists()).toBe(false)
     expect(wrapper.findAllComponents(MmRequestCard)).toHaveLength(2)
   })
 
   it('shows an empty state when there are no requests', async () => {
     mockSuccessfulLoad(requestsPage([]))
-
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No requests found.')
+    expect(view.empty().text()).toContain('No requests found.')
     expect(wrapper.findAllComponents(MmRequestCard)).toHaveLength(0)
   })
 
   it('shows background errors', async () => {
-    vi.mocked(sendBackgroundMessage).mockResolvedValue({
-      success: false,
-      error: 'Seerr is unavailable.',
-    })
-
-    const wrapper = mount(MmRequestView)
+    mockedSendMessage.mockResolvedValue({ success: false, error: 'Seerr is unavailable.' })
+    mountView()
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('Seerr is unavailable.')
+    expect(view.error().text()).toContain('Seerr is unavailable.')
     expect(wrapper.findAllComponents(MmRequestCard)).toHaveLength(0)
   })
 
   it('shows unexpected errors', async () => {
-    vi.mocked(sendBackgroundMessage).mockRejectedValue(new Error('Network failure.'))
-
-    const wrapper = mount(MmRequestView)
+    mockedSendMessage.mockRejectedValue(new Error('Network failure.'))
+    mountView()
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('Network failure.')
+    expect(view.error().text()).toContain('Network failure.')
   })
 
   it('uses a fallback message for non-Error failures', async () => {
-    vi.mocked(sendBackgroundMessage).mockRejectedValue('Unexpected failure')
-
-    const wrapper = mount(MmRequestView)
+    mockedSendMessage.mockRejectedValue('Unexpected failure')
+    mountView()
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('An unexpected error occurred.')
+    expect(view.error().text()).toContain('An unexpected error occurred.')
   })
 
   it('retries after a failed request', async () => {
-    vi.mocked(sendBackgroundMessage)
-      .mockResolvedValueOnce({
-        success: false,
-        error: 'Seerr is unavailable.',
-      })
-      .mockResolvedValueOnce({
-        success: true,
-        requests: requestsPage(),
-      })
+    mockedSendMessage
+      .mockResolvedValueOnce({ success: false, error: 'Seerr is unavailable.' })
+      .mockResolvedValueOnce({ success: true, requests: requestsPage() })
 
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('Seerr is unavailable.')
+    expect(view.error().text()).toContain('Seerr is unavailable.')
 
-    await wrapper.get('[role="alert"] button').trigger('click')
+    await view.retry().trigger('click')
     await flushPromises()
 
     expect(sendBackgroundMessage).toHaveBeenCalledTimes(2)
-    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(view.error().exists()).toBe(false)
     expect(wrapper.findAllComponents(MmRequestCard)).toHaveLength(2)
   })
 
   it('refreshes the current page', async () => {
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    await wrapper.get('.requests-template__actions button').trigger('click')
+    await view.refresh().trigger('click')
     await flushPromises()
 
     expect(sendBackgroundMessage).toHaveBeenCalledTimes(2)
@@ -276,12 +248,10 @@ describe('MmRequestView', () => {
   })
 
   it('selects the pending filter and resets to page one', async () => {
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    const filterButtons = wrapper.findAll('button[aria-pressed]')
-
-    await filterButtons[1]!.trigger('click')
+    await view.filter(1).trigger('click')
     await flushPromises()
 
     expect(sendBackgroundMessage).toHaveBeenLastCalledWith({
@@ -293,12 +263,10 @@ describe('MmRequestView', () => {
   })
 
   it('selects the approved filter', async () => {
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    const filterButtons = wrapper.findAll('button[aria-pressed]')
-
-    await filterButtons[2]!.trigger('click')
+    await view.filter(2).trigger('click')
     await flushPromises()
 
     expect(sendBackgroundMessage).toHaveBeenLastCalledWith({
@@ -310,10 +278,10 @@ describe('MmRequestView', () => {
   })
 
   it('does not refetch when selecting the active filter', async () => {
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    await wrapper.get('button[aria-pressed="true"]').trigger('click')
+    await view.activeFilter().trigger('click')
     await flushPromises()
 
     expect(sendBackgroundMessage).toHaveBeenCalledTimes(1)
@@ -321,25 +289,23 @@ describe('MmRequestView', () => {
 
   it('renders pagination when multiple pages are available', async () => {
     mockSuccessfulLoad(requestsPage(mockRequests, 25))
-
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    expect(wrapper.findComponent(MmPagination).exists()).toBe(true)
+    expect(view.pagination().exists()).toBe(true)
     expect(wrapper.getComponent(MmPagination).props('totalPages')).toBe(3)
   })
 
   it('does not render pagination for a single page', async () => {
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    expect(wrapper.findComponent(MmPagination).exists()).toBe(false)
+    expect(view.pagination().exists()).toBe(false)
   })
 
   it('loads the selected page from the background', async () => {
     mockSuccessfulLoad(requestsPage(mockRequests, 25))
-
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
     wrapper.getComponent(MmPagination).vm.$emit('update:page', 2)
@@ -355,16 +321,13 @@ describe('MmRequestView', () => {
 
   it('resets pagination when changing filters', async () => {
     mockSuccessfulLoad(requestsPage(mockRequests, 25))
-
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
     wrapper.getComponent(MmPagination).vm.$emit('update:page', 2)
     await flushPromises()
 
-    const filterButtons = wrapper.findAll('button[aria-pressed]')
-
-    await filterButtons[1]!.trigger('click')
+    await view.filter(1).trigger('click')
     await flushPromises()
 
     expect(sendBackgroundMessage).toHaveBeenLastCalledWith({
@@ -376,76 +339,53 @@ describe('MmRequestView', () => {
   })
 
   it('ignores stale responses when filters change quickly', async () => {
-    const pending = deferredResponse<{
-      success: true
-      requests: SeerrRequestsPage
-    }>()
+    const pending = deferredResponse<{ success: true; requests: SeerrRequestsPage }>()
 
-    vi.mocked(sendBackgroundMessage)
-      .mockResolvedValueOnce({
-        success: true,
-        requests: requestsPage(),
-      })
+    mockedSendMessage
+      .mockResolvedValueOnce({ success: true, requests: requestsPage() })
       .mockReturnValueOnce(pending.promise)
       .mockResolvedValueOnce({
         success: true,
         requests: requestsPage([mockRequests[0]!]),
       })
 
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
-    const filterButtons = wrapper.findAll('button[aria-pressed]')
-
-    await filterButtons[1]!.trigger('click')
-    await filterButtons[2]!.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.findAllComponents(MmRequestCard)).toHaveLength(1)
-
-    pending.resolve({
-      success: true,
-      requests: requestsPage([mockRequests[1]!]),
-    })
-
+    await view.filter(1).trigger('click')
+    await view.filter(2).trigger('click')
     await flushPromises()
 
     expect(wrapper.findAllComponents(MmRequestCard)).toHaveLength(1)
-    expect(wrapper.text()).toContain('Dune: Part Two')
-    expect(wrapper.text()).not.toContain('The Last of Us')
+
+    pending.resolve({ success: true, requests: requestsPage([mockRequests[1]!]) })
+    await flushPromises()
+
+    expect(wrapper.findAllComponents(MmRequestCard)).toHaveLength(1)
+    expect(view.content().text()).toContain('Dune: Part Two')
+    expect(view.content().text()).not.toContain('The Last of Us')
   })
 
   it('prevents duplicate refreshes while loading', async () => {
-    const pending = deferredResponse<{
-      success: true
-      requests: SeerrRequestsPage
-    }>()
+    const pending = deferredResponse<{ success: true; requests: SeerrRequestsPage }>()
+    mockedSendMessage.mockReturnValue(pending.promise)
 
-    vi.mocked(sendBackgroundMessage).mockReturnValue(pending.promise)
-
-    const wrapper = mount(MmRequestView)
+    mountView()
     await wrapper.vm.$nextTick()
 
-    const refreshButton = wrapper.get('.requests-template__actions button')
+    expect(view.refreshDisabled().exists()).toBe(true)
 
-    expect(refreshButton.attributes('disabled')).toBeDefined()
-
-    await refreshButton.trigger('click')
+    await view.refresh().trigger('click')
 
     expect(sendBackgroundMessage).toHaveBeenCalledTimes(1)
 
-    pending.resolve({
-      success: true,
-      requests: requestsPage(),
-    })
-
+    pending.resolve({ success: true, requests: requestsPage() })
     await flushPromises()
   })
 
   it('does not accept invalid page changes', async () => {
     mockSuccessfulLoad(requestsPage(mockRequests, 25))
-
-    const wrapper = mount(MmRequestView)
+    mountView()
     await flushPromises()
 
     const pagination = wrapper.getComponent(MmPagination)
@@ -453,7 +393,6 @@ describe('MmRequestView', () => {
     pagination.vm.$emit('update:page', 0)
     pagination.vm.$emit('update:page', 4)
     pagination.vm.$emit('update:page', 1)
-
     await flushPromises()
 
     expect(sendBackgroundMessage).toHaveBeenCalledTimes(1)

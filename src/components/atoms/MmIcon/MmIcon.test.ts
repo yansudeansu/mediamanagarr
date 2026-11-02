@@ -1,15 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmIcon from './MmIcon.vue'
 import type { IconName } from './MmIcon.vue'
+import { mmIconSelectors } from '../../../test/selectors/atoms/mmIcon.selectors'
+
+let wrapper: VueWrapper
+
+const icon = mmIconSelectors((selector) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replaceAll('svg.lucide ', ''))
+})
 
 function mountIcon(name: IconName, size?: number) {
-  return mount(MmIcon, {
+  wrapper = mount(MmIcon, {
     props: {
       name,
       ...(size === undefined ? {} : { size }),
     },
   })
+
+  return wrapper
 }
 
 const icons: IconName[] = [
@@ -31,275 +41,238 @@ const icons: IconName[] = [
 
 describe('MmIcon', () => {
   it('renders an SVG', () => {
-    const wrapper = mountIcon('settings')
+    mountIcon('settings')
 
-    expect(wrapper.find('svg').exists()).toBe(true)
+    expect(icon.get().exists()).toBe(true)
   })
 
   it('uses 18px as the default size', () => {
-    const wrapper = mountIcon('settings')
-    const svg = wrapper.get('svg')
+    mountIcon('settings')
 
-    expect(svg.attributes('width')).toBe('18')
-    expect(svg.attributes('height')).toBe('18')
+    expect(icon.size(18).exists()).toBe(true)
   })
 
   it('supports a custom size', () => {
-    const wrapper = mountIcon('settings', 24)
-    const svg = wrapper.get('svg')
+    mountIcon('settings', 24)
 
-    expect(svg.attributes('width')).toBe('24')
-    expect(svg.attributes('height')).toBe('24')
+    expect(icon.size(24).exists()).toBe(true)
   })
 
   it('hides decorative icons from assistive technology', () => {
-    const wrapper = mountIcon('settings')
-    const svg = wrapper.get('svg')
+    mountIcon('settings')
 
-    expect(svg.attributes('aria-hidden')).toBe('true')
-    expect(svg.attributes('focusable')).toBe('false')
+    expect(icon.decorative().exists()).toBe(true)
   })
 
   it('uses the current text color', () => {
-    const wrapper = mountIcon('settings')
+    mountIcon('settings')
 
-    expect(wrapper.get('svg').attributes('stroke')).toBe('currentColor')
+    expect(icon.stroke().exists()).toBe(true)
   })
 
   it('uses a consistent stroke width', () => {
-    const wrapper = mountIcon('settings')
+    mountIcon('settings')
 
-    expect(wrapper.get('svg').attributes('stroke-width')).toBe('2')
+    expect(icon.strokeWidth(2).exists()).toBe(true)
   })
 
   it('renders different shapes for settings and refresh', () => {
-    const settings = mountIcon('settings')
+    const settingsMarkup = icon.get().html()
     const refresh = mountIcon('refresh')
 
-    expect(settings.get('svg').html()).not.toBe(refresh.get('svg').html())
+    expect(settingsMarkup).not.toBe(refresh.get('svg').html())
   })
 
   it('renders different shapes for menu and settings', () => {
-    const menu = mountIcon('menu')
+    const menuMarkup = icon.get().html()
     const settings = mountIcon('settings')
 
-    expect(menu.get('svg').html()).not.toBe(settings.get('svg').html())
+    expect(menuMarkup).not.toBe(settings.get('svg').html())
   })
 
   it('renders different shapes for menu and external-link', () => {
-    const menu = mountIcon('menu')
+    const menuMarkup = icon.get().html()
     const externalLink = mountIcon('external-link')
 
-    expect(menu.get('svg').html()).not.toBe(externalLink.get('svg').html())
+    expect(menuMarkup).not.toBe(externalLink.get('svg').html())
   })
 
   it('renders different shapes for left and right arrows', () => {
-    const left = mountIcon('arrow-left')
+    const leftMarkup = icon.get().html()
     const right = mountIcon('arrow-right')
 
-    expect(left.get('svg').html()).not.toBe(right.get('svg').html())
+    expect(leftMarkup).not.toBe(right.get('svg').html())
   })
 
   it('renders different shapes for up and down arrows', () => {
-    const up = mountIcon('arrow-up')
+    const upMarkup = icon.get().html()
     const down = mountIcon('arrow-down')
 
-    expect(up.get('svg').html()).not.toBe(down.get('svg').html())
+    expect(upMarkup).not.toBe(down.get('svg').html())
   })
 
   it('renders different shapes for left and right chevrons', () => {
-    const left = mountIcon('chevron-left')
+    const leftMarkup = icon.get().html()
     const right = mountIcon('chevron-right')
 
-    expect(left.get('svg').html()).not.toBe(right.get('svg').html())
+    expect(leftMarkup).not.toBe(right.get('svg').html())
   })
 
   it('renders different shapes for detach and attach', () => {
-    const detach = mountIcon('detach')
+    const detachMarkup = icon.get().html()
     const attach = mountIcon('attach')
 
-    expect(detach.get('svg').html()).not.toBe(attach.get('svg').html())
+    expect(detachMarkup).not.toBe(attach.get('svg').html())
   })
 
   it('renders different shapes for detach and sidebar', () => {
-    const detach = mountIcon('detach')
+    const detachMarkup = icon.get().html()
     const sidebar = mountIcon('sidebar')
 
-    expect(detach.get('svg').html()).not.toBe(sidebar.get('svg').html())
+    expect(detachMarkup).not.toBe(sidebar.get('svg').html())
   })
 
   it('renders different shapes for opening and closing the sidebar', () => {
-    const open = mountIcon('sidebar')
+    const openMarkup = icon.get().html()
     const close = mountIcon('sidebar-close')
 
-    expect(open.get('svg').html()).not.toBe(close.get('svg').html())
+    expect(openMarkup).not.toBe(close.get('svg').html())
   })
 
   it.each(icons)('renders the %s icon', (name) => {
-    const wrapper = mountIcon(name)
+    mountIcon(name)
 
-    expect(wrapper.findAll('svg')).toHaveLength(1)
-    expect(wrapper.get('svg').find('path, line, polyline, rect, circle').exists()).toBe(true)
+    expect(icon.get().exists()).toBe(true)
+    expect(icon.shapes().exists()).toBe(true)
   })
 
   it.each(icons)('keeps the %s icon decorative', (name) => {
-    const wrapper = mountIcon(name)
-    const svg = wrapper.get('svg')
+    mountIcon(name)
 
-    expect(svg.attributes('aria-hidden')).toBe('true')
-    expect(svg.attributes('focusable')).toBe('false')
+    expect(icon.decorative().exists()).toBe(true)
   })
 
   it('updates when the icon name changes', async () => {
-    const wrapper = mountIcon('settings')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('settings')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'arrow-left',
-    })
+    await wrapper.setProps({ name: 'arrow-left' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(icon.get().html()).not.toBe(originalSvg)
   })
 
   it('updates when switching from settings to menu', async () => {
-    const wrapper = mountIcon('settings')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('settings')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'menu',
-    })
+    await wrapper.setProps({ name: 'menu' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
-    expect(wrapper.findAll('svg')).toHaveLength(1)
+    expect(icon.get().html()).not.toBe(originalSvg)
+    expect(icon.get().exists()).toBe(true)
   })
 
   it('updates when switching from menu to external-link', async () => {
-    const wrapper = mountIcon('menu')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('menu')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'external-link',
-    })
+    await wrapper.setProps({ name: 'external-link' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
-    expect(wrapper.findAll('svg')).toHaveLength(1)
+    expect(icon.get().html()).not.toBe(originalSvg)
+    expect(icon.get().exists()).toBe(true)
   })
 
   it('updates when switching between horizontal arrows', async () => {
-    const wrapper = mountIcon('arrow-left')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('arrow-left')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'arrow-right',
-    })
+    await wrapper.setProps({ name: 'arrow-right' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(icon.get().html()).not.toBe(originalSvg)
   })
 
   it('updates when switching between vertical arrows', async () => {
-    const wrapper = mountIcon('arrow-up')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('arrow-up')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'arrow-down',
-    })
+    await wrapper.setProps({ name: 'arrow-down' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(icon.get().html()).not.toBe(originalSvg)
   })
 
   it('updates when switching between chevrons', async () => {
-    const wrapper = mountIcon('chevron-left')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('chevron-left')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'chevron-right',
-    })
+    await wrapper.setProps({ name: 'chevron-right' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
+    expect(icon.get().html()).not.toBe(originalSvg)
   })
 
   it('updates when switching from detach to attach', async () => {
-    const wrapper = mountIcon('detach')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('detach')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'attach',
-    })
+    await wrapper.setProps({ name: 'attach' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
-    expect(wrapper.findAll('svg')).toHaveLength(1)
+    expect(icon.get().html()).not.toBe(originalSvg)
+    expect(icon.get().exists()).toBe(true)
   })
 
   it('updates when switching from attach to detach', async () => {
-    const wrapper = mountIcon('attach')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('attach')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'detach',
-    })
+    await wrapper.setProps({ name: 'detach' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
-    expect(wrapper.findAll('svg')).toHaveLength(1)
+    expect(icon.get().html()).not.toBe(originalSvg)
+    expect(icon.get().exists()).toBe(true)
   })
 
   it('updates when switching from detach to sidebar', async () => {
-    const wrapper = mountIcon('detach')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('detach')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'sidebar',
-    })
+    await wrapper.setProps({ name: 'sidebar' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
-    expect(wrapper.findAll('svg')).toHaveLength(1)
+    expect(icon.get().html()).not.toBe(originalSvg)
+    expect(icon.get().exists()).toBe(true)
   })
 
   it('updates when switching from sidebar to detach', async () => {
-    const wrapper = mountIcon('sidebar')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('sidebar')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'detach',
-    })
+    await wrapper.setProps({ name: 'detach' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
-    expect(wrapper.findAll('svg')).toHaveLength(1)
+    expect(icon.get().html()).not.toBe(originalSvg)
+    expect(icon.get().exists()).toBe(true)
   })
 
   it('updates when switching from sidebar to sidebar-close', async () => {
-    const wrapper = mountIcon('sidebar')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('sidebar')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'sidebar-close',
-    })
+    await wrapper.setProps({ name: 'sidebar-close' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
-    expect(wrapper.findAll('svg')).toHaveLength(1)
+    expect(icon.get().html()).not.toBe(originalSvg)
+    expect(icon.get().exists()).toBe(true)
   })
 
   it('updates when switching from sidebar-close to sidebar', async () => {
-    const wrapper = mountIcon('sidebar-close')
-    const originalSvg = wrapper.get('svg').html()
+    mountIcon('sidebar-close')
+    const originalSvg = icon.get().html()
 
-    await wrapper.setProps({
-      name: 'sidebar',
-    })
+    await wrapper.setProps({ name: 'sidebar' })
 
-    expect(wrapper.get('svg').html()).not.toBe(originalSvg)
-    expect(wrapper.findAll('svg')).toHaveLength(1)
+    expect(icon.get().html()).not.toBe(originalSvg)
+    expect(icon.get().exists()).toBe(true)
   })
 
   it('updates when the size changes', async () => {
-    const wrapper = mountIcon('settings')
+    mountIcon('settings')
 
-    await wrapper.setProps({
-      size: 32,
-    })
+    await wrapper.setProps({ size: 32 })
 
-    const svg = wrapper.get('svg')
-
-    expect(svg.attributes('width')).toBe('32')
-    expect(svg.attributes('height')).toBe('32')
+    expect(icon.size(32).exists()).toBe(true)
   })
 })

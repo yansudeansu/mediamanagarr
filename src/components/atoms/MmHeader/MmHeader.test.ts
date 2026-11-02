@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmHeader from './MmHeader.vue'
+import { mmHeaderSelectors } from '../../../test/selectors/atoms/mmHeader.selectors'
+
+let wrapper: VueWrapper
+
+const header = mmHeaderSelectors((selector) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^header\.header /, ''))
+})
 
 function mountHeader(
   props: {
@@ -9,69 +17,63 @@ function mountHeader(
   } = {},
   slots: Record<string, string> = {},
 ) {
-  return mount(MmHeader, {
+  wrapper = mount(MmHeader, {
     props: {
       title: 'Example App',
       ...props,
     },
     slots,
   })
+
+  return wrapper
 }
 
 describe('MmHeader', () => {
   describe('structure and title', () => {
     it('renders a semantic header element', () => {
-      const wrapper = mountHeader()
+      mountHeader()
 
-      expect(wrapper.element.tagName).toBe('HEADER')
+      expect(header.get().element.tagName).toBe('HEADER')
     })
 
     it('renders the supplied title', () => {
-      const wrapper = mountHeader({
-        title: 'Example App',
-      })
+      mountHeader({ title: 'Example App' })
 
-      expect(wrapper.get('h1').text()).toBe('Example App')
+      expect(header.title().text()).toBe('Example App')
     })
 
     it('renders a different title', () => {
-      const wrapper = mountHeader({
-        title: 'Preferences',
-      })
+      mountHeader({ title: 'Preferences' })
 
-      expect(wrapper.get('h1').text()).toBe('Preferences')
+      expect(header.title().text()).toBe('Preferences')
     })
 
     it('updates the title when the prop changes', async () => {
-      const wrapper = mountHeader()
+      mountHeader()
 
-      await wrapper.setProps({
-        title: 'Preferences',
-      })
+      await wrapper.setProps({ title: 'Preferences' })
 
-      expect(wrapper.get('h1').text()).toBe('Preferences')
+      expect(header.title().text()).toBe('Preferences')
     })
 
     it('renders the branding container', () => {
-      const wrapper = mountHeader()
+      mountHeader()
 
-      expect(wrapper.find('.header__branding').exists()).toBe(true)
+      expect(header.branding().exists()).toBe(true)
     })
   })
 
   describe('logo', () => {
     it('does not render a logo by default', () => {
-      const wrapper = mountHeader()
+      mountHeader()
 
-      expect(wrapper.find('.header__logo').exists()).toBe(false)
+      expect(header.logo().exists()).toBe(false)
     })
 
     it('renders the supplied logo', () => {
-      const wrapper = mountHeader({
-        logo: '/example-logo.svg',
-      })
+      mountHeader({ logo: '/example-logo.svg' })
 
-      const logo = wrapper.get('.header__logo')
+      const logo = header.logo()
 
       expect(logo.element.tagName).toBe('IMG')
       expect(logo.attributes('src')).toBe('/example-logo.svg')
@@ -80,27 +82,21 @@ describe('MmHeader', () => {
     })
 
     it('treats the logo as decorative', () => {
-      const wrapper = mountHeader({
-        logo: '/example-logo.svg',
-      })
+      mountHeader({ logo: '/example-logo.svg' })
 
-      expect(wrapper.get('.header__logo').attributes('alt')).toBe('')
+      expect(header.logo().attributes('alt')).toBe('')
     })
 
     it('does not render a logo when null is supplied', () => {
-      const wrapper = mountHeader({
-        logo: null,
-      })
+      mountHeader({ logo: null })
 
-      expect(wrapper.find('.header__logo').exists()).toBe(false)
+      expect(header.logo().exists()).toBe(false)
     })
 
     it('renders the logo before the title', () => {
-      const wrapper = mountHeader({
-        logo: '/example-logo.svg',
-      })
+      mountHeader({ logo: '/example-logo.svg' })
 
-      const branding = wrapper.get('.header__branding').element as HTMLElement
+      const branding = header.branding().element as HTMLElement
       const children = Array.from(branding.children)
 
       expect(children).toHaveLength(2)
@@ -109,61 +105,51 @@ describe('MmHeader', () => {
     })
 
     it('updates the logo when the prop changes', async () => {
-      const wrapper = mountHeader({
-        logo: '/first-logo.svg',
-      })
+      mountHeader({ logo: '/first-logo.svg' })
 
-      await wrapper.setProps({
-        logo: '/second-logo.svg',
-      })
+      await wrapper.setProps({ logo: '/second-logo.svg' })
 
-      expect(wrapper.get('.header__logo').attributes('src')).toBe('/second-logo.svg')
+      expect(header.logo().attributes('src')).toBe('/second-logo.svg')
     })
 
     it('removes the logo when the prop becomes null', async () => {
-      const wrapper = mountHeader({
-        logo: '/example-logo.svg',
-      })
+      mountHeader({ logo: '/example-logo.svg' })
 
-      await wrapper.setProps({
-        logo: null,
-      })
+      await wrapper.setProps({ logo: null })
 
-      expect(wrapper.find('.header__logo').exists()).toBe(false)
+      expect(header.logo().exists()).toBe(false)
     })
 
     it('adds the logo when the prop becomes available', async () => {
-      const wrapper = mountHeader()
+      mountHeader()
 
-      await wrapper.setProps({
-        logo: '/example-logo.svg',
-      })
+      await wrapper.setProps({ logo: '/example-logo.svg' })
 
-      expect(wrapper.get('.header__logo').attributes('src')).toBe('/example-logo.svg')
+      expect(header.logo().attributes('src')).toBe('/example-logo.svg')
     })
   })
 
   describe('actions slot', () => {
     it('does not render an actions container without the slot', () => {
-      const wrapper = mountHeader()
+      mountHeader()
 
-      expect(wrapper.find('.header__actions').exists()).toBe(false)
+      expect(header.actions().exists()).toBe(false)
     })
 
     it('renders the actions slot when supplied', () => {
-      const wrapper = mountHeader(
+      mountHeader(
         {},
         {
           actions: '<button type="button">Open menu</button>',
         },
       )
 
-      expect(wrapper.find('.header__actions').exists()).toBe(true)
-      expect(wrapper.get('.header__actions button').text()).toBe('Open menu')
+      expect(header.actions().exists()).toBe(true)
+      expect(header.actionButtons().text()).toBe('Open menu')
     })
 
     it('supports multiple actions', () => {
-      const wrapper = mountHeader(
+      mountHeader(
         {},
         {
           actions: `
@@ -173,19 +159,18 @@ describe('MmHeader', () => {
         },
       )
 
-      expect(wrapper.findAll('.header__actions button')).toHaveLength(2)
+      expect(header.actions().findAll('button')).toHaveLength(2)
     })
 
     it('renders branding before the actions', () => {
-      const wrapper = mountHeader(
+      mountHeader(
         {},
         {
           actions: '<button type="button">Settings</button>',
         },
       )
 
-      const header = wrapper.element as HTMLElement
-      const children = Array.from(header.children)
+      const children = Array.from((header.get().element as HTMLElement).children)
 
       expect(children).toHaveLength(2)
       expect(children[0]?.classList.contains('header__branding')).toBe(true)
@@ -193,14 +178,14 @@ describe('MmHeader', () => {
     })
 
     it('does not emit application-specific navigation events', async () => {
-      const wrapper = mountHeader(
+      mountHeader(
         {},
         {
           actions: '<button type="button">Settings</button>',
         },
       )
 
-      await wrapper.get('.header__actions button').trigger('click')
+      await header.actionButtons().trigger('click')
 
       expect(wrapper.emitted('settings')).toBeUndefined()
       expect(wrapper.emitted('back')).toBeUndefined()

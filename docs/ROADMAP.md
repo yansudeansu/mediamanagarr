@@ -77,41 +77,56 @@ Each pull request should contribute toward the target architecture while remaini
 - Prefer consolidating related controls over adding more buttons to an already compact interface.
 - Keep major features in separate, focused pull requests.
 
-## 1. Testing & Accessibility
+## Testing & Accessibility
 
-**Priority: Ongoing / Pre-release**
+Testing and accessibility are ongoing quality requirements rather than a one-time milestone.
 
-Build on the existing Vitest and Storybook coverage with browser-level testing and automated accessibility checks.
+MediaManagarr uses Vitest for unit and component tests, Storybook for component development and accessibility tooling, and Playwright for browser-level end-to-end testing.
 
-### Browser Automation
+### Automated Testing
 
-- Keep Vitest as the primary unit and component testing framework.
-- Evaluate Playwright for end-to-end browser automation.
-- Test critical extension workflows in real browsers.
-- Verify extension permissions, storage, and background messaging.
-- Expand cross-browser testing for Firefox, Zen Browser, and Chrome.
-- Test popup, native sidebar, and detached window behavior.
-- Verify toolbar-button behavior for each supported default workspace mode.
+- Maintain shared selector objects for application navigation, Settings, and critical workflows.
+- Prefer accessible roles and names, using stable test IDs only when necessary.
+- Reuse shared selectors across relevant component and E2E tests.
+- Preserve existing unit, component, and Storybook coverage.
+- Maintain installed-extension Playwright E2E tests for Chromium.
+- Cover application startup, navigation, service configuration, and critical extension workflows.
+- Verify permissions, storage, and background messaging where practical.
+- Keep automated checks integrated into development and CI workflows where reliable.
+
+### Browser Compatibility
+
+Chromium installed-extension E2E testing is automated.
+
+Firefox has a dedicated production build, but the current Playwright setup does not automate the installed Firefox extension's UI. Firefox compatibility therefore requires additional manual verification.
+
+Future testing improvements should:
+
+- Expand automated browser coverage when reliable tooling becomes available.
+- Verify popup, native sidebar, and detached window behavior in supported browsers.
 - Test workspace preference persistence and manual workspace switching.
-- Verify navigation state restoration when switching workspaces.
-- Verify detached window reuse and behavior when a workspace is already open.
-- Document browser-specific workspace limitations discovered during testing.
-- Integrate suitable automated checks into CI.
+- Verify navigation state restoration and detached window reuse.
+- Check toolbar-button behavior for supported workspace modes.
+- Document browser-specific limitations and regressions.
+- Validate Firefox and Chromium extension packages before release.
+
+Ordinary web-page tests should not be presented as equivalent to installed-extension testing.
 
 ### Accessibility
 
-- Build on existing accessibility tests and component practices.
-- Introduce automated accessibility checks where practical.
-- Audit keyboard navigation and focus management.
-- Review screen reader support and accessible status messages.
-- Verify Quick Access menu accessibility, including keyboard interaction and focus restoration.
-- Audit WCAG 2.2 AA accessibility.
-- Manually verify behavior that automated tools cannot fully assess.
-- Fix issues identified during testing.
+- Continue using Storybook accessibility tooling and existing accessibility tests.
+- Expand automated accessibility checks where practical.
+- Prefer semantic controls, accessible names, and keyboard-friendly interactions.
+- Audit keyboard navigation, focus management, and screen reader support.
+- Verify accessible status messages and error feedback.
+- Check Quick Access keyboard interaction and focus restoration.
+- Work toward WCAG 2.2 AA conformance.
+- Manually verify accessibility behavior that automated tools cannot fully assess.
+- Fix accessibility issues as they are identified.
 
-Testing and accessibility remain ongoing requirements throughout every milestone.
+Testing and accessibility improvements should accompany relevant feature work rather than require a separate large-scale testing initiative.
 
-## 2. Extensible Integrations
+## 1. Extensible Integrations
 
 **Priority: Medium / Incremental**
 
@@ -130,7 +145,7 @@ Make it easier for contributors to add new integrations without rewriting existi
 
 Introduce provider abstractions incrementally as real integrations require them.
 
-## 3. Branding & Documentation
+## 2. Branding & Documentation
 
 **Priority: Pre-release**
 
@@ -146,7 +161,7 @@ Prepare MediaManagarr for a wider audience.
 - Document the service registry and integration architecture.
 - Review screenshots and other release materials.
 
-## 4. Release & Distribution
+## 3. Release & Distribution
 
 **Priority: Pre-release**
 
@@ -161,7 +176,7 @@ Prepare and publish MediaManagarr for supported browsers.
 - Prepare Firefox Add-ons and Chrome Web Store submissions.
 - Document release and distribution procedures.
 
-## 5. Future Possibilities
+## 4. Future Possibilities
 
 Ideas that may be explored after the initial release or when there is sufficient demand.
 
@@ -183,24 +198,18 @@ Future features will be prioritized based on user feedback and practical value r
 
 ## Implementation Plan
 
-### Phase 1 — Testing & Accessibility
-
-- Expand existing tests to cover new functionality.
-- Introduce browser-level end-to-end testing.
-- Add automated accessibility checks.
-- Complete cross-browser and manual accessibility audits.
-- Verify workspace behavior in supported browsers.
-
-### Phase 2 — Extensibility & Documentation
+### Phase 1 — Extensibility & Documentation
 
 - Introduce shared provider interfaces where needed.
 - Document how to add integrations and navigation features.
 - Refine branding, configuration guides, and troubleshooting documentation.
+- Maintain automated testing and accessibility practices alongside implementation work.
 
-### Phase 3 — Release & Distribution
+### Phase 2 — Release & Distribution
 
 - Validate release automation and extension packages.
 - Complete installation and upgrade testing.
+- Verify supported browser behavior and accessibility.
 - Prepare browser store submissions.
 - Publish the initial release.
 
@@ -225,8 +234,8 @@ Future features will be prioritized based on user feedback and practical value r
 
 ## Suggested GitHub Issues
 
-1. `test: introduce browser-level end-to-end testing`
-2. `test: expand automated accessibility checks`
+1. `test: expand automated accessibility checks`
+2. `test: improve Firefox installed-extension E2E coverage when supported`
 3. `refactor: introduce extensible provider interfaces`
 4. `docs: improve integration and contributor documentation`
 5. `chore: prepare browser store releases`

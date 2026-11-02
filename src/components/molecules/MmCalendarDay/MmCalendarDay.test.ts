@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmCalendarDay from './MmCalendarDay.vue'
+import { mmCalendarDaySelectors } from '../../../test/selectors/molecules/mmCalendarDay.selectors'
 import type { CalendarItem } from '../../../types/calendar'
 
 const tvItem: CalendarItem = {
@@ -25,43 +26,49 @@ const movieItem: CalendarItem = {
   posterUrl: null,
 }
 
+let wrapper: VueWrapper
+
+const day = mmCalendarDaySelectors((selector) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^button\.calendar-day /, ''))
+})
+
 function mountDay(props: Partial<InstanceType<typeof MmCalendarDay>['$props']> = {}) {
-  return mount(MmCalendarDay, {
+  wrapper = mount(MmCalendarDay, {
     props: {
       date: '2026-11-05',
       day: 5,
       ...props,
     },
   })
+  return wrapper
 }
 
 describe('MmCalendarDay', () => {
   it('renders the day number', () => {
-    const wrapper = mountDay()
+    mountDay()
 
-    expect(wrapper.text()).toContain('5')
-    expect(wrapper.find('button').attributes('type')).toBe('button')
+    expect(day.number().text()).toContain('5')
+    expect(day.get().attributes('type')).toBe('button')
   })
 
   it('emits the selected date when clicked', async () => {
-    const wrapper = mountDay()
+    mountDay()
 
-    await wrapper.find('button').trigger('click')
+    await day.get().trigger('click')
 
     expect(wrapper.emitted('select')).toEqual([['2026-11-05']])
   })
 
   it('renders TV and movie indicators', () => {
-    const wrapper = mountDay({
-      items: [tvItem, movieItem],
-    })
+    mountDay({ items: [tvItem, movieItem] })
 
-    expect(wrapper.find('.calendar-day__dot--tv').exists()).toBe(true)
-    expect(wrapper.find('.calendar-day__dot--movie').exists()).toBe(true)
+    expect(day.tvDot().exists()).toBe(true)
+    expect(day.movieDot().exists()).toBe(true)
   })
 
   it('renders only one indicator per media type', () => {
-    const wrapper = mountDay({
+    mountDay({
       items: [
         tvItem,
         { ...tvItem, id: 'sonarr-102' },
@@ -70,139 +77,120 @@ describe('MmCalendarDay', () => {
       ],
     })
 
+    expect(day.tvDot().exists()).toBe(true)
+    expect(day.movieDot().exists()).toBe(true)
     expect(wrapper.findAll('.calendar-day__dot--tv')).toHaveLength(1)
     expect(wrapper.findAll('.calendar-day__dot--movie')).toHaveLength(1)
   })
 
   it('renders no indicators for an empty day', () => {
-    const wrapper = mountDay()
+    mountDay()
 
-    expect(wrapper.find('.calendar-day__indicators').exists()).toBe(false)
+    expect(day.indicators().exists()).toBe(false)
   })
 
   it('marks today and selected states', () => {
-    const wrapper = mountDay({
+    mountDay({
       isToday: true,
       isSelected: true,
     })
 
-    expect(wrapper.classes()).toContain('calendar-day--today')
-    expect(wrapper.classes()).toContain('calendar-day--selected')
-    expect(wrapper.attributes('aria-pressed')).toBe('true')
+    expect(day.today().exists()).toBe(true)
+    expect(day.selected().exists()).toBe(true)
+    expect(day.get().attributes('aria-pressed')).toBe('true')
   })
 
   it('marks adjacent-month dates', () => {
-    const wrapper = mountDay({
-      isOutsideMonth: true,
-    })
+    mountDay({ isOutsideMonth: true })
 
-    expect(wrapper.classes()).toContain('calendar-day--outside')
+    expect(day.outside().exists()).toBe(true)
   })
 
   it('provides an accessible date label', () => {
-    const wrapper = mountDay()
+    mountDay()
 
-    expect(wrapper.attributes('aria-label')).toBe('Thursday, November 5, 2026')
+    expect(day.get().attributes('aria-label')).toBe('Thursday, November 5, 2026')
   })
 
   it('includes the release count in the accessible label', () => {
-    const wrapper = mountDay({
-      items: [tvItem, movieItem],
-    })
+    mountDay({ items: [tvItem, movieItem] })
 
-    expect(wrapper.attributes('aria-label')).toBe('Thursday, November 5, 2026, 2 releases')
+    expect(day.get().attributes('aria-label')).toBe('Thursday, November 5, 2026, 2 releases')
   })
 
   it('hides decorative indicators from screen readers', () => {
-    const wrapper = mountDay({
-      items: [tvItem],
-    })
+    mountDay({ items: [tvItem] })
 
-    expect(wrapper.get('.calendar-day__indicators').attributes('aria-hidden')).toBe('true')
+    expect(day.decorativeIndicators().exists()).toBe(true)
+    expect(day.indicators().attributes('aria-hidden')).toBe('true')
   })
 
   it('emits preview on mouse enter when releases exist', async () => {
-    const wrapper = mountDay({
-      items: [tvItem],
-    })
+    mountDay({ items: [tvItem] })
 
-    await wrapper.trigger('mouseenter')
+    await day.get().trigger('mouseenter')
 
     expect(wrapper.emitted('preview')).toEqual([['2026-11-05']])
   })
 
   it('does not emit preview on empty dates', async () => {
-    const wrapper = mountDay()
+    mountDay()
 
-    await wrapper.trigger('mouseenter')
+    await day.get().trigger('mouseenter')
 
     expect(wrapper.emitted('preview')).toBeUndefined()
   })
 
   it('emits hide-preview on mouse leave', async () => {
-    const wrapper = mountDay({
-      items: [tvItem],
-    })
+    mountDay({ items: [tvItem] })
 
-    await wrapper.trigger('mouseleave')
+    await day.get().trigger('mouseleave')
 
     expect(wrapper.emitted('hide-preview')).toEqual([['2026-11-05']])
   })
 
   it('shows the preview on keyboard focus', async () => {
-    const wrapper = mountDay({
-      items: [tvItem],
-    })
+    mountDay({ items: [tvItem] })
 
-    await wrapper.trigger('focus')
+    await day.get().trigger('focus')
 
     expect(wrapper.emitted('preview')).toEqual([['2026-11-05']])
   })
 
   it('hides the preview on blur', async () => {
-    const wrapper = mountDay({
-      items: [tvItem],
-    })
+    mountDay({ items: [tvItem] })
 
-    await wrapper.trigger('blur')
+    await day.get().trigger('blur')
 
     expect(wrapper.emitted('hide-preview')).toEqual([['2026-11-05']])
   })
 
   it('hides the preview when Escape is pressed', async () => {
-    const wrapper = mountDay({
-      items: [tvItem],
-    })
+    mountDay({ items: [tvItem] })
 
-    await wrapper.trigger('keydown', {
-      key: 'Escape',
-    })
+    await day.get().trigger('keydown', { key: 'Escape' })
 
     expect(wrapper.emitted('hide-preview')).toEqual([['2026-11-05']])
   })
 
   it('connects the active tooltip using aria-describedby', () => {
-    const wrapper = mountDay({
+    mountDay({
       items: [tvItem],
       tooltipId: 'calendar-day-tooltip',
     })
 
-    expect(wrapper.attributes('aria-describedby')).toBe('calendar-day-tooltip')
+    expect(day.describedBy('calendar-day-tooltip').exists()).toBe(true)
   })
 
   it('does not reference a tooltip on empty dates', () => {
-    const wrapper = mountDay({
-      tooltipId: 'calendar-day-tooltip',
-    })
+    mountDay({ tooltipId: 'calendar-day-tooltip' })
 
-    expect(wrapper.attributes('aria-describedby')).toBeUndefined()
+    expect(day.get().attributes('aria-describedby')).toBeUndefined()
   })
 
   it('does not use a native title tooltip', () => {
-    const wrapper = mountDay({
-      items: [tvItem],
-    })
+    mountDay({ items: [tvItem] })
 
-    expect(wrapper.attributes('title')).toBeUndefined()
+    expect(day.get().attributes('title')).toBeUndefined()
   })
 })

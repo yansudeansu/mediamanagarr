@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import MmTabs from './MmTabs.vue'
 import type { TabItem } from './MmTabs.vue'
+import { mmTabsSelectors } from '../../../test/selectors/molecules/mmTabs.selectors'
 
 const items: TabItem[] = [
   { id: 'connections', label: 'Connections' },
@@ -23,14 +24,22 @@ interface TestProps {
   label: string
 }
 
+let wrapper: VueWrapper
+
+const tabs = mmTabsSelectors((selector) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^\.tabs /, ''))
+})
+
 function createWrapper(overrides: Partial<TestProps> = {}) {
-  return mount(MmTabs, {
+  wrapper = mount(MmTabs, {
     props: {
       modelValue: 'connections',
       items,
       ...overrides,
     },
   })
+  return wrapper
 }
 
 function createNavigationWrapper(overrides: Partial<TestProps> = {}) {
@@ -55,19 +64,9 @@ function mockScrollDimensions(
   },
 ): void {
   Object.defineProperties(element, {
-    clientWidth: {
-      configurable: true,
-      value: clientWidth,
-    },
-    scrollWidth: {
-      configurable: true,
-      value: scrollWidth,
-    },
-    scrollLeft: {
-      configurable: true,
-      writable: true,
-      value: scrollLeft,
-    },
+    clientWidth: { configurable: true, value: clientWidth },
+    scrollWidth: { configurable: true, value: scrollWidth },
+    scrollLeft: { configurable: true, writable: true, value: scrollLeft },
   })
 }
 
@@ -96,78 +95,73 @@ describe('MmTabs', () => {
   })
 
   it('renders all tab labels', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.text()).toContain('Connections')
-    expect(wrapper.text()).toContain('Workspace')
+    expect(tabs.get().text()).toContain('Connections')
+    expect(tabs.get().text()).toContain('Workspace')
   })
 
   it('uses tab semantics by default', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.get('[role="tablist"]').attributes('aria-label')).toBe('Tabs')
+    expect(tabs.tablist().attributes('aria-label')).toBe('Tabs')
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(2)
   })
 
   it('supports a custom accessible label', () => {
-    const wrapper = createWrapper({ label: 'Settings sections' })
+    createWrapper({ label: 'Settings sections' })
 
-    expect(wrapper.get('[role="tablist"]').attributes('aria-label')).toBe('Settings sections')
+    expect(tabs.labelled('Settings sections').exists()).toBe(true)
   })
 
   it('marks the selected tab', () => {
-    const wrapper = createWrapper()
-    const tabs = wrapper.findAll('[role="tab"]')
+    createWrapper()
 
-    expect(tabs[0]?.attributes('aria-selected')).toBe('true')
-    expect(tabs[0]?.attributes('tabindex')).toBe('0')
-    expect(tabs[1]?.attributes('aria-selected')).toBe('false')
-    expect(tabs[1]?.attributes('tabindex')).toBe('-1')
+    expect(tabs.tab(0).attributes('aria-selected')).toBe('true')
+    expect(tabs.tab(0).attributes('tabindex')).toBe('0')
+    expect(tabs.tab(1).attributes('aria-selected')).toBe('false')
+    expect(tabs.tab(1).attributes('tabindex')).toBe('-1')
   })
 
   it('emits an update when another tab is clicked', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.findAll('[role="tab"]')[1]?.trigger('click')
+    await tabs.tab(1).trigger('click')
 
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['workspace'])
   })
 
   it('does not select a disabled tab', async () => {
-    const wrapper = createWrapper({
+    createWrapper({
       items: [
         { id: 'connections', label: 'Connections' },
         { id: 'workspace', label: 'Workspace', disabled: true },
       ],
     })
 
-    await wrapper.findAll('[role="tab"]')[1]?.trigger('click')
+    await tabs.tab(1).trigger('click')
 
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
   it('selects the next tab with ArrowRight', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.findAll('[role="tab"]')[0]?.trigger('keydown', {
-      key: 'ArrowRight',
-    })
+    await tabs.tab(0).trigger('keydown', { key: 'ArrowRight' })
 
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['workspace'])
   })
 
   it('wraps to the previous tab with ArrowLeft', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.findAll('[role="tab"]')[0]?.trigger('keydown', {
-      key: 'ArrowLeft',
-    })
+    await tabs.tab(0).trigger('keydown', { key: 'ArrowLeft' })
 
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['workspace'])
   })
 
   it('skips disabled tabs during keyboard navigation', async () => {
-    const wrapper = createWrapper({
+    createWrapper({
       items: [
         { id: 'connections', label: 'Connections' },
         { id: 'disabled', label: 'Disabled', disabled: true },
@@ -175,15 +169,13 @@ describe('MmTabs', () => {
       ],
     })
 
-    await wrapper.findAll('[role="tab"]')[0]?.trigger('keydown', {
-      key: 'ArrowRight',
-    })
+    await tabs.tab(0).trigger('keydown', { key: 'ArrowRight' })
 
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['workspace'])
   })
 
   it('supports Home and End keyboard navigation', async () => {
-    const wrapper = createWrapper({
+    createWrapper({
       items: [
         { id: 'connections', label: 'Connections' },
         { id: 'workspace', label: 'Workspace' },
@@ -191,51 +183,42 @@ describe('MmTabs', () => {
       ],
     })
 
-    const tabs = wrapper.findAll('[role="tab"]')
-
-    await tabs[0]?.trigger('keydown', { key: 'End' })
-    await tabs[2]?.trigger('keydown', { key: 'Home' })
+    await tabs.tab(0).trigger('keydown', { key: 'End' })
+    await tabs.tab(2).trigger('keydown', { key: 'Home' })
 
     expect(wrapper.emitted('update:modelValue')).toEqual([['advanced'], ['connections']])
   })
 
   it('does not change selection for unrelated keys', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.findAll('[role="tab"]')[0]?.trigger('keydown', {
-      key: 'Escape',
-    })
+    await tabs.tab(0).trigger('keydown', { key: 'Escape' })
 
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
   it('focuses the target tab during keyboard navigation', async () => {
-    const wrapper = createWrapper()
-    const tabs = wrapper.findAll('[role="tab"]')
-    const target = tabs[1]?.element as HTMLElement
-    const focus = vi.spyOn(target, 'focus')
+    createWrapper()
 
-    await tabs[0]?.trigger('keydown', { key: 'ArrowRight' })
+    const focus = vi.spyOn(tabs.tab(1).element as HTMLElement, 'focus')
+
+    await tabs.tab(0).trigger('keydown', { key: 'ArrowRight' })
 
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['workspace'])
     expect(focus).toHaveBeenCalledOnce()
   })
 
   it('provides a keyboard entry point for an unknown selection', () => {
-    const wrapper = createWrapper({
-      modelValue: 'missing',
-    })
+    createWrapper({ modelValue: 'missing' })
 
-    const tabs = wrapper.findAll('[role="tab"]')
-
-    expect(tabs[0]?.attributes('tabindex')).toBe('0')
-    expect(tabs[1]?.attributes('tabindex')).toBe('-1')
-    expect(tabs[0]?.attributes('aria-selected')).toBe('false')
-    expect(tabs[1]?.attributes('aria-selected')).toBe('false')
+    expect(tabs.tab(0).attributes('tabindex')).toBe('0')
+    expect(tabs.tab(1).attributes('tabindex')).toBe('-1')
+    expect(tabs.tab(0).attributes('aria-selected')).toBe('false')
+    expect(tabs.tab(1).attributes('aria-selected')).toBe('false')
   })
 
   it('provides a keyboard entry point when the selected tab is disabled', () => {
-    const wrapper = createWrapper({
+    createWrapper({
       modelValue: 'connections',
       items: [
         { id: 'connections', label: 'Connections', disabled: true },
@@ -243,24 +226,22 @@ describe('MmTabs', () => {
       ],
     })
 
-    const tabs = wrapper.findAll('[role="tab"]')
-
-    expect(tabs[0]?.attributes('tabindex')).toBe('-1')
-    expect(tabs[1]?.attributes('tabindex')).toBe('0')
+    expect(tabs.tab(0).attributes('tabindex')).toBe('-1')
+    expect(tabs.tab(1).attributes('tabindex')).toBe('0')
   })
 
   it('does not make disabled tabs keyboard-reachable when all are disabled', () => {
-    const wrapper = createWrapper({
+    createWrapper({
       items: items.map((item) => ({ ...item, disabled: true })),
     })
 
-    const tabs = wrapper.findAll('[role="tab"]')
-
-    expect(tabs.every((tab) => tab.attributes('tabindex') === '-1')).toBe(true)
+    expect(
+      wrapper.findAll('[role="tab"]').every((tab) => tab.attributes('tabindex') === '-1'),
+    ).toBe(true)
   })
 
   it('updates the keyboard entry point when items change', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
     await wrapper.setProps({
       items: [
@@ -269,130 +250,95 @@ describe('MmTabs', () => {
       ],
     })
 
-    const tabs = wrapper.findAll('[role="tab"]')
-
-    expect(tabs[0]?.attributes('tabindex')).toBe('-1')
-    expect(tabs[1]?.attributes('tabindex')).toBe('0')
+    expect(tabs.tab(0).attributes('tabindex')).toBe('-1')
+    expect(tabs.tab(1).attributes('tabindex')).toBe('0')
   })
 
   it('uses navigation semantics when requested', () => {
-    const wrapper = createWrapper({
-      variant: 'navigation',
-    })
+    createWrapper({ variant: 'navigation' })
 
-    expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
-    expect(wrapper.find('[role="tab"]').exists()).toBe(false)
-
-    const buttons = wrapper.findAll('.tabs__item')
-
-    expect(buttons[0]?.attributes('aria-current')).toBe('page')
-    expect(buttons[1]?.attributes('aria-current')).toBeUndefined()
+    expect(tabs.tablist().exists()).toBe(false)
+    expect(tabs.tabButtons().exists()).toBe(false)
+    expect(tabs.button(0).attributes('aria-current')).toBe('page')
+    expect(tabs.button(1).attributes('aria-current')).toBeUndefined()
   })
 
   it('emits selection updates in navigation mode', async () => {
-    const wrapper = createWrapper({
-      variant: 'navigation',
-    })
+    createWrapper({ variant: 'navigation' })
 
-    await wrapper.findAll('.tabs__item')[1]?.trigger('click')
+    await tabs.button(1).trigger('click')
 
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['workspace'])
   })
 
   it('does not implement tab keyboard behavior in navigation mode', async () => {
-    const wrapper = createWrapper({
-      variant: 'navigation',
-    })
+    createWrapper({ variant: 'navigation' })
 
-    await wrapper.findAll('.tabs__item')[0]?.trigger('keydown', {
-      key: 'ArrowRight',
-    })
+    await tabs.button(0).trigger('keydown', { key: 'ArrowRight' })
 
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
   describe('scrollable navigation', () => {
     it('does not show scroll arrows when navigation fits', async () => {
-      const wrapper = createNavigationWrapper()
-      const viewport = wrapper.get('.tabs__viewport').element as HTMLElement
+      createNavigationWrapper()
 
-      mockScrollDimensions(viewport, {
-        clientWidth: 400,
-        scrollWidth: 400,
-      })
+      const viewport = tabs.viewport().element as HTMLElement
 
-      await wrapper.get('.tabs__viewport').trigger('scroll')
+      mockScrollDimensions(viewport, { clientWidth: 400, scrollWidth: 400 })
 
-      expect(wrapper.find('[aria-label="Scroll navigation left"]').exists()).toBe(false)
-      expect(wrapper.find('[aria-label="Scroll navigation right"]').exists()).toBe(false)
+      await tabs.viewport().trigger('scroll')
+
+      expect(tabs.scrollLeft().exists()).toBe(false)
+      expect(tabs.scrollRight().exists()).toBe(false)
     })
 
     it('shows scroll arrows when navigation overflows', async () => {
-      const wrapper = createNavigationWrapper()
-      const viewport = wrapper.get('.tabs__viewport').element as HTMLElement
+      createNavigationWrapper()
 
-      mockScrollDimensions(viewport, {
-        clientWidth: 200,
-        scrollWidth: 500,
-      })
+      const viewport = tabs.viewport().element as HTMLElement
 
-      await wrapper.get('.tabs__viewport').trigger('scroll')
+      mockScrollDimensions(viewport, { clientWidth: 200, scrollWidth: 500 })
 
-      const leftArrow = wrapper.get('[aria-label="Scroll navigation left"]')
-      const rightArrow = wrapper.get('[aria-label="Scroll navigation right"]')
+      await tabs.viewport().trigger('scroll')
 
-      expect(leftArrow.attributes('disabled')).toBeDefined()
-      expect(rightArrow.attributes('disabled')).toBeUndefined()
+      expect(tabs.disabledScrollLeft().exists()).toBe(true)
+      expect(tabs.enabledScrollRight().exists()).toBe(true)
     })
 
     it('updates arrow states as navigation scrolls', async () => {
-      const wrapper = createNavigationWrapper()
-      const viewport = wrapper.get('.tabs__viewport').element as HTMLElement
+      createNavigationWrapper()
 
-      mockScrollDimensions(viewport, {
-        clientWidth: 200,
-        scrollWidth: 500,
-      })
+      const viewport = tabs.viewport().element as HTMLElement
 
-      await wrapper.get('.tabs__viewport').trigger('scroll')
+      mockScrollDimensions(viewport, { clientWidth: 200, scrollWidth: 500 })
+
+      await tabs.viewport().trigger('scroll')
 
       viewport.scrollLeft = 150
-      await wrapper.get('.tabs__viewport').trigger('scroll')
+      await tabs.viewport().trigger('scroll')
 
-      expect(
-        wrapper.get('[aria-label="Scroll navigation left"]').attributes('disabled'),
-      ).toBeUndefined()
-
-      expect(
-        wrapper.get('[aria-label="Scroll navigation right"]').attributes('disabled'),
-      ).toBeUndefined()
+      expect(tabs.enabledScrollLeft().exists()).toBe(true)
+      expect(tabs.enabledScrollRight().exists()).toBe(true)
 
       viewport.scrollLeft = 300
-      await wrapper.get('.tabs__viewport').trigger('scroll')
+      await tabs.viewport().trigger('scroll')
 
-      expect(
-        wrapper.get('[aria-label="Scroll navigation left"]').attributes('disabled'),
-      ).toBeUndefined()
-
-      expect(
-        wrapper.get('[aria-label="Scroll navigation right"]').attributes('disabled'),
-      ).toBeDefined()
+      expect(tabs.enabledScrollLeft().exists()).toBe(true)
+      expect(tabs.disabledScrollRight().exists()).toBe(true)
     })
 
     it('scrolls when an arrow is clicked', async () => {
-      const wrapper = createNavigationWrapper()
-      const viewport = wrapper.get('.tabs__viewport').element as HTMLElement
+      createNavigationWrapper()
+
+      const viewport = tabs.viewport().element as HTMLElement
       const scrollBy = vi.fn()
 
-      mockScrollDimensions(viewport, {
-        clientWidth: 200,
-        scrollWidth: 500,
-      })
-
+      mockScrollDimensions(viewport, { clientWidth: 200, scrollWidth: 500 })
       viewport.scrollBy = scrollBy
 
-      await wrapper.get('.tabs__viewport').trigger('scroll')
-      await wrapper.get('[aria-label="Scroll navigation right"]').trigger('click')
+      await tabs.viewport().trigger('scroll')
+      await tabs.scrollRight().trigger('click')
 
       expect(scrollBy).toHaveBeenCalledWith({
         left: 150,
@@ -400,8 +346,8 @@ describe('MmTabs', () => {
       })
 
       viewport.scrollLeft = 150
-      await wrapper.get('.tabs__viewport').trigger('scroll')
-      await wrapper.get('[aria-label="Scroll navigation left"]').trigger('click')
+      await tabs.viewport().trigger('scroll')
+      await tabs.scrollLeft().trigger('click')
 
       expect(scrollBy).toHaveBeenLastCalledWith({
         left: -150,
@@ -410,17 +356,17 @@ describe('MmTabs', () => {
     })
 
     it('scrolls the selected navigation item into view', async () => {
-      const wrapper = createNavigationWrapper()
-      const viewport = wrapper.get('.tabs__viewport').element as HTMLElement
+      createNavigationWrapper()
+
+      const viewport = tabs.viewport().element as HTMLElement
       const scrollBy = vi.fn()
 
       viewport.scrollBy = scrollBy
 
       vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(mockRect(0, 200))
-
-      const downloadsButton = wrapper.findAll('.tabs__item')[3]?.element as HTMLElement
-
-      vi.spyOn(downloadsButton, 'getBoundingClientRect').mockReturnValue(mockRect(250, 350))
+      vi.spyOn(tabs.button(3).element as HTMLElement, 'getBoundingClientRect').mockReturnValue(
+        mockRect(250, 350),
+      )
 
       await wrapper.setProps({ modelValue: 'downloads' })
 
@@ -431,20 +377,17 @@ describe('MmTabs', () => {
     })
 
     it('scrolls left when the selected item is outside the left edge', async () => {
-      const wrapper = createNavigationWrapper({
-        modelValue: 'downloads',
-      })
+      createNavigationWrapper({ modelValue: 'downloads' })
 
-      const viewport = wrapper.get('.tabs__viewport').element as HTMLElement
+      const viewport = tabs.viewport().element as HTMLElement
       const scrollBy = vi.fn()
 
       viewport.scrollBy = scrollBy
 
       vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(mockRect(100, 300))
-
-      const requestsButton = wrapper.findAll('.tabs__item')[0]?.element as HTMLElement
-
-      vi.spyOn(requestsButton, 'getBoundingClientRect').mockReturnValue(mockRect(20, 90))
+      vi.spyOn(tabs.button(0).element as HTMLElement, 'getBoundingClientRect').mockReturnValue(
+        mockRect(20, 90),
+      )
 
       await wrapper.setProps({ modelValue: 'requests' })
 
@@ -455,40 +398,32 @@ describe('MmTabs', () => {
     })
 
     it('refreshes scroll state when navigation items change', async () => {
-      const wrapper = createNavigationWrapper()
-      const viewport = wrapper.get('.tabs__viewport').element as HTMLElement
+      createNavigationWrapper()
 
-      mockScrollDimensions(viewport, {
-        clientWidth: 200,
-        scrollWidth: 500,
-      })
+      const viewport = tabs.viewport().element as HTMLElement
 
-      await wrapper.get('.tabs__viewport').trigger('scroll')
+      mockScrollDimensions(viewport, { clientWidth: 200, scrollWidth: 500 })
 
-      expect(wrapper.find('[aria-label="Scroll navigation right"]').exists()).toBe(true)
+      await tabs.viewport().trigger('scroll')
 
-      mockScrollDimensions(viewport, {
-        clientWidth: 200,
-        scrollWidth: 200,
-      })
+      expect(tabs.scrollRight().exists()).toBe(true)
 
-      await wrapper.setProps({
-        items: navigationItems.slice(0, 2),
-      })
+      mockScrollDimensions(viewport, { clientWidth: 200, scrollWidth: 200 })
 
+      await wrapper.setProps({ items: navigationItems.slice(0, 2) })
       await nextTick()
-      await wrapper.get('.tabs__viewport').trigger('scroll')
+      await tabs.viewport().trigger('scroll')
 
-      expect(wrapper.find('[aria-label="Scroll navigation left"]').exists()).toBe(false)
-      expect(wrapper.find('[aria-label="Scroll navigation right"]').exists()).toBe(false)
+      expect(tabs.scrollLeft().exists()).toBe(false)
+      expect(tabs.scrollRight().exists()).toBe(false)
     })
 
     it('does not add scroll controls to ordinary tabs', () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      expect(wrapper.find('.tabs__viewport--navigation').exists()).toBe(false)
-      expect(wrapper.find('[aria-label="Scroll navigation left"]').exists()).toBe(false)
-      expect(wrapper.find('[aria-label="Scroll navigation right"]').exists()).toBe(false)
+      expect(tabs.navigationViewport().exists()).toBe(false)
+      expect(tabs.scrollLeft().exists()).toBe(false)
+      expect(tabs.scrollRight().exists()).toBe(false)
     })
 
     it('observes navigation dimensions and disconnects on unmount', async () => {
@@ -502,8 +437,7 @@ describe('MmTabs', () => {
 
       vi.stubGlobal('ResizeObserver', ResizeObserverMock)
 
-      const wrapper = createNavigationWrapper()
-
+      createNavigationWrapper()
       await nextTick()
 
       expect(observe).toHaveBeenCalledTimes(2)
@@ -526,7 +460,7 @@ describe('MmTabs', () => {
 
       vi.stubGlobal('ResizeObserver', ResizeObserverMock)
 
-      const wrapper = createWrapper()
+      createWrapper()
 
       expect(observe).not.toHaveBeenCalled()
 
@@ -554,16 +488,12 @@ describe('MmTabs', () => {
 
       vi.stubGlobal('ResizeObserver', ResizeObserverMock)
 
-      const wrapper = createNavigationWrapper()
-
+      createNavigationWrapper()
       await nextTick()
 
       const initialObservations = observe.mock.calls.length
 
-      await wrapper.setProps({
-        items: navigationItems.slice(0, 2),
-      })
-
+      await wrapper.setProps({ items: navigationItems.slice(0, 2) })
       await nextTick()
       await nextTick()
 

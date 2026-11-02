@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmTorrentCard from './MmTorrentCard.vue'
 import type { TorrentCardData } from './MmTorrentCard.vue'
+import { mmTorrentCardSelectors } from '../../../test/selectors/molecules/mmTorrentCard.selectors'
+import { mmProgressBarSelectors } from '../../../test/selectors/atoms/mmProgressBar.selectors'
 
 const torrent: TorrentCardData = {
   id: 'a'.repeat(40),
@@ -17,57 +19,59 @@ const torrent: TorrentCardData = {
   primaryActionLabel: 'Stop',
 }
 
+let wrapper: VueWrapper
+
+const query = (selector: string) => wrapper.find(selector)
+const card = mmTorrentCardSelectors(query)
+const progress = mmProgressBarSelectors(query)
+
 function createWrapper(
   overrides: Partial<TorrentCardData> = {},
-  props: {
-    pendingAction?: 'primary' | 'remove' | null
-    disabled?: boolean
-  } = {},
+  props: { pendingAction?: 'primary' | 'remove' | null; disabled?: boolean } = {},
 ) {
-  return mount(MmTorrentCard, {
+  wrapper = mount(MmTorrentCard, {
     props: {
       torrent: { ...torrent, ...overrides },
       ...props,
     },
   })
+  return wrapper
 }
 
 describe('MmTorrentCard', () => {
   it('renders the torrent name', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.find('.torrent-card__name').text()).toBe('Example Download (2026)')
+    expect(card.name().text()).toBe('Example Download (2026)')
   })
 
   it('preserves the full torrent name in the title attribute', () => {
     const name = 'A Very Long Download Name That Should Be Truncated Visually'
-    const wrapper = createWrapper({ name })
+    createWrapper({ name })
 
-    expect(wrapper.find('.torrent-card__name').attributes('title')).toBe(name)
+    expect(card.name().attributes('title')).toBe(name)
   })
 
   it('displays the supplied status label', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.find('.torrent-card__status').text()).toBe('Downloading')
+    expect(card.status().text()).toBe('Downloading')
   })
 
   it('applies the supplied status variant', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.find('.torrent-card__status').classes()).toContain(
-      'torrent-card__status--downloading',
-    )
+    expect(card.statusVariant('downloading').exists()).toBe(true)
   })
 
   it('renders an error status with error styling', () => {
-    const wrapper = createWrapper({
+    createWrapper({
       statusLabel: 'Error',
       statusVariant: 'error',
     })
 
-    expect(wrapper.find('.torrent-card__status').text()).toBe('Error')
-    expect(wrapper.find('.torrent-card__status').classes()).toContain('torrent-card__status--error')
+    expect(card.status().text()).toBe('Error')
+    expect(card.statusVariant('error').exists()).toBe(true)
   })
 
   it('supports all status variants', () => {
@@ -80,144 +84,134 @@ describe('MmTorrentCard', () => {
     ]
 
     for (const variant of variants) {
-      const wrapper = createWrapper({ statusVariant: variant })
+      createWrapper({ statusVariant: variant })
 
-      expect(wrapper.find('.torrent-card__status').classes()).toContain(
-        `torrent-card__status--${variant}`,
-      )
+      expect(card.statusVariant(variant).exists()).toBe(true)
 
       wrapper.unmount()
     }
   })
 
   it('displays the supplied progress label', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.find('.torrent-card__percentage').text()).toBe('42.5%')
+    expect(card.percentage().text()).toBe('42.5%')
   })
 
   it('passes the percentage to the progress bar', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('42.5')
+    expect(progress.track().attributes('aria-valuenow')).toBe('42.5')
   })
 
   it('displays the supplied size label', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.find('.torrent-card__size').text()).toBe('4.0 MiB / 10 MiB')
+    expect(card.size().text()).toBe('4.0 MiB / 10 MiB')
   })
 
   it('displays transfer speeds and ETA', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.text()).toContain('1.0 MiB/s')
-    expect(wrapper.text()).toContain('512 KiB/s')
-    expect(wrapper.text()).toContain('ETA: 1h 0m')
+    expect(card.download().text()).toContain('1.0 MiB/s')
+    expect(card.upload().text()).toContain('512 KiB/s')
+    expect(card.eta().text()).toContain('ETA: 1h 0m')
   })
 
   it('emits the primary action with the item ID', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.get('button[aria-label="Stop Example Download (2026)"]').trigger('click')
+    await card.primaryLabelled('Stop Example Download (2026)').trigger('click')
 
     expect(wrapper.emitted('primaryAction')).toEqual([[torrent.id]])
   })
 
   it('supports a configurable primary action label', async () => {
-    const wrapper = createWrapper({
+    createWrapper({
       primaryActionLabel: 'Start',
       statusLabel: 'Stopped',
       statusVariant: 'stopped',
     })
 
-    await wrapper.get('button[aria-label="Start Example Download (2026)"]').trigger('click')
+    await card.primaryLabelled('Start Example Download (2026)').trigger('click')
 
     expect(wrapper.emitted('primaryAction')).toEqual([[torrent.id]])
   })
 
   it('emits remove without performing deletion', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.get('button[aria-label="Remove Example Download (2026)"]').trigger('click')
+    await card.removeLabelled('Remove Example Download (2026)').trigger('click')
 
     expect(wrapper.emitted('remove')).toEqual([[torrent.id]])
   })
 
   it('disables actions when the card is disabled', async () => {
-    const wrapper = createWrapper({}, { disabled: true })
-    const buttons = wrapper.findAll('button')
+    createWrapper({}, { disabled: true })
 
-    expect(buttons).toHaveLength(2)
-    expect(buttons.every((button) => button.attributes('disabled') !== undefined)).toBe(true)
+    expect(wrapper.findAll('button')).toHaveLength(2)
+    expect(card.primaryDisabled().exists()).toBe(true)
+    expect(card.removeDisabled().exists()).toBe(true)
 
-    await buttons[0]!.trigger('click')
-    await buttons[1]!.trigger('click')
+    await card.primary().trigger('click')
+    await card.remove().trigger('click')
 
     expect(wrapper.emitted('primaryAction')).toBeUndefined()
     expect(wrapper.emitted('remove')).toBeUndefined()
   })
 
   it('shows a loading state during a primary action', () => {
-    const wrapper = createWrapper({}, { pendingAction: 'primary' })
+    createWrapper({}, { pendingAction: 'primary' })
 
-    expect(
-      wrapper.get('button[aria-label="Stop Example Download (2026)"]').attributes('aria-busy'),
-    ).toBe('true')
-
-    expect(
-      wrapper.findAll('button').every((button) => button.attributes('disabled') !== undefined),
-    ).toBe(true)
+    expect(card.primaryLoading().exists()).toBe(true)
+    expect(card.primaryDisabled().exists()).toBe(true)
+    expect(card.removeDisabled().exists()).toBe(true)
   })
 
   it('shows a loading state during removal', () => {
-    const wrapper = createWrapper({}, { pendingAction: 'remove' })
+    createWrapper({}, { pendingAction: 'remove' })
 
-    expect(
-      wrapper.get('button[aria-label="Remove Example Download (2026)"]').attributes('aria-busy'),
-    ).toBe('true')
-
-    expect(
-      wrapper.findAll('button').every((button) => button.attributes('disabled') !== undefined),
-    ).toBe(true)
+    expect(card.removeLoading().exists()).toBe(true)
+    expect(card.primaryDisabled().exists()).toBe(true)
+    expect(card.removeDisabled().exists()).toBe(true)
   })
 
   it('does not emit actions while another action is pending', async () => {
-    const wrapper = createWrapper({}, { pendingAction: 'primary' })
+    createWrapper({}, { pendingAction: 'primary' })
 
-    await wrapper.get('button[aria-label="Remove Example Download (2026)"]').trigger('click')
+    await card.remove().trigger('click')
 
     expect(wrapper.emitted('remove')).toBeUndefined()
   })
 
   it('does not emit a primary action while removal is pending', async () => {
-    const wrapper = createWrapper({}, { pendingAction: 'remove' })
+    createWrapper({}, { pendingAction: 'remove' })
 
-    await wrapper.get('button[aria-label="Stop Example Download (2026)"]').trigger('click')
+    await card.primary().trigger('click')
 
     expect(wrapper.emitted('primaryAction')).toBeUndefined()
   })
 
   it('clamps non-finite progress to zero', () => {
-    const wrapper = createWrapper({ progress: Number.NaN })
+    createWrapper({ progress: Number.NaN })
 
-    expect(wrapper.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('0')
+    expect(progress.track().attributes('aria-valuenow')).toBe('0')
   })
 
   it('clamps progress below zero', () => {
-    const wrapper = createWrapper({ progress: -25 })
+    createWrapper({ progress: -25 })
 
-    expect(wrapper.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('0')
+    expect(progress.track().attributes('aria-valuenow')).toBe('0')
   })
 
   it('clamps progress above 100', () => {
-    const wrapper = createWrapper({ progress: 125 })
+    createWrapper({ progress: 125 })
 
-    expect(wrapper.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('100')
+    expect(progress.track().attributes('aria-valuenow')).toBe('100')
   })
 
   it('updates when the display data changes', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
     await wrapper.setProps({
       torrent: {
@@ -230,19 +224,17 @@ describe('MmTorrentCard', () => {
       },
     })
 
-    expect(wrapper.find('.torrent-card__status').text()).toBe('Stopped')
-    expect(wrapper.find('.torrent-card__status').classes()).toContain(
-      'torrent-card__status--stopped',
-    )
-    expect(wrapper.find('.torrent-card__percentage').text()).toBe('50%')
-    expect(wrapper.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('50')
-    expect(wrapper.find('button[aria-label="Start Example Download (2026)"]').exists()).toBe(true)
+    expect(card.status().text()).toBe('Stopped')
+    expect(card.statusVariant('stopped').exists()).toBe(true)
+    expect(card.percentage().text()).toBe('50%')
+    expect(progress.track().attributes('aria-valuenow')).toBe('50')
+    expect(card.primaryLabelled('Start Example Download (2026)').exists()).toBe(true)
   })
 
   it('provides an accessible progress label', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe(
+    expect(progress.track().attributes('aria-label')).toBe(
       'Example Download (2026) download progress',
     )
   })

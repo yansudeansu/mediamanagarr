@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmNavigation from './MmNavigation.vue'
 import MmTabs from '../MmTabs/MmTabs.vue'
 import MmButton from '../../atoms/MmButton/MmButton.vue'
+import { mmNavigationSelectors } from '../../../test/selectors/molecules/mmNavigation.selectors'
 import type { TabItem } from '../MmTabs/MmTabs.vue'
 
 const items: TabItem[] = [
@@ -17,34 +18,41 @@ interface TestProps {
   label: string
 }
 
-function createWrapper(overrides: Partial<TestProps> = {}) {
-  return mount(MmNavigation, {
+let wrapper: VueWrapper
+
+const navigation = mmNavigationSelectors((selector) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^nav /, ''))
+})
+
+function createWrapper(overrides: Partial<TestProps> = {}, attachTo?: HTMLElement) {
+  wrapper = mount(MmNavigation, {
+    ...(attachTo ? { attachTo } : {}),
     props: {
       activeView: 'overview',
       items,
       ...overrides,
     },
   })
+  return wrapper
 }
 
 describe('MmNavigation', () => {
   it('renders a semantic navigation landmark', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.element.tagName).toBe('NAV')
-    expect(wrapper.attributes('aria-label')).toBe('Main navigation')
+    expect(navigation.get().element.tagName).toBe('NAV')
+    expect(navigation.get().attributes('aria-label')).toBe('Main navigation')
   })
 
   it('supports a custom navigation label', () => {
-    const wrapper = createWrapper({
-      label: 'Library navigation',
-    })
+    createWrapper({ label: 'Library navigation' })
 
-    expect(wrapper.attributes('aria-label')).toBe('Library navigation')
+    expect(navigation.labelled('Library navigation').exists()).toBe(true)
   })
 
   it('uses MmTabs in navigation mode', () => {
-    const wrapper = createWrapper()
+    createWrapper()
     const tabs = wrapper.getComponent(MmTabs)
 
     expect(tabs.props('variant')).toBe('navigation')
@@ -53,19 +61,16 @@ describe('MmNavigation', () => {
   })
 
   it('renders the supplied navigation items', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
     expect(wrapper.findAllComponents(MmButton)).toHaveLength(3)
-
-    expect(wrapper.findAll('button').map((button) => button.text())).toEqual([
-      'Overview',
-      'Activity',
-      'Library',
-    ])
+    expect(navigation.button(0).text()).toBe('Overview')
+    expect(navigation.button(1).text()).toBe('Activity')
+    expect(navigation.button(2).text()).toBe('Library')
   })
 
   it('supports a different set of navigation items', () => {
-    const wrapper = createWrapper({
+    createWrapper({
       activeView: 'movies',
       items: [
         { id: 'movies', label: 'Movies' },
@@ -73,13 +78,13 @@ describe('MmNavigation', () => {
       ],
     })
 
-    expect(wrapper.findAll('button').map((button) => button.text())).toEqual(['Movies', 'TV Shows'])
-
-    expect(wrapper.get('[aria-current="page"]').text()).toBe('Movies')
+    expect(navigation.button(0).text()).toBe('Movies')
+    expect(navigation.button(1).text()).toBe('TV Shows')
+    expect(navigation.current().text()).toBe('Movies')
   })
 
   it('updates the rendered items when the items prop changes', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
     await wrapper.setProps({
       items: [
@@ -88,14 +93,13 @@ describe('MmNavigation', () => {
       ],
     })
 
-    expect(wrapper.findAll('button').map((button) => button.text())).toEqual([
-      'Overview',
-      'Settings',
-    ])
+    expect(navigation.button(0).text()).toBe('Overview')
+    expect(navigation.button(1).text()).toBe('Settings')
+    expect(navigation.button(2).exists()).toBe(false)
   })
 
   it('uses ghost buttons with the small size', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
     for (const button of wrapper.findAll('button')) {
       expect(button.classes()).toContain('button--ghost')
@@ -104,7 +108,7 @@ describe('MmNavigation', () => {
   })
 
   it('uses native buttons with explicit button types', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
     for (const button of wrapper.findAll('button')) {
       expect(button.element.tagName).toBe('BUTTON')
@@ -117,78 +121,71 @@ describe('MmNavigation', () => {
     ['activity', 'Activity'],
     ['library', 'Library'],
   ])('marks %s as the active view', (activeView, label) => {
-    const wrapper = createWrapper({ activeView })
+    createWrapper({ activeView })
 
-    const activeButtons = wrapper.findAll('[aria-current="page"]')
-
-    expect(activeButtons).toHaveLength(1)
-    expect(activeButtons[0]?.text()).toBe(label)
+    expect(navigation.current().text()).toBe(label)
+    expect(wrapper.findAll('[aria-current="page"]')).toHaveLength(1)
   })
 
   it('does not mark inactive buttons as current', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    const inactiveButtons = wrapper.findAll('button').slice(1)
-
-    for (const button of inactiveButtons) {
-      expect(button.attributes('aria-current')).toBeUndefined()
-    }
+    expect(navigation.button(1).attributes('aria-current')).toBeUndefined()
+    expect(navigation.button(2).attributes('aria-current')).toBeUndefined()
   })
 
   it('emits the selected item ID when clicked', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await navigation.button(1).trigger('click')
 
     expect(wrapper.emitted('navigate')).toEqual([['activity']])
   })
 
   it('does not change the active view without a prop update', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await navigation.button(1).trigger('click')
 
-    expect(wrapper.get('[aria-current="page"]').text()).toBe('Overview')
+    expect(navigation.current().text()).toBe('Overview')
     expect(wrapper.emitted('navigate')).toEqual([['activity']])
   })
 
   it('updates the active item when the prop changes', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.setProps({
-      activeView: 'library',
-    })
+    await wrapper.setProps({ activeView: 'library' })
 
-    expect(wrapper.get('[aria-current="page"]').text()).toBe('Library')
+    expect(navigation.current().text()).toBe('Library')
     expect(wrapper.findAll('[aria-current="page"]')).toHaveLength(1)
     expect(wrapper.getComponent(MmTabs).props('modelValue')).toBe('library')
   })
 
   it('does not emit navigation events when props change', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.setProps({
-      activeView: 'activity',
-    })
+    await wrapper.setProps({ activeView: 'activity' })
 
     expect(wrapper.emitted('navigate')).toBeUndefined()
   })
 
   it('does not navigate when a disabled item is clicked', async () => {
-    const wrapper = createWrapper({
+    createWrapper({
       items: [
         { id: 'overview', label: 'Overview' },
         { id: 'activity', label: 'Activity', disabled: true },
       ],
     })
 
-    await wrapper.findAll('button')[1]!.trigger('click')
+    expect(navigation.button(1).attributes('disabled')).toBeDefined()
+
+    await navigation.button(1).trigger('click')
 
     expect(wrapper.emitted('navigate')).toBeUndefined()
   })
 
   it('keeps enabled navigation buttons in the natural tab order', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
     for (const button of wrapper.findAll('button')) {
       expect(button.attributes('disabled')).toBeUndefined()
@@ -197,46 +194,35 @@ describe('MmNavigation', () => {
   })
 
   it('uses navigation semantics rather than ARIA tabs', () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
-    expect(wrapper.find('[role="tab"]').exists()).toBe(false)
-
-    for (const button of wrapper.findAll('button')) {
-      expect(button.attributes('aria-selected')).toBeUndefined()
-    }
+    expect(navigation.tablist().exists()).toBe(false)
+    expect(navigation.tabs().exists()).toBe(false)
+    expect(navigation.selectedTabs().exists()).toBe(false)
   })
 
   it('does not navigate when arrow keys are pressed', async () => {
-    const wrapper = createWrapper()
+    createWrapper()
 
-    await wrapper.findAll('button')[0]!.trigger('keydown', {
-      key: 'ArrowRight',
-    })
+    await navigation.button(0).trigger('keydown', { key: 'ArrowRight' })
 
     expect(wrapper.emitted('navigate')).toBeUndefined()
-    expect(wrapper.get('[aria-current="page"]').text()).toBe('Overview')
+    expect(navigation.current().text()).toBe('Overview')
   })
 
   it('does not navigate when a button receives focus', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
 
-    const wrapper = mount(MmNavigation, {
-      attachTo: container,
-      props: {
-        activeView: 'overview',
-        items,
-      },
-    })
+    createWrapper({}, container)
 
     try {
-      const activityButton = wrapper.findAll('button')[1]!
+      const activityButton = navigation.button(1)
 
       activityButton.element.focus()
 
       expect(document.activeElement).toBe(activityButton.element)
-      expect(wrapper.get('[aria-current="page"]').text()).toBe('Overview')
+      expect(navigation.current().text()).toBe('Overview')
       expect(wrapper.emitted('navigate')).toBeUndefined()
     } finally {
       wrapper.unmount()
@@ -248,25 +234,17 @@ describe('MmNavigation', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
 
-    const wrapper = mount(MmNavigation, {
-      attachTo: container,
-      props: {
-        activeView: 'overview',
-        items,
-      },
-    })
+    createWrapper({}, container)
 
     try {
-      const activityButton = wrapper.findAll('button')[1]!
+      const activityButton = navigation.button(1)
 
       activityButton.element.focus()
 
-      await wrapper.setProps({
-        activeView: 'library',
-      })
+      await wrapper.setProps({ activeView: 'library' })
 
       expect(document.activeElement).toBe(activityButton.element)
-      expect(wrapper.get('[aria-current="page"]').text()).toBe('Library')
+      expect(navigation.current().text()).toBe('Library')
       expect(wrapper.emitted('navigate')).toBeUndefined()
     } finally {
       wrapper.unmount()

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmTorrentConfirmation from './MmTorrentConfirmation.vue'
 import type { ConfirmationItem } from './MmTorrentConfirmation.vue'
+import { mmTorrentConfirmationSelectors } from '../../../test/selectors/molecules/mmTorrentConfirmation.selectors'
+import { mmCardSelectors } from '../../../test/selectors/atoms/mmCard.selectors'
+import { mmCheckboxSelectors } from '../../../test/selectors/atoms/mmCheckbox.selectors'
 
 const item: ConfirmationItem = {
   id: 'a'.repeat(40),
@@ -26,33 +29,45 @@ interface ConfirmationOverrides {
   confirmWithFilesLabel?: string
 }
 
+let wrapper: VueWrapper
+
+const query = (selector: string) => {
+  if (wrapper.element instanceof Element && wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector)
+}
+
+const confirmation = mmTorrentConfirmationSelectors(query)
+const card = mmCardSelectors(query)
+const checkbox = mmCheckboxSelectors(query)
+
 function mountConfirmation(overrides: ConfirmationOverrides = {}) {
-  return mount(MmTorrentConfirmation, {
+  wrapper = mount(MmTorrentConfirmation, {
     props: {
       item,
       ...overrides,
     },
   })
+  return wrapper
 }
 
 describe('MmTorrentConfirmation', () => {
   it('does not render when no item is selected', () => {
-    const wrapper = mountConfirmation({ item: null })
+    mountConfirmation({ item: null })
 
-    expect(wrapper.find('.torrent-confirmation').exists()).toBe(false)
+    expect(confirmation.get().exists()).toBe(false)
   })
 
   it('renders using the shared card component', () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    expect(wrapper.find('.mm-card').exists()).toBe(true)
+    expect(card.get().exists()).toBe(true)
   })
 
   it('renders an accessible confirmation section', () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    const section = wrapper.get('section')
-    const heading = wrapper.get('h3')
+    const section = confirmation.get()
+    const heading = confirmation.title()
 
     expect(section.attributes('aria-labelledby')).toBe(heading.attributes('id'))
     expect(heading.attributes('id')).toBeTruthy()
@@ -70,243 +85,213 @@ describe('MmTorrentConfirmation', () => {
       },
     })
 
-    const wrapper = mount(Parent)
-
-    const headings = wrapper.findAll('h3')
+    const parent = mount(Parent)
+    const sections = parent.findAll('section.torrent-confirmation')
+    const headings = parent.findAll('h3.torrent-confirmation__title')
 
     expect(headings).toHaveLength(2)
     expect(headings[0]!.attributes('id')).toBeTruthy()
     expect(headings[1]!.attributes('id')).toBeTruthy()
     expect(headings[0]!.attributes('id')).not.toBe(headings[1]!.attributes('id'))
-
-    const sections = wrapper.findAll('section')
-
     expect(sections[0]!.attributes('aria-labelledby')).toBe(headings[0]!.attributes('id'))
     expect(sections[1]!.attributes('aria-labelledby')).toBe(headings[1]!.attributes('id'))
   })
 
   it('displays the selected item name', () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    expect(wrapper.text()).toContain('Example Download')
-    expect(wrapper.get('.torrent-confirmation__name').attributes('title')).toBe('Example Download')
+    expect(confirmation.name().text()).toBe('Example Download')
+    expect(confirmation.name().attributes('title')).toBe('Example Download')
   })
 
   it('explains that associated files are kept by default', () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    expect(wrapper.text()).toContain(
+    expect(confirmation.description().text()).toContain(
       'Its associated files will be kept unless you choose to delete them below.',
     )
   })
 
   it('supports a custom title and description', () => {
-    const wrapper = mountConfirmation({
+    mountConfirmation({
       title: 'Remove download?',
       description: 'The download will be removed from the service.',
     })
 
-    expect(wrapper.get('h3').text()).toBe('Remove download?')
-    expect(wrapper.get('.torrent-confirmation__description').text()).toBe(
-      'The download will be removed from the service.',
-    )
+    expect(confirmation.title().text()).toBe('Remove download?')
+    expect(confirmation.description().text()).toBe('The download will be removed from the service.')
   })
 
   it('renders an unchecked delete-files checkbox by default', () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    expect((wrapper.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
+    expect(checkbox.unchecked().exists()).toBe(true)
   })
 
   it('uses a clear label for the destructive checkbox', () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    expect(wrapper.text()).toContain('Also delete associated files')
-    expect(wrapper.text()).toContain('Permanently delete the associated files from disk.')
+    expect(checkbox.label().text()).toContain('Also delete associated files')
+    expect(checkbox.hint().text()).toContain('Permanently delete the associated files from disk.')
   })
 
   it('supports custom checkbox text', () => {
-    const wrapper = mountConfirmation({
+    mountConfirmation({
       deleteFilesLabel: 'Also delete downloaded files',
       deleteFilesHint: 'Permanently delete downloaded data.',
     })
 
-    expect(wrapper.text()).toContain('Also delete downloaded files')
-    expect(wrapper.text()).toContain('Permanently delete downloaded data.')
+    expect(checkbox.label().text()).toContain('Also delete downloaded files')
+    expect(checkbox.hint().text()).toContain('Permanently delete downloaded data.')
   })
 
   it('does not show the stronger warning by default', () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    expect(wrapper.find('.torrent-confirmation__warning').exists()).toBe(false)
+    expect(confirmation.warning().exists()).toBe(false)
   })
 
   it('shows a stronger warning when file deletion is selected', async () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await checkbox.control().setValue(true)
 
-    const warning = wrapper.get('.torrent-confirmation__warning')
-
-    expect(warning.attributes('role')).toBe('alert')
-    expect(warning.text()).toContain('This cannot be undone.')
+    expect(confirmation.alert().exists()).toBe(true)
+    expect(confirmation.alert().text()).toContain('This cannot be undone.')
   })
 
   it('supports a custom destructive-action warning', async () => {
-    const wrapper = mountConfirmation({
+    mountConfirmation({
       deleteFilesWarning: 'Warning: These files will be permanently deleted.',
     })
 
-    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await checkbox.control().setValue(true)
 
-    expect(wrapper.get('.torrent-confirmation__warning').text()).toBe(
-      'Warning: These files will be permanently deleted.',
-    )
+    expect(confirmation.warning().text()).toBe('Warning: These files will be permanently deleted.')
   })
 
   it('changes the confirm button label when file deletion is selected', async () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    expect(wrapper.get('button.button--danger').text()).toContain('Remove item')
+    expect(confirmation.confirm().text()).toContain('Remove item')
 
-    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await checkbox.control().setValue(true)
 
-    expect(wrapper.get('button.button--danger').text()).toContain('Remove + files')
+    expect(confirmation.confirm().text()).toContain('Remove + files')
   })
 
   it('supports custom confirmation button labels', async () => {
-    const wrapper = mountConfirmation({
+    mountConfirmation({
       confirmLabel: 'Remove torrent',
       confirmWithFilesLabel: 'Remove torrent + files',
     })
 
-    expect(wrapper.get('button.button--danger').text()).toBe('Remove torrent')
+    expect(confirmation.confirm().text()).toBe('Remove torrent')
 
-    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await checkbox.control().setValue(true)
 
-    expect(wrapper.get('button.button--danger').text()).toBe('Remove torrent + files')
+    expect(confirmation.confirm().text()).toBe('Remove torrent + files')
   })
 
   it('emits confirmation without deleting files by default', async () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    await wrapper.get('button.button--danger').trigger('click')
+    await confirmation.confirm().trigger('click')
 
-    expect(wrapper.emitted('confirm')?.[0]).toEqual([
-      {
-        id: item.id,
-        deleteFiles: false,
-      },
-    ])
+    expect(wrapper.emitted('confirm')?.[0]).toEqual([{ id: item.id, deleteFiles: false }])
   })
 
   it('emits confirmation with file deletion only when explicitly checked', async () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    await wrapper.get('input[type="checkbox"]').setValue(true)
-    await wrapper.get('button.button--danger').trigger('click')
+    await checkbox.control().setValue(true)
+    await confirmation.confirm().trigger('click')
 
-    expect(wrapper.emitted('confirm')?.[0]).toEqual([
-      {
-        id: item.id,
-        deleteFiles: true,
-      },
-    ])
+    expect(wrapper.emitted('confirm')?.[0]).toEqual([{ id: item.id, deleteFiles: true }])
   })
 
   it('emits cancel when the cancel button is clicked', async () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    await wrapper.get('button.button--secondary').trigger('click')
+    await confirmation.cancel().trigger('click')
 
     expect(wrapper.emitted('cancel')?.[0]).toEqual([])
   })
 
   it('resets file deletion when switching items', async () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await checkbox.control().setValue(true)
     await wrapper.setProps({ item: anotherItem })
 
-    expect((wrapper.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
+    expect(checkbox.unchecked().exists()).toBe(true)
 
-    await wrapper.get('button.button--danger').trigger('click')
+    await confirmation.confirm().trigger('click')
 
-    expect(wrapper.emitted('confirm')?.[0]).toEqual([
-      {
-        id: anotherItem.id,
-        deleteFiles: false,
-      },
-    ])
+    expect(wrapper.emitted('confirm')?.[0]).toEqual([{ id: anotherItem.id, deleteFiles: false }])
   })
 
   it('resets file deletion when closed and reopened for the same item', async () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await checkbox.control().setValue(true)
     await wrapper.setProps({ item: null })
     await wrapper.setProps({ item })
 
-    expect((wrapper.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
+    expect(checkbox.unchecked().exists()).toBe(true)
 
-    await wrapper.get('button.button--danger').trigger('click')
+    await confirmation.confirm().trigger('click')
 
-    expect(wrapper.emitted('confirm')?.[0]).toEqual([
-      {
-        id: item.id,
-        deleteFiles: false,
-      },
-    ])
+    expect(wrapper.emitted('confirm')?.[0]).toEqual([{ id: item.id, deleteFiles: false }])
   })
 
   it('resets file deletion when cancelled', async () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    await wrapper.get('input[type="checkbox"]').setValue(true)
-    await wrapper.get('button.button--secondary').trigger('click')
+    await checkbox.control().setValue(true)
+    await confirmation.cancel().trigger('click')
 
     expect(wrapper.emitted('cancel')).toHaveLength(1)
-    expect((wrapper.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
+    expect(checkbox.unchecked().exists()).toBe(true)
   })
 
   it('disables controls while loading', () => {
-    const wrapper = mountConfirmation({ loading: true })
+    mountConfirmation({ loading: true })
 
-    expect(wrapper.get('input[type="checkbox"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('button.button--secondary').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('button.button--danger').attributes('disabled')).toBeDefined()
+    expect(checkbox.disabled().exists()).toBe(true)
+    expect(confirmation.cancelDisabled().exists()).toBe(true)
+    expect(confirmation.confirmDisabled().exists()).toBe(true)
   })
 
   it('marks the confirm button as busy while loading', () => {
-    const wrapper = mountConfirmation({ loading: true })
+    mountConfirmation({ loading: true })
 
-    expect(wrapper.get('button.button--danger').attributes('aria-busy')).toBe('true')
+    expect(confirmation.confirmLoading().exists()).toBe(true)
   })
 
   it('does not emit confirmation while loading', async () => {
-    const wrapper = mountConfirmation({ loading: true })
+    mountConfirmation({ loading: true })
 
-    await wrapper.get('button.button--danger').trigger('click')
+    await confirmation.confirm().trigger('click')
 
     expect(wrapper.emitted('confirm')).toBeUndefined()
   })
 
   it('does not emit cancellation while loading', async () => {
-    const wrapper = mountConfirmation({ loading: true })
+    mountConfirmation({ loading: true })
 
-    await wrapper.get('button.button--secondary').trigger('click')
+    await confirmation.cancel().trigger('click')
 
     expect(wrapper.emitted('cancel')).toBeUndefined()
   })
 
   it('preserves the destructive selection when loading begins', async () => {
-    const wrapper = mountConfirmation()
+    mountConfirmation()
 
-    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await checkbox.control().setValue(true)
     await wrapper.setProps({ loading: true })
 
-    expect((wrapper.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
-
-    expect(wrapper.find('.torrent-confirmation__warning').exists()).toBe(true)
+    expect(checkbox.checked().exists()).toBe(true)
+    expect(confirmation.warning().exists()).toBe(true)
   })
 })
