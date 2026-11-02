@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.1
+
+### Bug Fixes
+
+- stabilize popup layout and update project documentation (07e3c50)
+
 ## v0.5.0
 
 ### Features
