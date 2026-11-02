@@ -368,11 +368,13 @@ async function openSidebar(): Promise<void> {
 .app-shell {
   display: flex;
   flex-direction: column;
+  width: 380px;
   height: 480px;
 }
 
 .app-shell--detached,
 .app-shell--sidebar {
+  width: 100%;
   height: 100vh;
 }
 
