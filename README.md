@@ -12,8 +12,8 @@ Built with Vue 3, TypeScript, and Vite, the project focuses on accessibility, pr
 ## Documentation
 
 - [User Guide](docs/USER-GUIDE.md) — Installation, service configuration, API keys, and browser-specific settings.
+- [Architecture](docs/ARCHITECTURE.md) — Service registry, navigation features, and application structure.
 - [Contributing](CONTRIBUTING.md) — Development conventions, testing, and pull requests.
-- [Roadmap](docs/ROADMAP.md) — Planned improvements and upcoming milestones.
 - [Component Library](https://yansudeansu.github.io/mediamanagarr/) — Storybook documentation for reusable UI components.
 
 ## Getting started
@@ -61,9 +61,7 @@ To load a development build into your browser, follow the [installation instruct
 
 ## Testing and quality assurance
 
-MediaManagarr uses automated checks to help maintain code quality, accessibility, and reliable integration with supported media services.
-
-The testing setup includes unit and component tests, Storybook for component development, and Playwright end-to-end tests.
+MediaManagarr uses Vitest for unit and component testing, Storybook for component development and accessibility tooling, and Playwright for browser-level end-to-end testing.
 
 ### Unit and component tests
 
@@ -73,35 +71,24 @@ Run the test suite:
 npm run test
 ```
 
-Or run tests in watch mode:
-
-```bash
-npm run test:watch
-```
+For watch mode, use `npm run test:watch`.
 
 ### End-to-end tests
 
 Playwright tests exercise the built Chromium extension in an installed-extension environment, including application navigation and service configuration workflows.
 
-Build the Chromium extension before running E2E tests:
+Build the extension before running the tests:
 
 ```bash
 npm run build:chrome
-npm run test:e2e
+npm run test:e2e:chromium
 ```
 
-**Browser coverage:** Installed-extension E2E tests currently run against Chromium. Firefox has a dedicated production build, but automated E2E testing of the installed Firefox extension is not yet supported by the project's test setup.
+**Browser coverage:** Installed-extension E2E tests currently run against Chromium. Firefox has a dedicated production build, but the current Playwright setup does not automate the installed Firefox extension.
 
-A successful Chromium E2E run should not be interpreted as verified Firefox extension compatibility. Firefox-specific behavior still requires manual testing.
+Chromium E2E results do not establish Firefox compatibility. Firefox-specific behavior requires manual verification.
 
 ### Code quality
-
-Run linting and formatting checks:
-
-```bash
-npm run lint
-npm run format:check
-```
 
 Run the full project verification workflow:
 
@@ -109,26 +96,30 @@ Run the full project verification workflow:
 npm run check
 ```
 
-The verification workflow checks linting, formatting, automated tests, and production builds. See [Contributing](CONTRIBUTING.md) for development and pull-request guidelines.
+This checks linting, formatting, unit and component tests, and production builds for both browser targets.
+
+Chromium extension E2E tests run separately and are included in CI for pull requests targeting `master`.
+
+See [Contributing](CONTRIBUTING.md) for individual commands and pull-request guidelines.
 
 ## Development commands
 
-| Command                   | Description                              |
-| ------------------------- | ---------------------------------------- |
-| `npm run start`           | Start the development server             |
-| `npm run lint`            | Check code with ESLint                   |
-| `npm run lint:fix`        | Automatically fix supported lint issues  |
-| `npm run format`          | Format source files                      |
-| `npm run format:check`    | Check formatting without modifying files |
-| `npm run test`            | Run unit and component tests             |
-| `npm run test:watch`      | Run tests in watch mode                  |
-| `npm run test:e2e`        | Run Playwright E2E tests                 |
-| `npm run build`           | Build both browser targets               |
-| `npm run build:chrome`    | Build the Chromium extension             |
-| `npm run build:firefox`   | Build the Firefox extension              |
-| `npm run storybook`       | Start Storybook                          |
-| `npm run build-storybook` | Build static Storybook documentation     |
-| `npm run check`           | Run the project verification workflow    |
+| Command                     | Description                                |
+| --------------------------- | ------------------------------------------ |
+| `npm run start`             | Start the development server               |
+| `npm run lint`              | Check code with ESLint                     |
+| `npm run lint:fix`          | Automatically fix supported lint issues    |
+| `npm run format`            | Format source files                        |
+| `npm run format:check`      | Check formatting without modifying files   |
+| `npm run test`              | Run unit and component tests               |
+| `npm run test:watch`        | Run tests in watch mode                    |
+| `npm run test:e2e:chromium` | Run Chromium installed-extension E2E tests |
+| `npm run build`             | Build both browser targets                 |
+| `npm run build:chrome`      | Build the Chromium extension               |
+| `npm run build:firefox`     | Build the Firefox extension                |
+| `npm run storybook`         | Start Storybook                            |
+| `npm run build-storybook`   | Build static Storybook documentation       |
+| `npm run check`             | Run the project verification workflow      |
 
 Run `npm run check` before submitting a pull request.
 
