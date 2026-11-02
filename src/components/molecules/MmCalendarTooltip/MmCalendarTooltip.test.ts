@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmCalendarTooltip from './MmCalendarTooltip.vue'
+import { mmCalendarTooltipSelectors } from '../../../test/selectors/molecules/mmCalendarTooltip.selectors'
 import type { CalendarItem } from '../../../types/calendar'
 
 const tvItem: CalendarItem = {
@@ -25,77 +26,60 @@ const movieItem: CalendarItem = {
   posterUrl: null,
 }
 
+let wrapper: VueWrapper
+
+const tooltip = mmCalendarTooltipSelectors((selector) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^\.calendar-tooltip\[role="tooltip"\] /, ''))
+})
+
+function mountTooltip(items: CalendarItem[] = [tvItem], date = '2026-11-05') {
+  wrapper = mount(MmCalendarTooltip, { props: { date, items } })
+  return wrapper
+}
+
 describe('MmCalendarTooltip', () => {
   it('renders an accessible tooltip', () => {
-    const wrapper = mount(MmCalendarTooltip, {
-      props: {
-        date: '2026-11-05',
-        items: [tvItem],
-      },
-    })
+    mountTooltip()
 
-    expect(wrapper.attributes('role')).toBe('tooltip')
-    expect(wrapper.text()).toContain('Thursday, November 5')
+    expect(tooltip.get().attributes('role')).toBe('tooltip')
+    expect(tooltip.date().text()).toBe('Thursday, November 5')
   })
 
   it('renders release titles and subtitles', () => {
-    const wrapper = mount(MmCalendarTooltip, {
-      props: {
-        date: '2026-11-05',
-        items: [tvItem, movieItem],
-      },
-    })
+    mountTooltip([tvItem, movieItem])
 
-    expect(wrapper.text()).toContain('Example Series')
-    expect(wrapper.text()).toContain('S02E03 · The Adventure')
-    expect(wrapper.text()).toContain('Example Movie')
-    expect(wrapper.text()).toContain('2026')
+    expect(tooltip.itemTitle(0).text()).toBe('Example Series')
+    expect(tooltip.itemSubtitle(0).text()).toBe('S02E03 · The Adventure')
+    expect(tooltip.itemTitle(1).text()).toBe('Example Movie')
+    expect(tooltip.itemSubtitle(1).text()).toBe('2026')
   })
 
   it('renders media indicators', () => {
-    const wrapper = mount(MmCalendarTooltip, {
-      props: {
-        date: '2026-11-05',
-        items: [tvItem, movieItem],
-      },
-    })
+    mountTooltip([tvItem, movieItem])
 
-    expect(wrapper.findAll('.calendar-tooltip__indicator--tv')).toHaveLength(1)
-    expect(wrapper.findAll('.calendar-tooltip__indicator--movie')).toHaveLength(1)
+    expect(tooltip.tvIndicators().exists()).toBe(true)
+    expect(tooltip.movieIndicators().exists()).toBe(true)
+    expect(tooltip.decorativeIndicators().exists()).toBe(true)
   })
 
   it('shows the plural release count', () => {
-    const wrapper = mount(MmCalendarTooltip, {
-      props: {
-        date: '2026-11-05',
-        items: [tvItem, movieItem],
-      },
-    })
+    mountTooltip([tvItem, movieItem])
 
-    expect(wrapper.get('.calendar-tooltip__count').text()).toBe('2 releases')
+    expect(tooltip.count().text()).toBe('2 releases')
   })
 
   it('shows the singular release count', () => {
-    const wrapper = mount(MmCalendarTooltip, {
-      props: {
-        date: '2026-11-05',
-        items: [tvItem],
-      },
-    })
+    mountTooltip([tvItem])
 
-    expect(wrapper.get('.calendar-tooltip__count').text()).toBe('1 release')
+    expect(tooltip.count().text()).toBe('1 release')
   })
 
   it('shows zero releases when the day is empty', () => {
-    const wrapper = mount(MmCalendarTooltip, {
-      props: {
-        date: '2026-11-05',
-        items: [],
-      },
-    })
+    mountTooltip([])
 
-    expect(wrapper.get('.calendar-tooltip__count').text()).toBe('0 releases')
-    expect(wrapper.findAll('.calendar-tooltip__item')).toHaveLength(0)
+    expect(tooltip.count().text()).toBe('0 releases')
+    expect(tooltip.firstItem().exists()).toBe(false)
   })
 
   it('limits the preview to four releases', () => {
@@ -105,26 +89,18 @@ describe('MmCalendarTooltip', () => {
       title: `Series ${index}`,
     }))
 
-    const wrapper = mount(MmCalendarTooltip, {
-      props: {
-        date: '2026-11-05',
-        items,
-      },
-    })
+    mountTooltip(items)
 
-    expect(wrapper.findAll('.calendar-tooltip__item')).toHaveLength(4)
-    expect(wrapper.get('.calendar-tooltip__remaining').text()).toBe('+2 more')
-    expect(wrapper.get('.calendar-tooltip__count').text()).toBe('6 releases')
+    expect(tooltip.item(0).exists()).toBe(true)
+    expect(tooltip.item(3).exists()).toBe(true)
+    expect(tooltip.item(4).exists()).toBe(false)
+    expect(tooltip.remaining().text()).toBe('+2 more')
+    expect(tooltip.count().text()).toBe('6 releases')
   })
 
   it('handles invalid dates', () => {
-    const wrapper = mount(MmCalendarTooltip, {
-      props: {
-        date: 'invalid',
-        items: [tvItem],
-      },
-    })
+    mountTooltip([tvItem], 'invalid')
 
-    expect(wrapper.text()).toContain('Unknown date')
+    expect(tooltip.date().text()).toBe('Unknown date')
   })
 })

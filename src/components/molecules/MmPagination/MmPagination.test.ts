@@ -1,165 +1,171 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmPagination from './MmPagination.vue'
+import { mmPaginationSelectors } from '../../../test/selectors/molecules/mmPagination.selectors'
+
+let wrapper: VueWrapper
+
+const pagination = mmPaginationSelectors((selector) => {
+  if (wrapper.element instanceof Element && wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^nav\.pagination\[aria-label="Pagination"\] /, ''))
+})
 
 function mountPagination(page = 1, totalPages = 5) {
-  return mount(MmPagination, {
-    props: {
-      page,
-      totalPages,
-    },
-  })
+  wrapper = mount(MmPagination, { props: { page, totalPages } })
+  return wrapper
 }
 
 describe('MmPagination', () => {
   it('renders the current page and total pages', () => {
-    const wrapper = mountPagination(3, 5)
+    mountPagination(3, 5)
 
-    expect(wrapper.get('.pagination-label').text()).toBe('Page 3 of 5')
+    expect(pagination.label().text()).toBe('Page 3 of 5')
   })
 
   it('renders previous and next navigation buttons', () => {
-    const wrapper = mountPagination()
+    mountPagination()
 
-    expect(wrapper.find('[aria-label="Previous page"]').exists()).toBe(true)
-    expect(wrapper.find('[aria-label="Next page"]').exists()).toBe(true)
+    expect(pagination.previous().exists()).toBe(true)
+    expect(pagination.next().exists()).toBe(true)
   })
 
   it('renders previous and next arrow icons', () => {
-    const wrapper = mountPagination()
+    mountPagination()
 
-    expect(wrapper.find('[aria-label="Previous page"] svg').exists()).toBe(true)
-    expect(wrapper.find('[aria-label="Next page"] svg').exists()).toBe(true)
+    expect(pagination.previousIcon().exists()).toBe(true)
+    expect(pagination.nextIcon().exists()).toBe(true)
   })
 
   it('hides decorative arrow icons from assistive technology', () => {
-    const wrapper = mountPagination()
+    mountPagination()
 
-    expect(wrapper.get('[aria-label="Previous page"] svg').attributes('aria-hidden')).toBe('true')
-    expect(wrapper.get('[aria-label="Next page"] svg').attributes('aria-hidden')).toBe('true')
+    expect(pagination.decorativePreviousIcon().exists()).toBe(true)
+    expect(pagination.decorativeNextIcon().exists()).toBe(true)
+    expect(pagination.previousIcon().attributes('aria-hidden')).toBe('true')
+    expect(pagination.nextIcon().attributes('aria-hidden')).toBe('true')
   })
 
   it('provides an accessible pagination navigation landmark', () => {
-    const wrapper = mountPagination()
+    mountPagination()
 
-    expect(wrapper.get('nav.pagination').attributes('aria-label')).toBe('Pagination')
+    expect(pagination.get().element.tagName).toBe('NAV')
+    expect(pagination.get().attributes('aria-label')).toBe('Pagination')
   })
 
   it('announces page changes to assistive technology', () => {
-    const wrapper = mountPagination(3, 5)
+    mountPagination(3, 5)
 
-    const label = wrapper.get('.pagination-label')
-
-    expect(label.attributes('aria-live')).toBe('polite')
-    expect(label.attributes('aria-atomic')).toBe('true')
+    expect(pagination.liveLabel().exists()).toBe(true)
+    expect(pagination.label().attributes('aria-live')).toBe('polite')
+    expect(pagination.label().attributes('aria-atomic')).toBe('true')
   })
 
   it('disables the previous arrow on the first page', () => {
-    const wrapper = mountPagination(1, 5)
+    mountPagination(1, 5)
 
-    expect(wrapper.get('[aria-label="Previous page"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('[aria-label="Next page"]').attributes('disabled')).toBeUndefined()
+    expect(pagination.previousDisabled().exists()).toBe(true)
+    expect(pagination.nextEnabled().exists()).toBe(true)
   })
 
   it('disables the next arrow on the last page', () => {
-    const wrapper = mountPagination(5, 5)
+    mountPagination(5, 5)
 
-    expect(wrapper.get('[aria-label="Next page"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('[aria-label="Previous page"]').attributes('disabled')).toBeUndefined()
+    expect(pagination.nextDisabled().exists()).toBe(true)
+    expect(pagination.previousEnabled().exists()).toBe(true)
   })
 
   it('enables both arrows on intermediate pages', () => {
-    const wrapper = mountPagination(3, 5)
+    mountPagination(3, 5)
 
-    expect(wrapper.get('[aria-label="Previous page"]').attributes('disabled')).toBeUndefined()
-    expect(wrapper.get('[aria-label="Next page"]').attributes('disabled')).toBeUndefined()
+    expect(pagination.previousEnabled().exists()).toBe(true)
+    expect(pagination.nextEnabled().exists()).toBe(true)
   })
 
   it('emits the previous page', async () => {
-    const wrapper = mountPagination(3, 5)
+    mountPagination(3, 5)
 
-    await wrapper.get('[aria-label="Previous page"]').trigger('click')
+    await pagination.previous().trigger('click')
 
     expect(wrapper.emitted('update:page')).toEqual([[2]])
   })
 
   it('emits the next page', async () => {
-    const wrapper = mountPagination(3, 5)
+    mountPagination(3, 5)
 
-    await wrapper.get('[aria-label="Next page"]').trigger('click')
+    await pagination.next().trigger('click')
 
     expect(wrapper.emitted('update:page')).toEqual([[4]])
   })
 
   it('does not emit when clicking the disabled previous arrow', async () => {
-    const wrapper = mountPagination(1, 5)
+    mountPagination(1, 5)
 
-    await wrapper.get('[aria-label="Previous page"]').trigger('click')
+    await pagination.previous().trigger('click')
 
     expect(wrapper.emitted('update:page')).toBeUndefined()
   })
 
   it('does not emit when clicking the disabled next arrow', async () => {
-    const wrapper = mountPagination(5, 5)
+    mountPagination(5, 5)
 
-    await wrapper.get('[aria-label="Next page"]').trigger('click')
+    await pagination.next().trigger('click')
 
     expect(wrapper.emitted('update:page')).toBeUndefined()
   })
 
   it('handles large page counts', () => {
-    const wrapper = mountPagination(25, 50)
+    mountPagination(25, 50)
 
-    expect(wrapper.get('.pagination-label').text()).toBe('Page 25 of 50')
-    expect(wrapper.findAll('.pagination-arrow')).toHaveLength(2)
+    expect(pagination.label().text()).toBe('Page 25 of 50')
+    expect(wrapper.findAll('button.pagination-arrow')).toHaveLength(2)
   })
 
   it('does not render numbered page buttons or ellipses', () => {
-    const wrapper = mountPagination(25, 50)
+    mountPagination(25, 50)
 
-    expect(wrapper.find('.pagination-page').exists()).toBe(false)
-    expect(wrapper.find('.pagination-ellipsis').exists()).toBe(false)
+    expect(pagination.numberedPages().exists()).toBe(false)
+    expect(pagination.ellipses().exists()).toBe(false)
   })
 
   it('hides pagination when there is only one page', () => {
-    const wrapper = mountPagination(1, 1)
+    mountPagination(1, 1)
 
-    expect(wrapper.find('.pagination').exists()).toBe(false)
+    expect(pagination.get().exists()).toBe(false)
   })
 
   it('hides pagination when there are zero pages', () => {
-    const wrapper = mountPagination(1, 0)
+    mountPagination(1, 0)
 
-    expect(wrapper.find('.pagination').exists()).toBe(false)
+    expect(pagination.get().exists()).toBe(false)
   })
 
   it('updates when the current page changes', async () => {
-    const wrapper = mountPagination(1, 5)
+    mountPagination(1, 5)
 
     await wrapper.setProps({ page: 3 })
 
-    expect(wrapper.get('.pagination-label').text()).toBe('Page 3 of 5')
+    expect(pagination.label().text()).toBe('Page 3 of 5')
   })
 
   it('updates when the total page count changes', async () => {
-    const wrapper = mountPagination(3, 5)
+    mountPagination(3, 5)
 
     await wrapper.setProps({ totalPages: 10 })
 
-    expect(wrapper.get('.pagination-label').text()).toBe('Page 3 of 10')
+    expect(pagination.label().text()).toBe('Page 3 of 10')
   })
 
   it('clamps the current page to the last available page', () => {
-    const wrapper = mountPagination(10, 5)
+    mountPagination(10, 5)
 
-    expect(wrapper.get('.pagination-label').text()).toBe('Page 5 of 5')
-    expect(wrapper.get('[aria-label="Next page"]').attributes('disabled')).toBeDefined()
+    expect(pagination.label().text()).toBe('Page 5 of 5')
+    expect(pagination.nextDisabled().exists()).toBe(true)
   })
 
   it('clamps the current page to at least one', () => {
-    const wrapper = mountPagination(0, 5)
+    mountPagination(0, 5)
 
-    expect(wrapper.get('.pagination-label').text()).toBe('Page 1 of 5')
-    expect(wrapper.get('[aria-label="Previous page"]').attributes('disabled')).toBeDefined()
+    expect(pagination.label().text()).toBe('Page 1 of 5')
+    expect(pagination.previousDisabled().exists()).toBe(true)
   })
 })

@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmButton from './MmButton.vue'
+import { mmButtonSelectors } from '../../../test/selectors/atoms/mmButton.selectors'
+
+let wrapper: VueWrapper
+
+const button = mmButtonSelectors((selector) => {
+  if (wrapper.element.matches(selector)) {
+    return wrapper
+  }
+
+  return wrapper.find(selector)
+})
 
 describe('MmButton', () => {
   it('renders its default slot', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       slots: {
         default: 'Save settings',
       },
@@ -14,23 +25,23 @@ describe('MmButton', () => {
   })
 
   it('uses the secondary variant by default', () => {
-    const wrapper = mount(MmButton)
+    wrapper = mount(MmButton)
 
-    expect(wrapper.classes()).toContain('button--secondary')
+    expect(button.variant('secondary').exists()).toBe(true)
   })
 
   it('applies the selected variant', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         variant: 'primary',
       },
     })
 
-    expect(wrapper.classes()).toContain('button--primary')
+    expect(button.variant('primary').exists()).toBe(true)
   })
 
   it('supports the pagination variant', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         variant: 'pagination',
         size: 'small',
@@ -40,13 +51,13 @@ describe('MmButton', () => {
       },
     })
 
-    expect(wrapper.classes()).toContain('button--pagination')
-    expect(wrapper.classes()).toContain('button--small')
+    expect(button.variant('pagination').exists()).toBe(true)
+    expect(button.size('small').exists()).toBe(true)
     expect(wrapper.text()).toBe('3')
   })
 
   it('supports an active pagination button', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         variant: 'pagination',
         disabled: true,
@@ -60,14 +71,14 @@ describe('MmButton', () => {
       },
     })
 
-    expect(wrapper.classes()).toContain('button--pagination')
-    expect(wrapper.attributes('aria-current')).toBe('page')
+    expect(button.variant('pagination').exists()).toBe(true)
+    expect(button.currentPage().exists()).toBe(true)
+    expect(button.disabled().exists()).toBe(true)
     expect(wrapper.attributes('aria-label')).toBe('Page 3')
-    expect(wrapper.attributes('disabled')).toBeDefined()
   })
 
   it('does not emit clicks from an active pagination button', async () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         variant: 'pagination',
         disabled: true,
@@ -86,23 +97,23 @@ describe('MmButton', () => {
   })
 
   it('applies the selected size', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         size: 'small',
       },
     })
 
-    expect(wrapper.classes()).toContain('button--small')
+    expect(button.size('small').exists()).toBe(true)
   })
 
   it('uses type="button" by default', () => {
-    const wrapper = mount(MmButton)
+    wrapper = mount(MmButton)
 
     expect(wrapper.attributes('type')).toBe('button')
   })
 
   it('supports submit buttons', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         type: 'submit',
       },
@@ -112,7 +123,7 @@ describe('MmButton', () => {
   })
 
   it('emits a click event when clicked', async () => {
-    const wrapper = mount(MmButton)
+    wrapper = mount(MmButton)
 
     await wrapper.trigger('click')
 
@@ -120,7 +131,7 @@ describe('MmButton', () => {
   })
 
   it('does not emit clicks when disabled', async () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         disabled: true,
       },
@@ -129,29 +140,29 @@ describe('MmButton', () => {
     await wrapper.trigger('click')
 
     expect(wrapper.emitted('click')).toBeUndefined()
-    expect(wrapper.attributes('disabled')).toBeDefined()
+    expect(button.disabled().exists()).toBe(true)
   })
 
   it('shows a spinner when loading', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         loading: true,
       },
     })
 
-    expect(wrapper.find('.button__spinner').exists()).toBe(true)
-    expect(wrapper.attributes('aria-busy')).toBe('true')
+    expect(button.spinner().exists()).toBe(true)
+    expect(button.loading().exists()).toBe(true)
   })
 
   it('does not show a spinner when not loading', () => {
-    const wrapper = mount(MmButton)
+    wrapper = mount(MmButton)
 
-    expect(wrapper.find('.button__spinner').exists()).toBe(false)
-    expect(wrapper.attributes('aria-busy')).toBeUndefined()
+    expect(button.spinner().exists()).toBe(false)
+    expect(button.loading().exists()).toBe(false)
   })
 
   it('does not emit clicks while loading', async () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         loading: true,
       },
@@ -160,11 +171,11 @@ describe('MmButton', () => {
     await wrapper.trigger('click')
 
     expect(wrapper.emitted('click')).toBeUndefined()
-    expect(wrapper.attributes('disabled')).toBeDefined()
+    expect(button.disabled().exists()).toBe(true)
   })
 
   it('supports full-width layout', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         block: true,
       },
@@ -174,7 +185,7 @@ describe('MmButton', () => {
   })
 
   it('renders without an icon by default', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       slots: {
         default: 'Save',
       },
@@ -185,7 +196,7 @@ describe('MmButton', () => {
   })
 
   it('renders an icon alongside its label', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         icon: 'refresh',
       },
@@ -196,11 +207,11 @@ describe('MmButton', () => {
 
     expect(wrapper.find('svg').exists()).toBe(true)
     expect(wrapper.text()).toBe('Refresh')
-    expect(wrapper.find('.button__content').exists()).toBe(true)
+    expect(button.content().exists()).toBe(true)
   })
 
   it('supports icon-only layout', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         iconOnly: true,
         icon: 'settings',
@@ -210,21 +221,21 @@ describe('MmButton', () => {
       },
     })
 
-    expect(wrapper.classes()).toContain('button--icon-only')
+    expect(button.iconOnly().exists()).toBe(true)
     expect(wrapper.attributes('aria-label')).toBe('Open settings')
     expect(wrapper.find('svg').exists()).toBe(true)
     expect(wrapper.find('svg').attributes('aria-hidden')).toBe('true')
-    expect(wrapper.find('.button__content').exists()).toBe(false)
+    expect(button.content().exists()).toBe(false)
   })
 
   it('does not use icon-only layout by default', () => {
-    const wrapper = mount(MmButton)
+    wrapper = mount(MmButton)
 
-    expect(wrapper.classes()).not.toContain('button--icon-only')
+    expect(button.iconOnly().exists()).toBe(false)
   })
 
   it('supports small icon-only buttons', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         iconOnly: true,
         icon: 'refresh',
@@ -235,14 +246,14 @@ describe('MmButton', () => {
       },
     })
 
-    expect(wrapper.classes()).toContain('button--icon-only')
-    expect(wrapper.classes()).toContain('button--small')
+    expect(button.iconOnly().exists()).toBe(true)
+    expect(button.size('small').exists()).toBe(true)
     expect(wrapper.get('svg').attributes('width')).toBe('16')
     expect(wrapper.get('svg').attributes('height')).toBe('16')
   })
 
   it('uses the correct icon size for standard buttons', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         icon: 'refresh',
         size: 'medium',
@@ -257,7 +268,7 @@ describe('MmButton', () => {
   })
 
   it('uses the correct icon size for medium icon-only buttons', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         icon: 'settings',
         iconOnly: true,
@@ -270,7 +281,7 @@ describe('MmButton', () => {
   })
 
   it('hides the icon while loading', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         icon: 'refresh',
         loading: true,
@@ -281,12 +292,12 @@ describe('MmButton', () => {
     })
 
     expect(wrapper.find('svg').exists()).toBe(false)
-    expect(wrapper.find('.button__spinner').exists()).toBe(true)
+    expect(button.spinner().exists()).toBe(true)
     expect(wrapper.text()).toBe('Refreshing...')
   })
 
   it('shows only the spinner when an icon-only button is loading', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         icon: 'refresh',
         iconOnly: true,
@@ -298,50 +309,50 @@ describe('MmButton', () => {
     })
 
     expect(wrapper.find('svg').exists()).toBe(false)
-    expect(wrapper.find('.button__spinner').exists()).toBe(true)
-    expect(wrapper.find('.button__content').exists()).toBe(false)
-    expect(wrapper.attributes('aria-busy')).toBe('true')
+    expect(button.spinner().exists()).toBe(true)
+    expect(button.content().exists()).toBe(false)
+    expect(button.loading().exists()).toBe(true)
   })
 
   it('reacts when its props change', async () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         variant: 'secondary',
       },
     })
 
-    expect(wrapper.classes()).toContain('button--secondary')
+    expect(button.variant('secondary').exists()).toBe(true)
 
     await wrapper.setProps({
       variant: 'danger',
     })
 
-    expect(wrapper.classes()).toContain('button--danger')
-    expect(wrapper.classes()).not.toContain('button--secondary')
+    expect(button.variant('danger').exists()).toBe(true)
+    expect(button.variant('secondary').exists()).toBe(false)
   })
 
   it('reacts when icon-only changes', async () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         iconOnly: false,
         icon: 'settings',
       },
     })
 
-    expect(wrapper.classes()).not.toContain('button--icon-only')
-    expect(wrapper.find('.button__content').exists()).toBe(true)
+    expect(button.iconOnly().exists()).toBe(false)
+    expect(button.content().exists()).toBe(true)
 
     await wrapper.setProps({
       iconOnly: true,
     })
 
-    expect(wrapper.classes()).toContain('button--icon-only')
-    expect(wrapper.find('.button__content').exists()).toBe(false)
+    expect(button.iconOnly().exists()).toBe(true)
+    expect(button.content().exists()).toBe(false)
     expect(wrapper.find('svg').exists()).toBe(true)
   })
 
   it('reacts when the icon changes', async () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       props: {
         icon: 'settings',
       },
@@ -357,7 +368,7 @@ describe('MmButton', () => {
   })
 
   it('forwards accessibility attributes to the native button', () => {
-    const wrapper = mount(MmButton, {
+    wrapper = mount(MmButton, {
       attrs: {
         'aria-current': 'page',
         'aria-label': 'Requests',
@@ -365,7 +376,7 @@ describe('MmButton', () => {
     })
 
     expect(wrapper.element.tagName).toBe('BUTTON')
-    expect(wrapper.attributes('aria-current')).toBe('page')
+    expect(button.currentPage().exists()).toBe(true)
     expect(wrapper.attributes('aria-label')).toBe('Requests')
   })
 })

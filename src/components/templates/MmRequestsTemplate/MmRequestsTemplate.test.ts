@@ -1,102 +1,95 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmRequestsTemplate from './MmRequestsTemplate.vue'
+import { mmRequestsTemplateSelectors } from '../../../test/selectors/templates/mmRequestsTemplate.selectors'
+
+let wrapper: VueWrapper
+
+const template = mmRequestsTemplateSelectors((selector) => {
+  if (wrapper.element instanceof Element && wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^\.requests-template /, ''))
+})
 
 describe('MmRequestsTemplate', () => {
   it('renders the Requests heading', () => {
-    const wrapper = mount(MmRequestsTemplate)
+    wrapper = mount(MmRequestsTemplate)
 
-    expect(wrapper.get('#requests-title').text()).toBe('Requests')
+    expect(template.title().text()).toBe('Requests')
   })
 
   it('renders the description', () => {
-    const wrapper = mount(MmRequestsTemplate)
+    wrapper = mount(MmRequestsTemplate)
 
-    expect(wrapper.text()).toContain('Browse media requests from Seerr.')
+    expect(template.description().text()).toBe('Browse media requests from Seerr.')
   })
 
   it('renders default slot content', () => {
-    const wrapper = mount(MmRequestsTemplate, {
-      slots: {
-        default: '<article>Example request</article>',
-      },
+    wrapper = mount(MmRequestsTemplate, {
+      slots: { default: '<article>Example request</article>' },
     })
 
-    expect(wrapper.get('.requests-template__content').text()).toBe('Example request')
+    expect(template.content().text()).toBe('Example request')
   })
 
   it('renders filters when provided', () => {
-    const wrapper = mount(MmRequestsTemplate, {
-      slots: {
-        filters: '<button>Pending</button>',
-      },
+    wrapper = mount(MmRequestsTemplate, {
+      slots: { filters: '<button>Pending</button>' },
     })
 
-    expect(wrapper.get('.requests-template__filters button').text()).toBe('Pending')
+    expect(template.filterButtons().text()).toBe('Pending')
   })
 
   it('renders pagination when provided', () => {
-    const wrapper = mount(MmRequestsTemplate, {
-      slots: {
-        pagination: '<button>Next</button>',
-      },
+    wrapper = mount(MmRequestsTemplate, {
+      slots: { pagination: '<button>Next</button>' },
     })
 
-    expect(wrapper.get('.requests-template__pagination button').text()).toBe('Next')
+    expect(template.paginationButtons().text()).toBe('Next')
   })
 
   it('renders actions when provided', () => {
-    const wrapper = mount(MmRequestsTemplate, {
-      slots: {
-        actions: '<button>Refresh</button>',
-      },
+    wrapper = mount(MmRequestsTemplate, {
+      slots: { actions: '<button>Refresh</button>' },
     })
 
-    expect(wrapper.get('.requests-template__actions button').text()).toBe('Refresh')
+    expect(template.actionButtons().text()).toBe('Refresh')
   })
 
   it('does not render unused optional sections', () => {
-    const wrapper = mount(MmRequestsTemplate)
+    wrapper = mount(MmRequestsTemplate)
 
-    expect(wrapper.find('.requests-template__filters').exists()).toBe(false)
-    expect(wrapper.find('.requests-template__pagination').exists()).toBe(false)
-    expect(wrapper.find('.requests-template__actions').exists()).toBe(false)
+    expect(template.filters().exists()).toBe(false)
+    expect(template.pagination().exists()).toBe(false)
+    expect(template.actions().exists()).toBe(false)
   })
 
   it('provides an accessible label for filters', () => {
-    const wrapper = mount(MmRequestsTemplate, {
-      slots: {
-        filters: '<button>All</button>',
-      },
+    wrapper = mount(MmRequestsTemplate, {
+      slots: { filters: '<button>All</button>' },
     })
 
-    expect(wrapper.get('.requests-template__filters').attributes('aria-label')).toBe(
-      'Request filters',
-    )
+    expect(template.labelledFilters().exists()).toBe(true)
+    expect(template.filters().attributes('aria-label')).toBe('Request filters')
   })
 
   it('provides an accessible label for pagination', () => {
-    const wrapper = mount(MmRequestsTemplate, {
-      slots: {
-        pagination: '<button>Next</button>',
-      },
+    wrapper = mount(MmRequestsTemplate, {
+      slots: { pagination: '<button>Next</button>' },
     })
 
-    expect(wrapper.get('.requests-template__pagination').attributes('aria-label')).toBe(
-      'Request pagination',
-    )
+    expect(template.labelledPagination().exists()).toBe(true)
+    expect(template.pagination().attributes('aria-label')).toBe('Request pagination')
   })
 
   it('associates the content with the Requests heading', () => {
-    const wrapper = mount(MmRequestsTemplate)
+    wrapper = mount(MmRequestsTemplate)
 
-    expect(wrapper.get('.requests-template__content').attributes('aria-labelledby')).toBe(
-      'requests-title',
-    )
+    expect(template.labelledContent().exists()).toBe(true)
+    expect(template.title().attributes('id')).toBe('requests-title')
   })
 
   it('renders all slots together', () => {
-    const wrapper = mount(MmRequestsTemplate, {
+    wrapper = mount(MmRequestsTemplate, {
       slots: {
         actions: '<button>Refresh</button>',
         filters: '<button>Approved</button>',
@@ -105,9 +98,9 @@ describe('MmRequestsTemplate', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Refresh')
-    expect(wrapper.text()).toContain('Approved')
-    expect(wrapper.text()).toContain('Movie request')
-    expect(wrapper.text()).toContain('Previous')
+    expect(template.actions().text()).toContain('Refresh')
+    expect(template.filters().text()).toContain('Approved')
+    expect(template.content().text()).toContain('Movie request')
+    expect(template.pagination().text()).toContain('Previous')
   })
 })

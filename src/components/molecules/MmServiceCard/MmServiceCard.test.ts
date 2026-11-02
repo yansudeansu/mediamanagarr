@@ -1,31 +1,42 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmServiceCard from './MmServiceCard.vue'
+import { mmServiceCardSelectors } from '../../../test/selectors/molecules/mmServiceCard.selectors'
+import { mmStatusBadgeSelectors } from '../../../test/selectors/atoms/mmStatusBadge.selectors'
+
+let wrapper: VueWrapper
+
+const query = (selector: string) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^button\.service-card /, ''))
+}
+
+const service = mmServiceCardSelectors(query)
+const badge = mmStatusBadgeSelectors(query)
+
+function createWrapper(props: Partial<InstanceType<typeof MmServiceCard>['$props']> = {}) {
+  wrapper = mount(MmServiceCard, {
+    props: {
+      name: 'Example Service',
+      status: 'not-configured',
+      ...props,
+    },
+  })
+  return wrapper
+}
 
 describe('MmServiceCard', () => {
-  function createWrapper(props: Partial<InstanceType<typeof MmServiceCard>['$props']> = {}) {
-    return mount(MmServiceCard, {
-      props: {
-        name: 'Example Service',
-        status: 'not-configured',
-        ...props,
-      },
-    })
-  }
-
   describe('rendering', () => {
     it('renders the service name', () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      expect(wrapper.get('.service-card__name').text()).toBe('Example Service')
+      expect(service.name().text()).toBe('Example Service')
     })
 
     it('renders the connection status', () => {
-      const wrapper = createWrapper({
-        status: 'connected',
-      })
+      createWrapper({ status: 'connected' })
 
-      expect(wrapper.get('.status-badge__label').text()).toBe('Connected')
+      expect(badge.label().text()).toBe('Connected')
     })
 
     it.each([
@@ -34,86 +45,80 @@ describe('MmServiceCard', () => {
       ['connected', 'Connected', 'success'],
       ['failed', 'Failed', 'danger'],
     ] as const)('renders the %s status', (status, label, variant) => {
-      const wrapper = createWrapper({ status })
+      createWrapper({ status })
 
-      expect(wrapper.get('.status-badge__label').text()).toBe(label)
-      expect(wrapper.get('.status-badge').classes()).toContain(`status-badge--${variant}`)
+      expect(badge.label().text()).toBe(label)
+      expect(badge.variant(variant).exists()).toBe(true)
     })
 
     it('renders as a native button', () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      expect(wrapper.element.tagName).toBe('BUTTON')
-      expect(wrapper.attributes('type')).toBe('button')
+      expect(service.get().element.tagName).toBe('BUTTON')
+      expect(service.get().attributes('type')).toBe('button')
     })
 
     it('does not render a service description inside the selector row', () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      expect(wrapper.text()).not.toContain('Service description')
+      expect(service.get().text()).not.toContain('Service description')
     })
 
     it('does not render a chevron', () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      expect(wrapper.find('.service-card__chevron').exists()).toBe(false)
+      expect(service.chevron().exists()).toBe(false)
     })
 
     it('reacts to name changes', async () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      await wrapper.setProps({
-        name: 'Another Service',
-      })
+      await wrapper.setProps({ name: 'Another Service' })
 
-      expect(wrapper.get('.service-card__name').text()).toBe('Another Service')
+      expect(service.name().text()).toBe('Another Service')
     })
 
     it('reacts to status changes', async () => {
-      const wrapper = createWrapper({
-        status: 'configured',
-      })
+      createWrapper({ status: 'configured' })
 
-      expect(wrapper.get('.status-badge__label').text()).toBe('Configured')
+      expect(badge.label().text()).toBe('Configured')
 
-      await wrapper.setProps({
-        status: 'connected',
-      })
+      await wrapper.setProps({ status: 'connected' })
 
-      expect(wrapper.get('.status-badge__label').text()).toBe('Connected')
+      expect(badge.label().text()).toBe('Connected')
     })
   })
 
   describe('interaction', () => {
     it('emits select when clicked', async () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      await wrapper.trigger('click')
+      await service.get().trigger('click')
 
       expect(wrapper.emitted('select')).toHaveLength(1)
     })
 
     it('does not emit select before interaction', () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
       expect(wrapper.emitted('select')).toBeUndefined()
     })
 
     it('emits select on repeated clicks', async () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      await wrapper.trigger('click')
-      await wrapper.trigger('click')
+      await service.get().trigger('click')
+      await service.get().trigger('click')
 
       expect(wrapper.emitted('select')).toHaveLength(2)
     })
 
     it('does not emit select when disabled', async () => {
-      const wrapper = createWrapper({
-        disabled: true,
-      })
+      createWrapper({ disabled: true })
 
-      await wrapper.trigger('click')
+      expect(service.disabled().exists()).toBe(true)
+
+      await service.get().trigger('click')
 
       expect(wrapper.emitted('select')).toBeUndefined()
     })
@@ -121,112 +126,96 @@ describe('MmServiceCard', () => {
 
   describe('selected state', () => {
     it('supports the selected state', () => {
-      const wrapper = createWrapper({
-        selected: true,
-      })
+      createWrapper({ selected: true })
 
-      expect(wrapper.classes()).toContain('service-card--selected')
-      expect(wrapper.attributes('aria-current')).toBe('true')
+      expect(service.selected().exists()).toBe(true)
+      expect(service.get().classes()).toContain('service-card--selected')
+      expect(service.get().attributes('aria-current')).toBe('true')
     })
 
     it('does not mark unselected cards as current', () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      expect(wrapper.classes()).not.toContain('service-card--selected')
-      expect(wrapper.attributes('aria-current')).toBeUndefined()
+      expect(service.unselected().exists()).toBe(true)
+      expect(service.get().classes()).not.toContain('service-card--selected')
+      expect(service.get().attributes('aria-current')).toBeUndefined()
     })
 
     it('reacts when the selected state changes', async () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      await wrapper.setProps({
-        selected: true,
-      })
+      await wrapper.setProps({ selected: true })
 
-      expect(wrapper.classes()).toContain('service-card--selected')
-      expect(wrapper.attributes('aria-current')).toBe('true')
+      expect(service.selected().exists()).toBe(true)
+      expect(service.get().attributes('aria-current')).toBe('true')
 
-      await wrapper.setProps({
-        selected: false,
-      })
+      await wrapper.setProps({ selected: false })
 
-      expect(wrapper.classes()).not.toContain('service-card--selected')
-      expect(wrapper.attributes('aria-current')).toBeUndefined()
+      expect(service.unselected().exists()).toBe(true)
+      expect(service.get().attributes('aria-current')).toBeUndefined()
     })
   })
 
   describe('disabled state', () => {
     it('supports the disabled state', () => {
-      const wrapper = createWrapper({
-        disabled: true,
-      })
+      createWrapper({ disabled: true })
 
-      expect(wrapper.attributes('disabled')).toBeDefined()
+      expect(service.disabled().exists()).toBe(true)
+      expect(service.get().attributes('disabled')).toBeDefined()
     })
 
     it('is enabled by default', () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      expect(wrapper.attributes('disabled')).toBeUndefined()
+      expect(service.enabled().exists()).toBe(true)
+      expect(service.get().attributes('disabled')).toBeUndefined()
     })
   })
 
   describe('accessibility', () => {
     it('uses visible content rather than overriding the accessible name', () => {
-      const wrapper = createWrapper({
-        status: 'connected',
-      })
+      createWrapper({ status: 'connected' })
 
-      expect(wrapper.attributes('aria-label')).toBeUndefined()
-      expect(wrapper.attributes('aria-labelledby')).toBeUndefined()
+      expect(service.customLabel().exists()).toBe(false)
+      expect(service.labelledBy().exists()).toBe(false)
     })
 
     it('includes the service name and visible status in its button content', () => {
-      const wrapper = createWrapper({
-        status: 'connected',
-      })
+      createWrapper({ status: 'connected' })
 
-      expect(wrapper.text()).toContain('Example Service')
-      expect(wrapper.text()).toContain('Connected')
+      expect(service.get().text()).toContain('Example Service')
+      expect(service.get().text()).toContain('Connected')
     })
 
     it('includes the visible not-configured label in its button content', () => {
-      const wrapper = createWrapper({
-        status: 'not-configured',
-      })
+      createWrapper({ status: 'not-configured' })
 
-      expect(wrapper.text()).toContain('Example Service')
-      expect(wrapper.text()).toContain('Not set')
+      expect(service.get().text()).toContain('Example Service')
+      expect(service.get().text()).toContain('Not set')
     })
 
     it('updates its visible status when the connection changes', async () => {
-      const wrapper = createWrapper({
-        status: 'configured',
-      })
+      createWrapper({ status: 'configured' })
 
-      expect(wrapper.text()).toContain('Configured')
+      expect(badge.label().text()).toBe('Configured')
 
-      await wrapper.setProps({
-        status: 'failed',
-      })
+      await wrapper.setProps({ status: 'failed' })
 
-      expect(wrapper.text()).toContain('Failed')
+      expect(badge.label().text()).toBe('Failed')
     })
 
     it('updates its visible service name when the name changes', async () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      await wrapper.setProps({
-        name: 'Another Service',
-      })
+      await wrapper.setProps({ name: 'Another Service' })
 
-      expect(wrapper.text()).toContain('Another Service')
+      expect(service.name().text()).toBe('Another Service')
     })
 
     it('does not add a custom keyboard role to the native button', () => {
-      const wrapper = createWrapper()
+      createWrapper()
 
-      expect(wrapper.attributes('role')).toBeUndefined()
+      expect(service.customRole().exists()).toBe(false)
     })
   })
 })

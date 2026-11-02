@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import MmCalendarView from './MmCalendarView.vue'
 import MmCalendarHeader from '../components/molecules/MmCalendarHeader/MmCalendarHeader.vue'
 import MmCalendarGrid from '../components/organisms/MmCalendarGrid/MmCalendarGrid.vue'
 import MmCalendarDetails from '../components/organisms/MmCalendarDetails/MmCalendarDetails.vue'
 import MmFilterGroup from '../components/molecules/MmFilterGroup/MmFilterGroup.vue'
-import MmButton from '../components/atoms/MmButton/MmButton.vue'
 import type { CalendarItem, CalendarResult } from '../types/calendar'
 import { sendBackgroundMessage } from '../utils/background-messaging'
+import { mmCalendarViewSelectors } from '../test/selectors/views/mmCalendarView.selectors'
 
 vi.mock('../utils/background-messaging', () => ({
   sendBackgroundMessage: vi.fn(),
@@ -48,14 +48,16 @@ const calendar: CalendarResult = {
 const storageGet = vi.fn()
 const storageSet = vi.fn()
 
-function mountView() {
-  return mount(MmCalendarView)
-}
+let wrapper: VueWrapper
 
-function findActionButton(wrapper: ReturnType<typeof mountView>, label: string) {
+const view = mmCalendarViewSelectors((selector) => {
+  if (wrapper.element instanceof Element && wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^\.calendar-template /, ''))
+})
+
+function mountView() {
+  wrapper = mount(MmCalendarView)
   return wrapper
-    .findAllComponents(MmButton)
-    .find((button) => button.attributes('aria-label') === label)
 }
 
 beforeEach(() => {
@@ -94,45 +96,40 @@ describe('MmCalendarView', () => {
   })
 
   it('renders calendar releases', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarGrid).props('items')).toEqual([tvItem, movieItem])
   })
 
   it('renders the release count', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('2 releases this month')
+    expect(view.description().text()).toContain('2 releases this month')
   })
 
   it('places filters and actions in the same toolbar', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
-    const toolbar = wrapper.get('.calendar-template__toolbar')
-
-    expect(toolbar.find('.calendar-template__filters').exists()).toBe(true)
-    expect(toolbar.find('.calendar-template__actions').exists()).toBe(true)
+    expect(view.toolbar().exists()).toBe(true)
+    expect(view.filters().exists()).toBe(true)
+    expect(view.actions().exists()).toBe(true)
   })
 
   it('renders Today and Refresh outside the month navigation', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
-    const actions = wrapper.get('.calendar-template__actions')
-    const navigation = wrapper.get('.calendar-template__navigation')
-
-    expect(actions.text()).toContain('Today')
-    expect(actions.find('button[aria-label="Refresh calendar"]').exists()).toBe(true)
-
-    expect(navigation.text()).not.toContain('Today')
-    expect(navigation.find('button[aria-label="Refresh calendar"]').exists()).toBe(false)
+    expect(view.actions().text()).toContain('Today')
+    expect(view.refresh().exists()).toBe(true)
+    expect(view.navigation().text()).not.toContain('Today')
+    expect(view.navigation().find('button[aria-label="Refresh calendar"]').exists()).toBe(false)
   })
 
   it('filters releases by TV', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     wrapper.findComponent(MmFilterGroup).vm.$emit('update:modelValue', 'tv')
@@ -142,7 +139,7 @@ describe('MmCalendarView', () => {
   })
 
   it('filters releases by movies', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     wrapper.findComponent(MmFilterGroup).vm.$emit('update:modelValue', 'movie')
@@ -152,7 +149,7 @@ describe('MmCalendarView', () => {
   })
 
   it('ignores unsupported filter values', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     wrapper.findComponent(MmFilterGroup).vm.$emit('update:modelValue', 'invalid')
@@ -162,7 +159,7 @@ describe('MmCalendarView', () => {
   })
 
   it('shows releases for the selected day', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarDetails).props('items')).toEqual([tvItem])
@@ -174,7 +171,7 @@ describe('MmCalendarView', () => {
   })
 
   it('loads the previous month', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     wrapper.findComponent(MmCalendarHeader).vm.$emit('previous')
@@ -188,7 +185,7 @@ describe('MmCalendarView', () => {
   })
 
   it('loads the next month', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     wrapper.findComponent(MmCalendarHeader).vm.$emit('next')
@@ -202,20 +199,15 @@ describe('MmCalendarView', () => {
   })
 
   it('returns to today from another month', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     wrapper.findComponent(MmCalendarHeader).vm.$emit('next')
     await flushPromises()
 
-    const todayButton = wrapper
-      .get('.calendar-template__actions')
-      .findAll('button')
-      .find((button) => button.text().trim() === 'Today')
+    expect(view.today().text().trim()).toBe('Today')
 
-    expect(todayButton).toBeDefined()
-
-    await todayButton!.trigger('click')
+    await view.today().trigger('click')
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-11-01')
@@ -223,35 +215,28 @@ describe('MmCalendarView', () => {
   })
 
   it('returns to today when already viewing the current month', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-12')
     await flushPromises()
 
-    const todayButton = wrapper
-      .get('.calendar-template__actions')
-      .findAll('button')
-      .find((button) => button.text().trim() === 'Today')
+    expect(view.today().text().trim()).toBe('Today')
+    expect(view.today().attributes('disabled')).toBeUndefined()
 
-    expect(todayButton).toBeDefined()
-    expect(todayButton!.attributes('disabled')).toBeUndefined()
-
-    await todayButton!.trigger('click')
+    await view.today().trigger('click')
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarDetails).props('date')).toBe('2026-11-05')
   })
 
   it('refreshes the current month', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
-    const refreshButton = findActionButton(wrapper, 'Refresh calendar')
+    expect(view.refresh().exists()).toBe(true)
 
-    expect(refreshButton).toBeDefined()
-
-    await refreshButton!.trigger('click')
+    await view.refresh().trigger('click')
     await flushPromises()
 
     expect(mockedSendMessage).toHaveBeenCalledTimes(2)
@@ -267,22 +252,19 @@ describe('MmCalendarView', () => {
         }),
     )
 
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
-    const refreshButton = findActionButton(wrapper, 'Refresh calendar')
-
-    expect(refreshButton).toBeDefined()
-    expect(refreshButton!.attributes('disabled')).toBeDefined()
+    expect(view.refreshDisabled().exists()).toBe(true)
 
     resolveRequest?.({ success: true, calendar })
     await flushPromises()
 
-    expect(findActionButton(wrapper, 'Refresh calendar')?.attributes('disabled')).toBeUndefined()
+    expect(view.refreshEnabled().exists()).toBe(true)
   })
 
   it('persists the selected date', async () => {
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-12')
@@ -304,7 +286,7 @@ describe('MmCalendarView', () => {
       },
     })
 
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-12-01')
@@ -325,7 +307,7 @@ describe('MmCalendarView', () => {
       },
     })
 
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-11-01')
@@ -343,11 +325,11 @@ describe('MmCalendarView', () => {
       },
     })
 
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Radarr:')
-    expect(wrapper.text()).toContain('Connection timed out.')
+    expect(view.warnings().text()).toContain('Radarr:')
+    expect(view.warnings().text()).toContain('Connection timed out.')
     expect(wrapper.findComponent(MmCalendarGrid).props('items')).toEqual([tvItem])
   })
 
@@ -363,10 +345,10 @@ describe('MmCalendarView', () => {
       },
     })
 
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Connect Sonarr or Radarr in Settings')
+    expect(view.setupGuidance().text()).toContain('Connect Sonarr or Radarr in Settings')
   })
 
   it('shows a retry action when loading fails', async () => {
@@ -375,11 +357,11 @@ describe('MmCalendarView', () => {
       error: 'Background service unavailable.',
     })
 
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('Background service unavailable.')
-    expect(wrapper.text()).toContain('Retry')
+    expect(view.error().text()).toContain('Background service unavailable.')
+    expect(view.retry().text()).toContain('Retry')
   })
 
   it('ignores stale responses after changing months', async () => {
@@ -401,7 +383,7 @@ describe('MmCalendarView', () => {
         },
       })
 
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     wrapper.findComponent(MmCalendarHeader).vm.$emit('next')
@@ -433,7 +415,7 @@ describe('MmCalendarView', () => {
         }),
     )
 
-    const wrapper = mountView()
+    mountView()
     wrapper.unmount()
 
     resolveStorage?.({
@@ -459,7 +441,7 @@ describe('MmCalendarView', () => {
         }),
     )
 
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     expect(mockedSendMessage).toHaveBeenCalledWith({
@@ -502,7 +484,7 @@ describe('MmCalendarView', () => {
       })
     })
 
-    const wrapper = mountView()
+    mountView()
     await flushPromises()
 
     expect(mockedSendMessage).toHaveBeenCalledWith({

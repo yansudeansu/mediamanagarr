@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmRequestCard from './MmRequestCard.vue'
 import MmMediaPoster from '../../atoms/MmMediaPoster/MmMediaPoster.vue'
+import { mmRequestCardSelectors } from '../../../test/selectors/molecules/mmRequestCard.selectors'
+import { mmCardSelectors } from '../../../test/selectors/atoms/mmCard.selectors'
+import { mmMediaPosterSelectors } from '../../../test/selectors/atoms/mmMediaPoster.selectors'
 import type { RequestCardData } from './MmRequestCard.vue'
 
 const movieRequest: RequestCardData = {
@@ -14,56 +17,55 @@ const movieRequest: RequestCardData = {
   posterUrl: 'https://image.tmdb.org/t/p/w185/example-poster.jpg',
 }
 
+let wrapper: VueWrapper
+
+const query = (selector: string) => wrapper.find(selector)
+const request = mmRequestCardSelectors(query)
+const card = mmCardSelectors(query)
+const poster = mmMediaPosterSelectors(query)
+
 function createRequest(overrides: Partial<RequestCardData> = {}): RequestCardData {
-  return {
-    ...movieRequest,
-    ...overrides,
-  }
+  return { ...movieRequest, ...overrides }
 }
 
 function mountRequest(overrides: Partial<RequestCardData> = {}) {
-  return mount(MmRequestCard, {
-    props: {
-      request: createRequest(overrides),
-    },
+  wrapper = mount(MmRequestCard, {
+    props: { request: createRequest(overrides) },
   })
+  return wrapper
 }
 
 describe('MmRequestCard', () => {
   it('renders the request title', () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
-    expect(wrapper.get('.request-card__title').text()).toBe('Example Movie')
+    expect(request.title().text()).toBe('Example Movie')
   })
 
   it('uses the generic MmCard container', () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
-    expect(wrapper.find('.mm-card').exists()).toBe(true)
-    expect(wrapper.find('.mm-card--padding-none').exists()).toBe(true)
+    expect(card.get().exists()).toBe(true)
+    expect(card.padding('none').exists()).toBe(true)
   })
 
   it('displays Movie for movie requests', () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
-    expect(wrapper.get('.request-card__type').text()).toBe('Movie')
+    expect(request.type().text()).toBe('Movie')
   })
 
   it('displays TV Show for television requests', () => {
-    const wrapper = mountRequest({
-      type: 'tv',
-      title: 'Example Series',
-    })
+    mountRequest({ type: 'tv', title: 'Example Series' })
 
-    expect(wrapper.get('.request-card__type').text()).toBe('TV Show')
+    expect(request.type().text()).toBe('TV Show')
   })
 
   it('uses the shared media poster atom', () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
-    const poster = wrapper.getComponent(MmMediaPoster)
-
-    expect(poster.props()).toMatchObject({
+    expect(poster.get().exists()).toBe(true)
+    expect(wrapper.getComponent(MmMediaPoster).props()).toMatchObject({
       title: 'Example Movie',
       type: 'movie',
       image: 'https://image.tmdb.org/t/p/w185/example-poster.jpg',
@@ -71,47 +73,42 @@ describe('MmRequestCard', () => {
   })
 
   it('renders the supplied poster URL', () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
-    const image = wrapper.get('img')
-
-    expect(image.attributes('src')).toBe('https://image.tmdb.org/t/p/w185/example-poster.jpg')
-    expect(image.attributes('alt')).toBe('Example Movie poster')
-    expect(image.attributes('loading')).toBe('lazy')
+    expect(poster.image().attributes('src')).toBe(
+      'https://image.tmdb.org/t/p/w185/example-poster.jpg',
+    )
+    expect(poster.image().attributes('alt')).toBe('Example Movie poster')
+    expect(poster.image().attributes('loading')).toBe('lazy')
   })
 
   it('renders a placeholder when the poster is missing', () => {
-    const wrapper = mountRequest({
-      posterUrl: null,
-    })
+    mountRequest({ posterUrl: null })
 
-    expect(wrapper.find('img').exists()).toBe(false)
-
-    expect(wrapper.get('.media-poster__placeholder').attributes('aria-label')).toBe(
+    expect(poster.image().exists()).toBe(false)
+    expect(poster.placeholder().attributes('aria-label')).toBe(
       'No poster available for Example Movie',
     )
   })
 
   it('renders a TV placeholder', () => {
-    const wrapper = mountRequest({
+    mountRequest({
       type: 'tv',
       title: 'Example Series',
       posterUrl: null,
     })
 
-    expect(wrapper.get('.media-poster__placeholder').text()).toContain('📺')
+    expect(poster.placeholder().text()).toContain('📺')
   })
 
   it('renders exactly one status badge', () => {
-    const wrapper = mountRequest({
+    mountRequest({
       status: 'Unknown',
       mediaStatus: 'Available',
     })
 
-    const badges = wrapper.findAll('.request-card__badge')
-
-    expect(badges).toHaveLength(1)
-    expect(badges[0]?.text()).toBe('Available')
+    expect(request.badge().text()).toBe('Available')
+    expect(wrapper.findAll('.request-card__badge')).toHaveLength(1)
   })
 
   it.each([
@@ -119,15 +116,13 @@ describe('MmRequestCard', () => {
     ['Partially Available', 'partial'],
     ['Processing', 'processing'],
   ] as const)('prioritizes media status %s', (mediaStatus, cssClass) => {
-    const wrapper = mountRequest({
+    mountRequest({
       status: 'Unknown',
       mediaStatus,
     })
 
-    const badge = wrapper.get('.request-card__badge')
-
-    expect(badge.text()).toBe(mediaStatus)
-    expect(badge.classes()).toContain(`request-card__badge--${cssClass}`)
+    expect(request.badge().text()).toBe(mediaStatus)
+    expect(request.status(cssClass).exists()).toBe(true)
     expect(wrapper.findAll('.request-card__badge')).toHaveLength(1)
   })
 
@@ -137,67 +132,57 @@ describe('MmRequestCard', () => {
     ['Declined', 'declined'],
     ['Unknown', 'unknown'],
   ] as const)('falls back to request status %s', (status, cssClass) => {
-    const wrapper = mountRequest({
+    mountRequest({
       status,
       mediaStatus: 'Unknown',
     })
 
-    const badge = wrapper.get('.request-card__badge')
-
-    expect(badge.text()).toBe(status)
-    expect(badge.classes()).toContain(`request-card__badge--${cssClass}`)
+    expect(request.badge().text()).toBe(status)
+    expect(request.status(cssClass).exists()).toBe(true)
   })
 
   it('uses request status when media status is Pending', () => {
-    const wrapper = mountRequest({
+    mountRequest({
       status: 'Approved',
       mediaStatus: 'Pending',
     })
 
-    const badge = wrapper.get('.request-card__badge')
-
-    expect(badge.text()).toBe('Approved')
-    expect(badge.classes()).toContain('request-card__badge--approved')
+    expect(request.badge().text()).toBe('Approved')
+    expect(request.status('approved').exists()).toBe(true)
   })
 
   it('displays Processing instead of Approved when media is processing', () => {
-    const wrapper = mountRequest({
+    mountRequest({
       status: 'Approved',
       mediaStatus: 'Processing',
     })
 
-    const badge = wrapper.get('.request-card__badge')
-
-    expect(badge.text()).toBe('Processing')
-    expect(badge.classes()).toContain('request-card__badge--processing')
+    expect(request.badge().text()).toBe('Processing')
+    expect(request.status('processing').exists()).toBe(true)
   })
 
   it('displays the requester', () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
-    expect(wrapper.get('.request-card__requester').text()).toBe('Requested by Alice')
+    expect(request.requester().text()).toBe('Requested by Alice')
   })
 
   it('formats the request date', () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
-    const date = wrapper.get('time')
-
-    expect(date.attributes('datetime')).toBe('2026-10-20T12:00:00.000Z')
-    expect(date.text()).toBe('Oct 20, 2026')
+    expect(request.validDate().attributes('datetime')).toBe('2026-10-20T12:00:00.000Z')
+    expect(request.validDate().text()).toBe('Oct 20, 2026')
   })
 
   it('handles invalid request dates', () => {
-    const wrapper = mountRequest({
-      createdAt: 'invalid-date',
-    })
+    mountRequest({ createdAt: 'invalid-date' })
 
-    expect(wrapper.find('time').exists()).toBe(false)
-    expect(wrapper.get('.request-card__date').text()).toBe('Unknown date')
+    expect(request.validDate().exists()).toBe(false)
+    expect(request.invalidDate().text()).toBe('Unknown date')
   })
 
   it('updates when the request changes', async () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
     await wrapper.setProps({
       request: createRequest({
@@ -208,23 +193,20 @@ describe('MmRequestCard', () => {
       }),
     })
 
-    expect(wrapper.get('.request-card__title').text()).toBe('Another Movie')
-    expect(wrapper.get('.request-card__requester').text()).toBe('Requested by Bob')
-
-    const badges = wrapper.findAll('.request-card__badge')
-
-    expect(badges).toHaveLength(1)
-    expect(badges[0]?.text()).toBe('Available')
-    expect(badges[0]?.classes()).toContain('request-card__badge--available')
+    expect(request.title().text()).toBe('Another Movie')
+    expect(request.requester().text()).toBe('Requested by Bob')
+    expect(request.badge().text()).toBe('Available')
+    expect(request.status('available').exists()).toBe(true)
+    expect(wrapper.findAll('.request-card__badge')).toHaveLength(1)
   })
 
   it('updates the displayed status when request props change', async () => {
-    const wrapper = mountRequest({
+    mountRequest({
       status: 'Pending',
       mediaStatus: 'Unknown',
     })
 
-    expect(wrapper.get('.request-card__badge').text()).toBe('Pending')
+    expect(request.badge().text()).toBe('Pending')
 
     await wrapper.setProps({
       request: createRequest({
@@ -233,12 +215,12 @@ describe('MmRequestCard', () => {
       }),
     })
 
-    expect(wrapper.get('.request-card__badge').text()).toBe('Partially Available')
-    expect(wrapper.get('.request-card__badge').classes()).toContain('request-card__badge--partial')
+    expect(request.badge().text()).toBe('Partially Available')
+    expect(request.status('partial').exists()).toBe(true)
   })
 
   it('updates the poster when request props change', async () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
     await wrapper.setProps({
       request: createRequest({
@@ -248,19 +230,16 @@ describe('MmRequestCard', () => {
       }),
     })
 
-    const poster = wrapper.getComponent(MmMediaPoster)
-
-    expect(poster.props()).toMatchObject({
+    expect(wrapper.getComponent(MmMediaPoster).props()).toMatchObject({
       title: 'Updated Series',
       type: 'tv',
       image: null,
     })
-
-    expect(wrapper.get('.media-poster__placeholder').text()).toContain('📺')
+    expect(poster.placeholder().text()).toContain('📺')
   })
 
   it('updates the supplied poster URL reactively', async () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
     await wrapper.setProps({
       request: createRequest({
@@ -271,12 +250,13 @@ describe('MmRequestCard', () => {
     expect(wrapper.getComponent(MmMediaPoster).props('image')).toBe(
       'https://example.com/updated-poster.jpg',
     )
+    expect(poster.image().attributes('src')).toBe('https://example.com/updated-poster.jpg')
   })
 
   it('does not create an interactive control', () => {
-    const wrapper = mountRequest()
+    mountRequest()
 
-    expect(wrapper.find('button').exists()).toBe(false)
-    expect(wrapper.find('a').exists()).toBe(false)
+    expect(request.buttons().exists()).toBe(false)
+    expect(request.links().exists()).toBe(false)
   })
 })

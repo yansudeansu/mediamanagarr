@@ -1,27 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmPanel from './MmPanel.vue'
+import { mmPanelSelectors } from '../../../test/selectors/atoms/mmPanel.selectors'
+
+let wrapper: VueWrapper
+
+const panel = mmPanelSelectors((selector) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^section\.mm-panel > /, ''))
+})
 
 describe('MmPanel', () => {
   it('renders a section element', () => {
-    const wrapper = mount(MmPanel)
+    wrapper = mount(MmPanel)
 
-    expect(wrapper.element.tagName).toBe('SECTION')
-    expect(wrapper.classes()).toContain('mm-panel')
+    expect(panel.get().element.tagName).toBe('SECTION')
+    expect(panel.get().classes()).toContain('mm-panel')
   })
 
   it('renders default slot content', () => {
-    const wrapper = mount(MmPanel, {
+    wrapper = mount(MmPanel, {
       slots: {
         default: '<p data-testid="content">Panel content</p>',
       },
     })
 
-    expect(wrapper.get('[data-testid="content"]').text()).toBe('Panel content')
+    expect(panel.content().text()).toBe('Panel content')
   })
 
   it('renders multiple children in their original order', () => {
-    const wrapper = mount(MmPanel, {
+    wrapper = mount(MmPanel, {
       slots: {
         default: `
           <h2>Panel heading</h2>
@@ -39,77 +47,65 @@ describe('MmPanel', () => {
   })
 
   it('uses medium padding by default', () => {
-    const wrapper = mount(MmPanel)
+    wrapper = mount(MmPanel)
 
-    expect(wrapper.classes()).toContain('mm-panel--padding-md')
+    expect(panel.padding('md').exists()).toBe(true)
   })
 
   it('supports small padding', () => {
-    const wrapper = mount(MmPanel, {
-      props: {
-        padding: 'sm',
-      },
+    wrapper = mount(MmPanel, {
+      props: { padding: 'sm' },
     })
 
-    expect(wrapper.classes()).toContain('mm-panel--padding-sm')
-    expect(wrapper.classes()).not.toContain('mm-panel--padding-md')
+    expect(panel.padding('sm').exists()).toBe(true)
+    expect(panel.padding('md').exists()).toBe(false)
   })
 
   it('supports explicitly selecting medium padding', () => {
-    const wrapper = mount(MmPanel, {
-      props: {
-        padding: 'md',
-      },
+    wrapper = mount(MmPanel, {
+      props: { padding: 'md' },
     })
 
-    expect(wrapper.classes()).toContain('mm-panel--padding-md')
+    expect(panel.padding('md').exists()).toBe(true)
   })
 
   it('inherits an accessible label', () => {
-    const wrapper = mount(MmPanel, {
-      attrs: {
-        'aria-label': 'Workspace preferences',
-      },
+    wrapper = mount(MmPanel, {
+      attrs: { 'aria-label': 'Workspace preferences' },
     })
 
-    expect(wrapper.attributes('aria-label')).toBe('Workspace preferences')
+    expect(panel.get().attributes('aria-label')).toBe('Workspace preferences')
   })
 
   it('supports aria-labelledby', () => {
-    const wrapper = mount(MmPanel, {
-      attrs: {
-        'aria-labelledby': 'workspace-settings-title',
-      },
+    wrapper = mount(MmPanel, {
+      attrs: { 'aria-labelledby': 'workspace-settings-title' },
     })
 
-    expect(wrapper.attributes('aria-labelledby')).toBe('workspace-settings-title')
+    expect(panel.get().attributes('aria-labelledby')).toBe('workspace-settings-title')
   })
 
   it('inherits an id', () => {
-    const wrapper = mount(MmPanel, {
-      attrs: {
-        id: 'workspace-panel',
-      },
+    wrapper = mount(MmPanel, {
+      attrs: { id: 'workspace-panel' },
     })
 
-    expect(wrapper.attributes('id')).toBe('workspace-panel')
+    expect(panel.get().attributes('id')).toBe('workspace-panel')
   })
 
   it('preserves consumer-provided classes', () => {
-    const wrapper = mount(MmPanel, {
-      attrs: {
-        class: 'service-form',
-      },
+    wrapper = mount(MmPanel, {
+      attrs: { class: 'service-form' },
     })
 
-    expect(wrapper.classes()).toContain('mm-panel')
-    expect(wrapper.classes()).toContain('service-form')
+    expect(panel.get().classes()).toContain('mm-panel')
+    expect(panel.get().classes()).toContain('service-form')
   })
 
   it('renders without slot content', () => {
-    const wrapper = mount(MmPanel)
+    wrapper = mount(MmPanel)
 
-    expect(wrapper.element.tagName).toBe('SECTION')
-    expect(wrapper.text()).toBe('')
+    expect(panel.get().element.tagName).toBe('SECTION')
+    expect(panel.get().text()).toBe('')
   })
 })

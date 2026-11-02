@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmCalendarEvent from './MmCalendarEvent.vue'
 import MmMediaPoster from '../../atoms/MmMediaPoster/MmMediaPoster.vue'
+import { mmCalendarEventSelectors } from '../../../test/selectors/molecules/mmCalendarEvent.selectors'
+import { mmMediaPosterSelectors } from '../../../test/selectors/atoms/mmMediaPoster.selectors'
 import type { CalendarItem } from '../../../types/calendar'
 
 const tvItem: CalendarItem = {
@@ -26,55 +28,59 @@ const digitalMovie: CalendarItem = {
   posterUrl: null,
 }
 
+let wrapper: VueWrapper
+
+const query = (selector: string) => wrapper.find(selector)
+const event = mmCalendarEventSelectors(query)
+const poster = mmMediaPosterSelectors(query)
+
 function mountEvent(item: CalendarItem = tvItem, image: string | null = null) {
-  return mount(MmCalendarEvent, {
-    props: {
-      item,
-      image,
-    },
+  wrapper = mount(MmCalendarEvent, {
+    props: { item, image },
   })
+  return wrapper
 }
 
 describe('MmCalendarEvent', () => {
   it('renders a TV episode title and subtitle', () => {
-    const wrapper = mountEvent()
+    mountEvent()
 
-    expect(wrapper.text()).toContain('Example Series')
-    expect(wrapper.text()).toContain('S02E03 · The Adventure')
-    expect(wrapper.text()).toContain('TV episode')
+    expect(event.title().text()).toBe('Example Series')
+    expect(event.subtitle().text()).toBe('S02E03 · The Adventure')
+    expect(event.type().text()).toBe('TV episode')
   })
 
   it('renders a movie title and subtitle', () => {
-    const wrapper = mountEvent(digitalMovie)
+    mountEvent(digitalMovie)
 
-    expect(wrapper.text()).toContain('Example Movie')
-    expect(wrapper.text()).toContain('2026')
-    expect(wrapper.text()).toContain('Movie')
+    expect(event.title().text()).toBe('Example Movie')
+    expect(event.subtitle().text()).toBe('2026')
+    expect(event.type().text()).toBe('Movie')
   })
 
   it('labels TV releases as airing', () => {
-    const wrapper = mountEvent()
+    mountEvent()
 
-    expect(wrapper.find('.calendar-event__release-type').text()).toBe('Airing')
+    expect(event.releaseType().text()).toBe('Airing')
   })
 
   it('labels digital movie releases', () => {
-    const wrapper = mountEvent(digitalMovie)
+    mountEvent(digitalMovie)
 
-    expect(wrapper.find('.calendar-event__release-type').text()).toBe('Digital release')
+    expect(event.releaseType().text()).toBe('Digital release')
   })
 
   it('labels physical movie releases', () => {
-    const wrapper = mountEvent({
+    mountEvent({
       ...digitalMovie,
       releaseType: 'physical',
     })
 
-    expect(wrapper.find('.calendar-event__release-type').text()).toBe('Physical release')
+    expect(event.releaseType().text()).toBe('Physical release')
   })
 
   it('uses the shared media poster atom for TV', () => {
-    const wrapper = mountEvent()
+    mountEvent()
 
     expect(wrapper.getComponent(MmMediaPoster).props()).toMatchObject({
       title: 'Example Series',
@@ -84,7 +90,7 @@ describe('MmCalendarEvent', () => {
   })
 
   it('uses the shared media poster atom for movies', () => {
-    const wrapper = mountEvent(digitalMovie, 'https://example.com/poster.jpg')
+    mountEvent(digitalMovie, 'https://example.com/poster.jpg')
 
     expect(wrapper.getComponent(MmMediaPoster).props()).toMatchObject({
       title: 'Example Movie',
@@ -94,9 +100,9 @@ describe('MmCalendarEvent', () => {
   })
 
   it('renders a poster image when supplied', () => {
-    const wrapper = mountEvent(digitalMovie, 'https://example.com/poster.jpg')
+    mountEvent(digitalMovie, 'https://example.com/poster.jpg')
 
-    const image = wrapper.find('img')
+    const image = poster.image()
 
     expect(image.exists()).toBe(true)
     expect(image.attributes('src')).toBe('https://example.com/poster.jpg')
@@ -105,11 +111,11 @@ describe('MmCalendarEvent', () => {
   })
 
   it('renders a TV placeholder when no image is supplied', () => {
-    const wrapper = mountEvent()
+    mountEvent()
 
-    expect(wrapper.find('img').exists()).toBe(false)
+    expect(poster.image().exists()).toBe(false)
 
-    const placeholder = wrapper.get('.media-poster__placeholder')
+    const placeholder = poster.placeholder()
 
     expect(placeholder.text()).toContain('📺')
     expect(placeholder.attributes('role')).toBe('img')
@@ -117,68 +123,67 @@ describe('MmCalendarEvent', () => {
   })
 
   it('renders a movie placeholder when no image is supplied', () => {
-    const wrapper = mountEvent(digitalMovie)
+    mountEvent(digitalMovie)
 
-    const placeholder = wrapper.get('.media-poster__placeholder')
+    const placeholder = poster.placeholder()
 
     expect(placeholder.text()).toContain('🎬')
     expect(placeholder.attributes('aria-label')).toBe('No poster available for Example Movie')
   })
 
   it('renders a green indicator for TV', () => {
-    const wrapper = mountEvent()
+    mountEvent()
 
-    expect(wrapper.find('.calendar-event__indicator--tv').exists()).toBe(true)
-    expect(wrapper.find('.calendar-event__indicator--movie').exists()).toBe(false)
+    expect(event.tvIndicator().exists()).toBe(true)
+    expect(event.movieIndicator().exists()).toBe(false)
   })
 
   it('renders a blue indicator for movies', () => {
-    const wrapper = mountEvent(digitalMovie)
+    mountEvent(digitalMovie)
 
-    expect(wrapper.find('.calendar-event__indicator--movie').exists()).toBe(true)
-    expect(wrapper.find('.calendar-event__indicator--tv').exists()).toBe(false)
+    expect(event.movieIndicator().exists()).toBe(true)
+    expect(event.tvIndicator().exists()).toBe(false)
   })
 
   it('hides the decorative media indicator from screen readers', () => {
-    const wrapper = mountEvent()
+    mountEvent()
 
-    const indicator = wrapper.find('.calendar-event__indicator')
-
-    expect(indicator.attributes('aria-hidden')).toBe('true')
-    expect(indicator.attributes('aria-label')).toBeUndefined()
+    expect(event.decorativeIndicator().exists()).toBe(true)
+    expect(event.indicator().attributes('aria-hidden')).toBe('true')
+    expect(event.indicator().attributes('aria-label')).toBeUndefined()
   })
 
   it('formats date-only release dates', () => {
-    const wrapper = mountEvent(digitalMovie)
+    mountEvent(digitalMovie)
 
-    expect(wrapper.find('time').text()).toBe('Nov 5, 2026')
-    expect(wrapper.find('time').attributes('datetime')).toBe('2026-11-05')
+    expect(event.validDate().text()).toBe('Nov 5, 2026')
+    expect(event.validDate().attributes('datetime')).toBe('2026-11-05')
   })
 
   it('formats timestamp release dates', () => {
-    const wrapper = mountEvent()
+    mountEvent()
 
-    expect(wrapper.find('time').exists()).toBe(true)
-    expect(wrapper.find('time').attributes('datetime')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(event.validDate().exists()).toBe(true)
+    expect(event.validDate().attributes('datetime')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
   it('handles an invalid date gracefully', () => {
-    const wrapper = mountEvent({
+    mountEvent({
       ...digitalMovie,
       date: 'not-a-date',
     })
 
-    expect(wrapper.find('time').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Unknown date')
+    expect(event.validDate().exists()).toBe(false)
+    expect(event.invalidDate().text()).toBe('Unknown date')
   })
 
   it('does not expose the original poster URL without an image prop', () => {
-    const wrapper = mountEvent({
+    mountEvent({
       ...digitalMovie,
       posterUrl: 'https://example.com/poster.jpg?apikey=secret',
     })
 
-    expect(wrapper.find('img').exists()).toBe(false)
+    expect(poster.image().exists()).toBe(false)
     expect(wrapper.html()).not.toContain('apikey=secret')
   })
 })

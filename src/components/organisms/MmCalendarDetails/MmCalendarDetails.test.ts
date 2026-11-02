@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import MmCalendarDetails from './MmCalendarDetails.vue'
 import MmCalendarEvent from '../../molecules/MmCalendarEvent/MmCalendarEvent.vue'
 import type { CalendarItem } from '../../../types/calendar'
+import { mmCalendarDetailsSelectors } from '../../../test/selectors/organisms/mmCalendarDetails.selectors'
+import { mmMediaPosterSelectors } from '../../../test/selectors/atoms/mmMediaPoster.selectors'
 
 const tvItem: CalendarItem = {
   id: 'sonarr-101',
@@ -34,8 +36,18 @@ interface MountOptions {
   loading?: boolean
 }
 
+let wrapper: VueWrapper
+
+const query = (selector: string) => {
+  if (wrapper.element instanceof Element && wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^section\.calendar-details /, ''))
+}
+
+const details = mmCalendarDetailsSelectors(query)
+const poster = mmMediaPosterSelectors(query)
+
 function mountDetails(options: MountOptions = {}) {
-  return mount(MmCalendarDetails, {
+  wrapper = mount(MmCalendarDetails, {
     props: {
       date: options.date ?? '2026-11-05',
       items: options.items ?? [],
@@ -43,20 +55,21 @@ function mountDetails(options: MountOptions = {}) {
       loading: options.loading ?? false,
     },
   })
+  return wrapper
 }
 
 describe('MmCalendarDetails', () => {
   it('renders the selected date as a heading', () => {
-    const wrapper = mountDetails()
+    mountDetails()
 
-    expect(wrapper.get('.calendar-details__title').text()).toBe('Thursday, November 5, 2026')
+    expect(details.title().text()).toBe('Thursday, November 5, 2026')
   })
 
   it('labels the section using its heading', () => {
-    const wrapper = mountDetails()
+    mountDetails()
 
-    const section = wrapper.get('section')
-    const heading = wrapper.get('.calendar-details__title')
+    const section = details.get()
+    const heading = details.title()
 
     expect(heading.attributes('id')).toBeTruthy()
     expect(section.attributes('aria-labelledby')).toBe(heading.attributes('id'))
@@ -67,22 +80,15 @@ describe('MmCalendarDetails', () => {
       setup() {
         return () =>
           h('div', [
-            h(MmCalendarDetails, {
-              date: '2026-11-05',
-              items: [tvItem],
-            }),
-            h(MmCalendarDetails, {
-              date: '2026-11-06',
-              items: [movieItem],
-            }),
+            h(MmCalendarDetails, { date: '2026-11-05', items: [tvItem] }),
+            h(MmCalendarDetails, { date: '2026-11-06', items: [movieItem] }),
           ])
       },
     })
 
-    const wrapper = mount(Parent)
-
-    const sections = wrapper.findAll('section.calendar-details')
-    const headings = wrapper.findAll('.calendar-details__title')
+    const parent = mount(Parent)
+    const sections = parent.findAll('section.calendar-details')
+    const headings = parent.findAll('.calendar-details__title')
 
     expect(sections).toHaveLength(2)
     expect(headings).toHaveLength(2)
@@ -93,68 +99,57 @@ describe('MmCalendarDetails', () => {
     expect(firstId).toBeTruthy()
     expect(secondId).toBeTruthy()
     expect(firstId).not.toBe(secondId)
-
     expect(sections[0]!.attributes('aria-labelledby')).toBe(firstId)
     expect(sections[1]!.attributes('aria-labelledby')).toBe(secondId)
   })
 
   it('shows a zero-release count for an empty day', () => {
-    const wrapper = mountDetails()
+    mountDetails()
 
-    expect(wrapper.get('.calendar-details__count').text()).toBe('0 releases')
+    expect(details.count().text()).toBe('0 releases')
   })
 
   it('uses singular wording for one release', () => {
-    const wrapper = mountDetails({
-      items: [tvItem],
-    })
+    mountDetails({ items: [tvItem] })
 
-    expect(wrapper.get('.calendar-details__count').text()).toBe('1 release')
+    expect(details.count().text()).toBe('1 release')
   })
 
   it('uses plural wording for multiple releases', () => {
-    const wrapper = mountDetails({
-      items: [tvItem, movieItem],
-    })
+    mountDetails({ items: [tvItem, movieItem] })
 
-    expect(wrapper.get('.calendar-details__count').text()).toBe('2 releases')
+    expect(details.count().text()).toBe('2 releases')
   })
 
   it('shows an empty state when no releases are scheduled', () => {
-    const wrapper = mountDetails()
+    mountDetails()
 
-    expect(wrapper.get('.calendar-details__state').text()).toBe(
-      'No releases scheduled for this day.',
-    )
-
-    expect(wrapper.findAllComponents(MmCalendarEvent)).toHaveLength(0)
+    expect(details.empty().text()).toBe('No releases scheduled for this day.')
+    expect(details.eventCards().exists()).toBe(false)
   })
 
   it('renders one calendar event for each item', () => {
-    const wrapper = mountDetails({
-      items: [tvItem, movieItem],
-    })
+    mountDetails({ items: [tvItem, movieItem] })
 
     const events = wrapper.findAllComponents(MmCalendarEvent)
 
     expect(events).toHaveLength(2)
     expect(events[0]?.props('item')).toEqual(tvItem)
     expect(events[1]?.props('item')).toEqual(movieItem)
+    expect(wrapper.findAll('article.calendar-event')).toHaveLength(2)
   })
 
   it('renders TV and movie titles', () => {
-    const wrapper = mountDetails({
-      items: [tvItem, movieItem],
-    })
+    mountDetails({ items: [tvItem, movieItem] })
 
-    expect(wrapper.text()).toContain('Example Series')
-    expect(wrapper.text()).toContain('Example Movie')
+    expect(details.get().text()).toContain('Example Series')
+    expect(details.get().text()).toContain('Example Movie')
   })
 
   it('passes resolved artwork to the correct event', () => {
     const image = 'data:image/jpeg;base64,example'
 
-    const wrapper = mountDetails({
+    mountDetails({
       items: [tvItem, movieItem],
       images: {
         'sonarr-101': image,
@@ -166,110 +161,82 @@ describe('MmCalendarDetails', () => {
 
     expect(events[0]?.props('image')).toBe(image)
     expect(events[1]?.props('image')).toBe(null)
-
-    expect(wrapper.get('img').attributes('src')).toBe(image)
+    expect(poster.image().attributes('src')).toBe(image)
   })
 
   it('uses placeholders when artwork is not available', () => {
-    const wrapper = mountDetails({
-      items: [tvItem, movieItem],
-    })
+    mountDetails({ items: [tvItem, movieItem] })
 
-    expect(wrapper.findAll('img')).toHaveLength(0)
+    expect(details.images().exists()).toBe(false)
     expect(wrapper.findAll('.media-poster__placeholder')).toHaveLength(2)
   })
 
   it('does not expose unresolved poster URLs', () => {
-    const wrapper = mountDetails({
-      items: [
-        {
-          ...tvItem,
-          posterUrl: 'https://example.com/poster.jpg?apikey=secret',
-        },
-      ],
+    mountDetails({
+      items: [{ ...tvItem, posterUrl: 'https://example.com/poster.jpg?apikey=secret' }],
     })
 
-    expect(wrapper.find('img').exists()).toBe(false)
+    expect(details.images().exists()).toBe(false)
     expect(wrapper.html()).not.toContain('apikey=secret')
   })
 
   it('shows a loading state while fetching releases', () => {
-    const wrapper = mountDetails({
-      items: [tvItem],
-      loading: true,
-    })
+    mountDetails({ items: [tvItem], loading: true })
 
-    expect(wrapper.get('[role="status"]').text()).toBe('Loading releases…')
-    expect(wrapper.findAllComponents(MmCalendarEvent)).toHaveLength(0)
+    expect(details.loading().text()).toBe('Loading releases…')
+    expect(details.eventCards().exists()).toBe(false)
   })
 
   it('prioritizes loading over the empty state', () => {
-    const wrapper = mountDetails({
-      loading: true,
-    })
+    mountDetails({ loading: true })
 
-    expect(wrapper.get('[role="status"]').text()).toBe('Loading releases…')
-    expect(wrapper.text()).not.toContain('No releases scheduled for this day.')
+    expect(details.loading().text()).toBe('Loading releases…')
+    expect(details.empty().exists()).toBe(false)
   })
 
   it('handles invalid dates gracefully', () => {
-    const wrapper = mountDetails({
-      date: 'not-a-date',
-    })
+    mountDetails({ date: 'not-a-date' })
 
-    expect(wrapper.get('.calendar-details__title').text()).toBe('Unknown date')
+    expect(details.title().text()).toBe('Unknown date')
   })
 
   it('updates the heading when the selected date changes', async () => {
-    const wrapper = mountDetails()
+    mountDetails()
 
-    await wrapper.setProps({
-      date: '2026-11-06',
-    })
+    await wrapper.setProps({ date: '2026-11-06' })
 
-    expect(wrapper.get('.calendar-details__title').text()).toBe('Friday, November 6, 2026')
+    expect(details.title().text()).toBe('Friday, November 6, 2026')
   })
 
   it('updates the release count when items change', async () => {
-    const wrapper = mountDetails()
+    mountDetails()
 
-    expect(wrapper.get('.calendar-details__count').text()).toBe('0 releases')
+    expect(details.count().text()).toBe('0 releases')
 
-    await wrapper.setProps({
-      items: [tvItem, movieItem],
-    })
+    await wrapper.setProps({ items: [tvItem, movieItem] })
 
-    expect(wrapper.get('.calendar-details__count').text()).toBe('2 releases')
+    expect(details.count().text()).toBe('2 releases')
     expect(wrapper.findAllComponents(MmCalendarEvent)).toHaveLength(2)
   })
 
   it('updates artwork when the images prop changes', async () => {
-    const wrapper = mountDetails({
-      items: [tvItem],
-    })
+    mountDetails({ items: [tvItem] })
 
-    expect(wrapper.find('img').exists()).toBe(false)
+    expect(details.images().exists()).toBe(false)
 
     await wrapper.setProps({
-      images: {
-        'sonarr-101': 'data:image/png;base64,updated',
-      },
+      images: { 'sonarr-101': 'data:image/png;base64,updated' },
     })
 
-    expect(wrapper.get('img').attributes('src')).toBe('data:image/png;base64,updated')
+    expect(poster.image().attributes('src')).toBe('data:image/png;base64,updated')
   })
 
   it('switches from loading to showing releases', async () => {
-    const wrapper = mountDetails({
-      items: [tvItem],
-      loading: true,
-    })
+    mountDetails({ items: [tvItem], loading: true })
 
-    await wrapper.setProps({
-      loading: false,
-    })
+    await wrapper.setProps({ loading: false })
 
-    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    expect(details.loading().exists()).toBe(false)
     expect(wrapper.findAllComponents(MmCalendarEvent)).toHaveLength(1)
   })
 })

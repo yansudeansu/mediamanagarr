@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from './App.vue'
+import { appSelectors } from './test/selectors/app.selectors'
 import { sendBackgroundMessage } from './utils/background-messaging'
 import { openWorkspaceSidebar } from './utils/workspace-sidebar'
 import { getSafeServiceConfigs } from './utils/service-storage'
@@ -12,48 +13,34 @@ import type { BackgroundResponse, BackgroundMessage } from './types/messages'
 vi.mock('./utils/background-messaging', () => ({
   sendBackgroundMessage: vi.fn(),
 }))
-
 vi.mock('./utils/workspace-sidebar', () => ({
   openWorkspaceSidebar: vi.fn(),
 }))
-
 vi.mock('./utils/service-storage', () => ({
   getSafeServiceConfigs: vi.fn(),
 }))
-
 vi.mock('./utils/workspace-state', () => ({
   getWorkspaceNavigationState: vi.fn(),
   saveWorkspaceNavigationState: vi.fn(),
 }))
-
 vi.mock('./views/MmRequestView.vue', () => ({
   default: {
     name: 'MockRequestView',
     template: '<div data-testid="requests-view">Requests content</div>',
   },
 }))
-
-vi.mock('./views/MmUpNextView.vue', () => ({
-  default: {
-    name: 'MockUpNextView',
-    template: '<div data-testid="up-next-view">Up Next content</div>',
-  },
-}))
-
 vi.mock('./views/MmCalendarView.vue', () => ({
   default: {
     name: 'MockCalendarView',
     template: '<div data-testid="calendar-view">Calendar content</div>',
   },
 }))
-
 vi.mock('./views/MmDownloadsView.vue', () => ({
   default: {
     name: 'MockDownloadsView',
     template: '<div data-testid="downloads-view">Downloads content</div>',
   },
 }))
-
 vi.mock('./views/SettingsView.vue', () => ({
   default: {
     name: 'MockSettingsView',
@@ -79,7 +66,6 @@ vi.mock('./views/SettingsView.vue', () => ({
     `,
   },
 }))
-
 vi.mock('./views/MmUpNextView.vue', () => ({
   default: {
     name: 'MockUpNextView',
@@ -122,9 +108,17 @@ const detachedSuccess = {
   windowId: 123,
 }
 
+function selectors(wrapper: ReturnType<typeof mount>) {
+  return appSelectors((selector) => {
+    if (wrapper.element instanceof Element && wrapper.element.matches(selector)) return wrapper
+    return wrapper.find(selector.replace(/^\.app-shell /, ''))
+  })
+}
+
 function getNavigationButton(wrapper: ReturnType<typeof mount>, label: string) {
-  const button = wrapper
-    .findAll('nav[aria-label="Main navigation"] button')
+  const button = selectors(wrapper)
+    .navigation()
+    .findAll('button')
     .find((item) => item.text() === label)
 
   if (!button) {
@@ -135,13 +129,12 @@ function getNavigationButton(wrapper: ReturnType<typeof mount>, label: string) {
 }
 
 async function openQuickAccess(wrapper: ReturnType<typeof mount>): Promise<void> {
-  await wrapper.get('button[aria-label="Open workspace menu"]').trigger('click')
+  await selectors(wrapper).quickAccess().trigger('click')
 }
 
 async function openSettings(wrapper: ReturnType<typeof mount>): Promise<void> {
   await openQuickAccess(wrapper)
-
-  await wrapper.get('button[aria-label="Open settings"]').trigger('click')
+  await selectors(wrapper).openSettings().trigger('click')
 }
 
 async function requestSidebar(wrapper: ReturnType<typeof mount>): Promise<void> {
@@ -197,7 +190,6 @@ describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     storageChangeListeners.clear()
-
     window.history.replaceState(null, '', window.location.pathname)
 
     vi.stubGlobal('chrome', {
@@ -221,7 +213,6 @@ describe('App', () => {
       activeView: 'requests',
       settingsOpen: false,
     })
-
     mockedGetSafeServices.mockResolvedValue(configuredServices)
     mockedSaveWorkspaceState.mockResolvedValue(undefined)
     mockedOpenSidebar.mockResolvedValue(undefined)
@@ -230,7 +221,6 @@ describe('App', () => {
 
   afterEach(() => {
     window.history.replaceState(null, '', window.location.pathname)
-
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     storageChangeListeners.clear()
@@ -239,47 +229,34 @@ describe('App', () => {
   describe('application layout', () => {
     it('renders the application header', () => {
       const wrapper = mount(App)
-
       expect(wrapper.get('h1').text()).toBe('MediaManagarr')
-
       wrapper.unmount()
     })
 
     it('renders the application footer', () => {
       const wrapper = mount(App)
-
-      expect(wrapper.find('footer').exists()).toBe(true)
-
+      expect(selectors(wrapper).footer().exists()).toBe(true)
       wrapper.unmount()
     })
 
     it('starts in popup mode', () => {
       const wrapper = mount(App)
-
-      expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--detached')
-
-      expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--sidebar')
-
+      expect(selectors(wrapper).get().classes()).not.toContain('app-shell--detached')
+      expect(selectors(wrapper).get().classes()).not.toContain('app-shell--sidebar')
       wrapper.unmount()
     })
 
     it('detects detached workspace mode', () => {
       setWorkspaceMode('detached')
-
       const wrapper = mount(App)
-
-      expect(wrapper.get('.app-shell').classes()).toContain('app-shell--detached')
-
+      expect(selectors(wrapper).get().classes()).toContain('app-shell--detached')
       wrapper.unmount()
     })
 
     it('detects sidebar workspace mode', () => {
       setWorkspaceMode('sidebar')
-
       const wrapper = mount(App)
-
-      expect(wrapper.get('.app-shell').classes()).toContain('app-shell--sidebar')
-
+      expect(selectors(wrapper).get().classes()).toContain('app-shell--sidebar')
       wrapper.unmount()
     })
   })
@@ -288,104 +265,73 @@ describe('App', () => {
     it('renders all navigation items when all services are configured', async () => {
       const wrapper = mount(App)
       await flushPromises()
-
-      const navigation = wrapper.get('nav[aria-label="Main navigation"]')
-
+      const navigation = selectors(wrapper).navigation()
       expect(navigation.text()).toContain('Requests')
       expect(navigation.text()).toContain('Up Next')
       expect(navigation.text()).toContain('Calendar')
       expect(navigation.text()).toContain('Downloads')
-
       wrapper.unmount()
     })
 
     it('starts on the Requests view', async () => {
       const wrapper = mount(App)
       await flushPromises()
-
       expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
-
       expect(getNavigationButton(wrapper, 'Requests').attributes('aria-current')).toBe('page')
-
       wrapper.unmount()
     })
 
     it('navigates to Up Next', async () => {
       const wrapper = mount(App)
       await flushPromises()
-
       await getNavigationButton(wrapper, 'Up Next').trigger('click')
-
       expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
-
       expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(false)
-
       wrapper.unmount()
     })
 
     it('navigates to Calendar', async () => {
       const wrapper = mount(App)
       await flushPromises()
-
       await getNavigationButton(wrapper, 'Calendar').trigger('click')
-
       expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-
       wrapper.unmount()
     })
 
     it('navigates to Downloads', async () => {
       const wrapper = mount(App)
       await flushPromises()
-
       await getNavigationButton(wrapper, 'Downloads').trigger('click')
-
       expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(true)
-
       wrapper.unmount()
     })
 
     it('unmounts the previous view when navigating', async () => {
       const wrapper = mount(App)
       await flushPromises()
-
       await getNavigationButton(wrapper, 'Downloads').trigger('click')
-
       expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(true)
-
       await getNavigationButton(wrapper, 'Calendar').trigger('click')
-
       expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
-
       expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-
       wrapper.unmount()
     })
   })
-
   describe('dynamic navigation', () => {
     it('shows only capabilities supported by configured services', async () => {
       mockedGetSafeServices.mockResolvedValue({
-        jellyfin: {
-          url: 'https://jellyfin.example.com',
-          configured: true,
-        },
-        sonarr: {
-          url: 'https://sonarr.example.com',
-          configured: true,
-        },
+        jellyfin: { url: 'https://jellyfin.example.com', configured: true },
+        sonarr: { url: 'https://sonarr.example.com', configured: true },
       })
 
       const wrapper = mount(App)
       await flushPromises()
 
-      const navigation = wrapper.get('nav[aria-label="Main navigation"]')
-
+      const navigation = selectors(wrapper).navigation()
       expect(navigation.text()).toContain('Up Next')
       expect(navigation.text()).toContain('Calendar')
       expect(navigation.text()).not.toContain('Requests')
       expect(navigation.text()).not.toContain('Downloads')
-
       expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
 
       wrapper.unmount()
@@ -393,52 +339,37 @@ describe('App', () => {
 
     it('shows Calendar without navigation for Sonarr and Radarr', async () => {
       mockedGetSafeServices.mockResolvedValue({
-        sonarr: {
-          url: 'https://sonarr.example.com',
-          configured: true,
-        },
-        radarr: {
-          url: 'https://radarr.example.com',
-          configured: true,
-        },
+        sonarr: { url: 'https://sonarr.example.com', configured: true },
+        radarr: { url: 'https://radarr.example.com', configured: true },
       })
 
       const wrapper = mount(App)
       await flushPromises()
 
       expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+      expect(selectors(wrapper).navigation().exists()).toBe(false)
 
       wrapper.unmount()
     })
 
     it('shows Up Next without navigation when only Jellyfin is configured', async () => {
       mockedGetSafeServices.mockResolvedValue({
-        jellyfin: {
-          url: 'https://jellyfin.example.com',
-          configured: true,
-        },
+        jellyfin: { url: 'https://jellyfin.example.com', configured: true },
       })
 
       const wrapper = mount(App)
       await flushPromises()
 
       expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+      expect(selectors(wrapper).navigation().exists()).toBe(false)
 
       wrapper.unmount()
     })
 
     it('ignores services marked unconfigured', async () => {
       mockedGetSafeServices.mockResolvedValue({
-        jellyfin: {
-          url: '',
-          configured: false,
-        },
-        seerr: {
-          url: 'https://seerr.example.com',
-          configured: true,
-        },
+        jellyfin: { url: '', configured: false },
+        seerr: { url: 'https://seerr.example.com', configured: true },
       })
 
       const wrapper = mount(App)
@@ -446,7 +377,7 @@ describe('App', () => {
 
       expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(false)
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+      expect(selectors(wrapper).navigation().exists()).toBe(false)
 
       wrapper.unmount()
     })
@@ -457,11 +388,11 @@ describe('App', () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
-
-      expect(wrapper.text()).toContain('No services configured yet.')
-
-      expect(wrapper.text()).toContain('Configure a service in Settings to get started.')
+      expect(selectors(wrapper).navigation().exists()).toBe(false)
+      expect(selectors(wrapper).emptyNavigation().text()).toContain('No services configured yet.')
+      expect(selectors(wrapper).emptyNavigation().text()).toContain(
+        'Configure a service in Settings to get started.',
+      )
 
       wrapper.unmount()
     })
@@ -472,8 +403,7 @@ describe('App', () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      await wrapper.get('.empty-navigation button').trigger('click')
-
+      await selectors(wrapper).setupSettings().trigger('click')
       expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
 
       wrapper.unmount()
@@ -489,7 +419,6 @@ describe('App', () => {
       await flushPromises()
 
       expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
-
       expect(getNavigationButton(wrapper, 'Calendar').attributes('aria-current')).toBe('page')
 
       wrapper.unmount()
@@ -500,22 +429,16 @@ describe('App', () => {
         activeView: 'downloads',
         settingsOpen: false,
       })
-
       mockedGetSafeServices.mockResolvedValue({
-        jellyfin: {
-          url: 'https://jellyfin.example.com',
-          configured: true,
-        },
+        jellyfin: { url: 'https://jellyfin.example.com', configured: true },
       })
 
       const wrapper = mount(App)
       await flushPromises()
 
       expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
-
       expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
-
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+      expect(selectors(wrapper).navigation().exists()).toBe(false)
 
       wrapper.unmount()
     })
@@ -533,14 +456,13 @@ describe('App', () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
-
-      expect(wrapper.find('.empty-navigation').exists()).toBe(false)
+      expect(selectors(wrapper).navigation().exists()).toBe(false)
+      expect(selectors(wrapper).emptyNavigation().exists()).toBe(false)
 
       resolveServices?.(configuredServices)
       await flushPromises()
 
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(true)
+      expect(selectors(wrapper).navigation().exists()).toBe(true)
 
       wrapper.unmount()
     })
@@ -558,13 +480,12 @@ describe('App', () => {
       const wrapper = mount(App)
       await flushPromises()
 
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+      expect(selectors(wrapper).navigation().exists()).toBe(false)
 
       resolveState?.({
         activeView: 'calendar',
         settingsOpen: false,
       })
-
       await flushPromises()
 
       expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
@@ -579,10 +500,7 @@ describe('App', () => {
       expect(getNavigationButton(wrapper, 'Downloads').exists()).toBe(true)
 
       mockedGetSafeServices.mockResolvedValue({
-        seerr: {
-          url: 'https://seerr.example.com',
-          configured: true,
-        },
+        seerr: { url: 'https://seerr.example.com', configured: true },
       })
 
       emitStorageChange({
@@ -591,14 +509,13 @@ describe('App', () => {
           newValue: {},
         },
       })
-
       await flushPromises()
 
       expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(false)
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+      expect(selectors(wrapper).navigation().exists()).toBe(false)
 
       wrapper.unmount()
     })
@@ -608,14 +525,10 @@ describe('App', () => {
       await flushPromises()
 
       await getNavigationButton(wrapper, 'Downloads').trigger('click')
-
       expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(true)
 
       mockedGetSafeServices.mockResolvedValue({
-        jellyfin: {
-          url: 'https://jellyfin.example.com',
-          configured: true,
-        },
+        jellyfin: { url: 'https://jellyfin.example.com', configured: true },
       })
 
       emitStorageChange({
@@ -624,11 +537,9 @@ describe('App', () => {
           newValue: {},
         },
       })
-
       await flushPromises()
 
       expect(wrapper.find('[data-testid="downloads-view"]').exists()).toBe(false)
-
       expect(wrapper.find('[data-testid="up-next-view"]').exists()).toBe(true)
 
       wrapper.unmount()
@@ -641,11 +552,8 @@ describe('App', () => {
       expect(mockedGetSafeServices).toHaveBeenCalledOnce()
 
       emitStorageChange({
-        unrelatedSetting: {
-          newValue: true,
-        },
+        unrelatedSetting: { newValue: true },
       })
-
       await flushPromises()
 
       expect(mockedGetSafeServices).toHaveBeenCalledOnce()
@@ -659,13 +567,10 @@ describe('App', () => {
 
       emitStorageChange(
         {
-          mediaManagarrServices: {
-            newValue: configuredServices,
-          },
+          mediaManagarrServices: { newValue: configuredServices },
         },
         'session',
       )
-
       await flushPromises()
 
       expect(mockedGetSafeServices).toHaveBeenCalledOnce()
@@ -689,18 +594,14 @@ describe('App', () => {
       await flushPromises()
 
       emitStorageChange({
-        mediaManagarrServices: {
-          newValue: configuredServices,
-        },
+        mediaManagarrServices: { newValue: configuredServices },
       })
-
       await flushPromises()
 
       resolveInitialLoad?.({})
       await flushPromises()
 
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(true)
-
+      expect(selectors(wrapper).navigation().exists()).toBe(true)
       expect(getNavigationButton(wrapper, 'Downloads').exists()).toBe(true)
 
       wrapper.unmount()
@@ -708,7 +609,6 @@ describe('App', () => {
 
     it('handles service loading errors gracefully', async () => {
       mockedGetSafeServices.mockRejectedValue(new Error('Service storage unavailable.'))
-
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       const wrapper = mount(App)
@@ -718,8 +618,7 @@ describe('App', () => {
         'MediaManagarr: Unable to load safe service configurations:',
         expect.any(Error),
       )
-
-      expect(wrapper.text()).toContain('No services configured yet.')
+      expect(selectors(wrapper).emptyNavigation().text()).toContain('No services configured yet.')
 
       wrapper.unmount()
     })
@@ -731,11 +630,9 @@ describe('App', () => {
       await flushPromises()
 
       expect(mockedGetSafeServices).toHaveBeenCalledOnce()
-
       await openQuickAccess(wrapper)
 
       expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
-
       expect(wrapper.get('#quick-access-menu').text()).toContain('Sonarr')
 
       wrapper.unmount()
@@ -744,14 +641,12 @@ describe('App', () => {
     it('preserves reverse-proxy paths and custom ports', async () => {
       const wrapper = mount(App)
       await flushPromises()
-
       await openQuickAccess(wrapper)
 
       const links = wrapper.findAll('#quick-access-menu a')
       const hrefs = links.map((link) => link.attributes('href'))
 
       expect(hrefs).toContain('https://media.example.com/jellyfin')
-
       expect(hrefs).toContain('https://home.example.com:8989/sonarr')
 
       for (const link of links) {
@@ -768,11 +663,9 @@ describe('App', () => {
 
       const wrapper = mount(App)
       await flushPromises()
-
       await openQuickAccess(wrapper)
 
       expect(wrapper.get('#quick-access-menu').text()).toContain('No links available')
-
       expect(wrapper.findAll('#quick-access-menu a')).toHaveLength(0)
 
       wrapper.unmount()
@@ -783,17 +676,12 @@ describe('App', () => {
 
       const wrapper = mount(App)
       await flushPromises()
-
       await openQuickAccess(wrapper)
 
       mockedGetSafeServices.mockResolvedValue(configuredServices)
-
       emitStorageChange({
-        mediaManagarrServices: {
-          newValue: configuredServices,
-        },
+        mediaManagarrServices: { newValue: configuredServices },
       })
-
       await flushPromises()
 
       expect(wrapper.get('#quick-access-menu').text()).toContain('Jellyfin')
@@ -819,7 +707,6 @@ describe('App', () => {
     it('opens Settings through Quick Access', async () => {
       const wrapper = mount(App)
       await flushPromises()
-
       await openSettings(wrapper)
 
       expect(wrapper.find('[data-testid="settings-view"]').exists()).toBe(true)
@@ -830,11 +717,9 @@ describe('App', () => {
     it('hides navigation while Settings is open', async () => {
       const wrapper = mount(App)
       await flushPromises()
-
       await openSettings(wrapper)
 
-      expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
-
+      expect(selectors(wrapper).navigation().exists()).toBe(false)
       expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(false)
 
       wrapper.unmount()
@@ -846,8 +731,7 @@ describe('App', () => {
 
       await getNavigationButton(wrapper, 'Calendar').trigger('click')
       await openSettings(wrapper)
-
-      await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
+      await selectors(wrapper).back().trigger('click')
 
       expect(wrapper.find('[data-testid="calendar-view"]').exists()).toBe(true)
 
@@ -919,9 +803,7 @@ describe('App', () => {
       await flushPromises()
 
       await openSettings(wrapper)
-
-      await wrapper.get('button[aria-label="Back to previous view"]').trigger('click')
-
+      await selectors(wrapper).back().trigger('click')
       await flushPromises()
 
       expect(mockedSaveWorkspaceState).toHaveBeenCalledWith({
@@ -934,20 +816,17 @@ describe('App', () => {
 
     it('continues with defaults when restoration fails', async () => {
       mockedGetWorkspaceState.mockRejectedValue(new Error('Session unavailable.'))
-
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       const wrapper = mount(App)
       await flushPromises()
 
       expect(warnSpy).toHaveBeenCalled()
-
       expect(wrapper.find('[data-testid="requests-view"]').exists()).toBe(true)
 
       wrapper.unmount()
     })
   })
-
   describe('detached workspace', () => {
     it('opens a detached workspace from Settings', async () => {
       const wrapper = mount(App)
@@ -994,7 +873,7 @@ describe('App', () => {
       await requestDetached(wrapper)
       await flushPromises()
 
-      expect(wrapper.get('[role="alert"]').text()).toContain('Unable to create window.')
+      expect(selectors(wrapper).workspaceError().text()).toContain('Unable to create window.')
 
       wrapper.unmount()
     })
@@ -1009,7 +888,7 @@ describe('App', () => {
       await requestDetached(wrapper)
       await flushPromises()
 
-      expect(wrapper.get('[role="alert"]').text()).toContain('Background unavailable.')
+      expect(selectors(wrapper).workspaceError().text()).toContain('Background unavailable.')
 
       wrapper.unmount()
     })
@@ -1051,7 +930,6 @@ describe('App', () => {
       await flushPromises()
 
       await openSettings(wrapper)
-
       await requestDetached(wrapper)
       await flushPromises()
 
@@ -1083,7 +961,6 @@ describe('App', () => {
 
     it('opens the sidebar from a detached workspace', async () => {
       setWorkspaceMode('detached')
-
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
       const wrapper = mount(App)
@@ -1125,9 +1002,7 @@ describe('App', () => {
 
     it('continues opening the sidebar when saving state fails', async () => {
       mockedSaveWorkspaceState.mockRejectedValue(new Error('Session unavailable.'))
-
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
       const wrapper = mount(App)
@@ -1146,7 +1021,6 @@ describe('App', () => {
 
     it('shows an error if opening the sidebar fails', async () => {
       mockedOpenSidebar.mockRejectedValue(new Error('Sidebar unavailable.'))
-
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
       const wrapper = mount(App)
@@ -1156,8 +1030,7 @@ describe('App', () => {
       await requestSidebar(wrapper)
       await flushPromises()
 
-      expect(wrapper.get('[role="alert"]').text()).toContain('Sidebar unavailable.')
-
+      expect(selectors(wrapper).workspaceError().text()).toContain('Sidebar unavailable.')
       expect(closeSpy).not.toHaveBeenCalled()
 
       wrapper.unmount()
@@ -1173,7 +1046,9 @@ describe('App', () => {
       await requestSidebar(wrapper)
       await flushPromises()
 
-      expect(wrapper.get('[role="alert"]').text()).toContain('Unable to open the browser sidebar.')
+      expect(selectors(wrapper).workspaceError().text()).toContain(
+        'Unable to open the browser sidebar.',
+      )
 
       wrapper.unmount()
     })
@@ -1212,7 +1087,6 @@ describe('App', () => {
       await flushPromises()
 
       await openSettings(wrapper)
-
       await requestSidebar(wrapper)
       await flushPromises()
 
@@ -1306,7 +1180,6 @@ describe('App', () => {
       await getNavigationButton(wrapper, 'Up Next').trigger('click')
 
       const upNext = wrapper.getComponent({ name: 'MockUpNextView' })
-
       expect(upNext.props('jellyfinUrl')).toBe('https://media.example.com/jellyfin')
 
       const updatedServices: SafeServiceConfigs = {
@@ -1325,7 +1198,6 @@ describe('App', () => {
           newValue: updatedServices,
         },
       })
-
       await flushPromises()
 
       expect(upNext.props('jellyfinUrl')).toBe('https://new-media.example.com/jellyfin')

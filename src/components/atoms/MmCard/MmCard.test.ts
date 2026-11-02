@@ -1,85 +1,93 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmCard from './MmCard.vue'
+import { mmCardSelectors } from '../../../test/selectors/atoms/mmCard.selectors'
+
+let wrapper: VueWrapper
+
+const card = mmCardSelectors((selector) => {
+  if (wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector)
+})
 
 describe('MmCard', () => {
   it('renders its default slot', () => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       slots: {
         default: '<p>Example content</p>',
       },
     })
 
-    expect(wrapper.get('.mm-card__content').text()).toBe('Example content')
+    expect(card.content().text()).toBe('Example content')
   })
 
   it('renders as a semantic article', () => {
-    const wrapper = mount(MmCard)
+    wrapper = mount(MmCard)
 
-    expect(wrapper.element.tagName).toBe('ARTICLE')
+    expect(card.get().element.tagName).toBe('ARTICLE')
   })
 
   it('uses default styling', () => {
-    const wrapper = mount(MmCard)
+    wrapper = mount(MmCard)
 
-    expect(wrapper.classes()).toContain('mm-card--default')
-    expect(wrapper.classes()).toContain('mm-card--padding-md')
+    expect(card.variant('default').exists()).toBe(true)
+    expect(card.padding('md').exists()).toBe(true)
   })
 
   it('supports the outlined variant', () => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       props: {
         variant: 'outlined',
       },
     })
 
-    expect(wrapper.classes()).toContain('mm-card--outlined')
+    expect(card.variant('outlined').exists()).toBe(true)
   })
 
   it.each(['none', 'sm', 'md'] as const)('supports %s padding', (padding) => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       props: { padding },
     })
 
-    expect(wrapper.classes()).toContain(`mm-card--padding-${padding}`)
+    expect(card.padding(padding).exists()).toBe(true)
   })
 
   it('renders the header slot when provided', () => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       slots: {
         header: '<h3>Card title</h3>',
         default: '<p>Card body</p>',
       },
     })
 
-    expect(wrapper.get('.mm-card__header').text()).toBe('Card title')
-    expect(wrapper.get('.mm-card__content').text()).toBe('Card body')
+    expect(card.header().text()).toBe('Card title')
+    expect(card.content().text()).toBe('Card body')
   })
 
   it('renders the footer slot when provided', () => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       slots: {
         default: '<p>Card body</p>',
         footer: '<span>Card footer</span>',
       },
     })
 
-    expect(wrapper.get('.mm-card__footer').text()).toBe('Card footer')
+    expect(card.footer().text()).toBe('Card footer')
   })
 
   it('does not render unused header or footer elements', () => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       slots: {
         default: '<p>Only content</p>',
       },
     })
 
-    expect(wrapper.find('.mm-card__header').exists()).toBe(false)
-    expect(wrapper.find('.mm-card__footer').exists()).toBe(false)
+    expect(card.header().exists()).toBe(false)
+    expect(card.footer().exists()).toBe(false)
   })
 
   it('supports all three slots together', () => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       slots: {
         header: '<h3>Title</h3>',
         default: '<p>Description</p>',
@@ -87,25 +95,25 @@ describe('MmCard', () => {
       },
     })
 
-    expect(wrapper.get('.mm-card__header h3').text()).toBe('Title')
-    expect(wrapper.get('.mm-card__content p').text()).toBe('Description')
-    expect(wrapper.get('.mm-card__footer button').text()).toBe('View details')
+    expect(card.header().find('h3').text()).toBe('Title')
+    expect(card.content().find('p').text()).toBe('Description')
+    expect(card.footer().find('button').text()).toBe('View details')
   })
 
   it('does not create an interactive control by default', () => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       slots: {
         default: 'Static content',
       },
     })
 
-    expect(wrapper.find('button').exists()).toBe(false)
-    expect(wrapper.find('a').exists()).toBe(false)
-    expect(wrapper.attributes('tabindex')).toBeUndefined()
+    expect(card.get().find('button').exists()).toBe(false)
+    expect(card.get().find('a').exists()).toBe(false)
+    expect(card.get().attributes('tabindex')).toBeUndefined()
   })
 
   it('updates when its variant changes', async () => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       props: {
         variant: 'default',
       },
@@ -115,12 +123,12 @@ describe('MmCard', () => {
       variant: 'outlined',
     })
 
-    expect(wrapper.classes()).toContain('mm-card--outlined')
-    expect(wrapper.classes()).not.toContain('mm-card--default')
+    expect(card.variant('outlined').exists()).toBe(true)
+    expect(card.variant('default').exists()).toBe(false)
   })
 
   it('updates when its padding changes', async () => {
-    const wrapper = mount(MmCard, {
+    wrapper = mount(MmCard, {
       props: {
         padding: 'md',
       },
@@ -130,7 +138,7 @@ describe('MmCard', () => {
       padding: 'none',
     })
 
-    expect(wrapper.classes()).toContain('mm-card--padding-none')
-    expect(wrapper.classes()).not.toContain('mm-card--padding-md')
+    expect(card.padding('none').exists()).toBe(true)
+    expect(card.padding('md').exists()).toBe(false)
   })
 })

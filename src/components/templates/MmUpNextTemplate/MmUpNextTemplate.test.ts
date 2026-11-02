@@ -1,76 +1,71 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import MmUpNextTemplate from './MmUpNextTemplate.vue'
+import { mmUpNextTemplateSelectors } from '../../../test/selectors/templates/mmUpNextTemplate.selectors'
+
+let wrapper: VueWrapper
+
+const template = mmUpNextTemplateSelectors((selector) => {
+  if (wrapper.element instanceof Element && wrapper.element.matches(selector)) return wrapper
+  return wrapper.find(selector.replace(/^\.up-next-template /, ''))
+})
 
 describe('MmUpNextTemplate', () => {
   it('renders the Up Next heading', () => {
-    const wrapper = mount(MmUpNextTemplate)
+    wrapper = mount(MmUpNextTemplate)
 
-    expect(wrapper.get('#up-next-title').text()).toBe('Up Next')
+    expect(template.title().text()).toBe('Up Next')
   })
 
   it('renders the default description', () => {
-    const wrapper = mount(MmUpNextTemplate)
+    wrapper = mount(MmUpNextTemplate)
 
-    expect(wrapper.get('.up-next-template__description').text()).toBe(
-      'Recently added, unwatched media from Jellyfin.',
-    )
+    expect(template.description().text()).toBe('Recently added, unwatched media from Jellyfin.')
   })
 
   it('renders a custom description', () => {
-    const wrapper = mount(MmUpNextTemplate, {
-      slots: {
-        description: '3 new · 42 unwatched items',
-      },
+    wrapper = mount(MmUpNextTemplate, {
+      slots: { description: '3 new · 42 unwatched items' },
     })
 
-    expect(wrapper.get('.up-next-template__description').text()).toBe('3 new · 42 unwatched items')
-
-    expect(wrapper.text()).not.toContain('Recently added, unwatched media from Jellyfin.')
+    expect(template.description().text()).toBe('3 new · 42 unwatched items')
+    expect(template.get().text()).not.toContain('Recently added, unwatched media from Jellyfin.')
   })
 
   it('renders default slot content', () => {
-    const wrapper = mount(MmUpNextTemplate, {
-      slots: {
-        default: '<article>Example arrival</article>',
-      },
+    wrapper = mount(MmUpNextTemplate, {
+      slots: { default: '<article>Example arrival</article>' },
     })
 
-    expect(wrapper.get('.up-next-template__content article').text()).toBe('Example arrival')
+    expect(template.articles().text()).toBe('Example arrival')
   })
 
   it('renders filters when provided', () => {
-    const wrapper = mount(MmUpNextTemplate, {
-      slots: {
-        filters: '<button>New</button>',
-      },
+    wrapper = mount(MmUpNextTemplate, {
+      slots: { filters: '<button>New</button>' },
     })
 
-    expect(wrapper.get('.up-next-template__filters button').text()).toBe('New')
+    expect(template.filterButtons().text()).toBe('New')
   })
 
   it('renders pagination when provided', () => {
-    const wrapper = mount(MmUpNextTemplate, {
-      slots: {
-        pagination: '<button>Next</button>',
-      },
+    wrapper = mount(MmUpNextTemplate, {
+      slots: { pagination: '<button>Next</button>' },
     })
 
-    expect(wrapper.get('.up-next-template__pagination button').text()).toBe('Next')
+    expect(template.paginationButtons().text()).toBe('Next')
   })
 
   it('renders actions when provided', () => {
-    const wrapper = mount(MmUpNextTemplate, {
-      slots: {
-        actions: '<button>Refresh</button>',
-      },
+    wrapper = mount(MmUpNextTemplate, {
+      slots: { actions: '<button>Refresh</button>' },
     })
 
-    expect(wrapper.get('.up-next-template__actions button').text()).toBe('Refresh')
+    expect(template.actionButtons().text()).toBe('Refresh')
   })
 
   it('supports multiple action buttons', () => {
-    const wrapper = mount(MmUpNextTemplate, {
+    wrapper = mount(MmUpNextTemplate, {
       slots: {
         actions: `
           <button>Clear notifications</button>
@@ -79,83 +74,73 @@ describe('MmUpNextTemplate', () => {
       },
     })
 
-    const buttons = wrapper.findAll('.up-next-template__actions button')
-
-    expect(buttons).toHaveLength(2)
-    expect(buttons[0]?.text()).toBe('Clear notifications')
-    expect(buttons[1]?.text()).toBe('Refresh')
+    expect(template.actionButtons().exists()).toBe(true)
+    expect(template.actionButton(0).text()).toBe('Clear notifications')
+    expect(template.actionButton(1).text()).toBe('Refresh')
+    expect(wrapper.findAll('.up-next-template__actions button')).toHaveLength(2)
   })
 
   it('does not render unused optional sections', () => {
-    const wrapper = mount(MmUpNextTemplate)
+    wrapper = mount(MmUpNextTemplate)
 
-    expect(wrapper.find('.up-next-template__filters').exists()).toBe(false)
-    expect(wrapper.find('.up-next-template__pagination').exists()).toBe(false)
-    expect(wrapper.find('.up-next-template__actions').exists()).toBe(false)
+    expect(template.filters().exists()).toBe(false)
+    expect(template.pagination().exists()).toBe(false)
+    expect(template.actions().exists()).toBe(false)
   })
 
   it('provides an accessible label for filters', () => {
-    const wrapper = mount(MmUpNextTemplate, {
-      slots: {
-        filters: '<button>All</button>',
-      },
+    wrapper = mount(MmUpNextTemplate, {
+      slots: { filters: '<button>All</button>' },
     })
 
-    expect(wrapper.get('.up-next-template__filters').attributes('aria-label')).toBe(
-      'Arrival filters',
-    )
+    expect(template.labelledFilters().exists()).toBe(true)
+    expect(template.filters().attributes('aria-label')).toBe('Arrival filters')
   })
 
   it('provides an accessible label for pagination', () => {
-    const wrapper = mount(MmUpNextTemplate, {
-      slots: {
-        pagination: '<button>Next</button>',
-      },
+    wrapper = mount(MmUpNextTemplate, {
+      slots: { pagination: '<button>Next</button>' },
     })
 
-    expect(wrapper.get('.up-next-template__pagination').attributes('aria-label')).toBe(
-      'Arrival pagination',
-    )
+    expect(template.labelledPagination().exists()).toBe(true)
+    expect(template.pagination().attributes('aria-label')).toBe('Arrival pagination')
   })
 
   it('associates the content with the Up Next heading', () => {
-    const wrapper = mount(MmUpNextTemplate)
+    wrapper = mount(MmUpNextTemplate)
 
-    expect(wrapper.get('.up-next-template__content').attributes('aria-labelledby')).toBe(
-      'up-next-title',
-    )
+    expect(template.labelledContent().exists()).toBe(true)
+    expect(template.title().attributes('id')).toBe('up-next-title')
   })
 
   it('uses a semantic heading', () => {
-    const wrapper = mount(MmUpNextTemplate)
+    wrapper = mount(MmUpNextTemplate)
 
-    expect(wrapper.get('#up-next-title').element.tagName).toBe('H2')
+    expect(template.title().element.tagName).toBe('H2')
   })
 
   it('uses semantic sections for filters and content', () => {
-    const wrapper = mount(MmUpNextTemplate, {
+    wrapper = mount(MmUpNextTemplate, {
       slots: {
         filters: '<button>New</button>',
         default: '<article>Arrival</article>',
       },
     })
 
-    expect(wrapper.get('.up-next-template__filters').element.tagName).toBe('SECTION')
-    expect(wrapper.get('.up-next-template__content').element.tagName).toBe('SECTION')
+    expect(template.filters().element.tagName).toBe('SECTION')
+    expect(template.content().element.tagName).toBe('SECTION')
   })
 
   it('uses semantic navigation for pagination', () => {
-    const wrapper = mount(MmUpNextTemplate, {
-      slots: {
-        pagination: '<button>Next</button>',
-      },
+    wrapper = mount(MmUpNextTemplate, {
+      slots: { pagination: '<button>Next</button>' },
     })
 
-    expect(wrapper.get('.up-next-template__pagination').element.tagName).toBe('NAV')
+    expect(template.pagination().element.tagName).toBe('NAV')
   })
 
   it('renders all slots together', () => {
-    const wrapper = mount(MmUpNextTemplate, {
+    wrapper = mount(MmUpNextTemplate, {
       slots: {
         description: '2 new · 15 unwatched items',
         actions: `
@@ -171,19 +156,19 @@ describe('MmUpNextTemplate', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('2 new · 15 unwatched items')
-    expect(wrapper.text()).toContain('Clear notifications')
-    expect(wrapper.text()).toContain('Refresh')
-    expect(wrapper.text()).toContain('All')
-    expect(wrapper.text()).toContain('New')
-    expect(wrapper.text()).toContain('Example movie')
-    expect(wrapper.text()).toContain('Previous')
+    expect(template.description().text()).toContain('2 new · 15 unwatched items')
+    expect(template.actions().text()).toContain('Clear notifications')
+    expect(template.actions().text()).toContain('Refresh')
+    expect(template.filters().text()).toContain('All')
+    expect(template.filters().text()).toContain('New')
+    expect(template.content().text()).toContain('Example movie')
+    expect(template.pagination().text()).toContain('Previous')
   })
 
   it('keeps the content section when no arrivals are provided', () => {
-    const wrapper = mount(MmUpNextTemplate)
+    wrapper = mount(MmUpNextTemplate)
 
-    expect(wrapper.find('.up-next-template__content').exists()).toBe(true)
-    expect(wrapper.get('.up-next-template__content').text()).toBe('')
+    expect(template.content().exists()).toBe(true)
+    expect(template.content().text()).toBe('')
   })
 })

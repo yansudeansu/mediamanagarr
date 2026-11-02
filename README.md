@@ -59,25 +59,78 @@ Build output is written to `dist/firefox/` and `dist/chrome/`.
 
 To load a development build into your browser, follow the [installation instructions](docs/USER-GUIDE.md#installation).
 
-### Development commands
+## Testing and quality assurance
+
+MediaManagarr uses automated checks to help maintain code quality, accessibility, and reliable integration with supported media services.
+
+The testing setup includes unit and component tests, Storybook for component development, and Playwright end-to-end tests.
+
+### Unit and component tests
+
+Run the test suite:
 
 ```bash
-npm run start
-npm run lint
-npm run lint:fix
-npm run format
-npm run format:check
 npm run test
+```
+
+Or run tests in watch mode:
+
+```bash
 npm run test:watch
-npm run build
+```
+
+### End-to-end tests
+
+Playwright tests exercise the built Chromium extension in an installed-extension environment, including application navigation and service configuration workflows.
+
+Build the Chromium extension before running E2E tests:
+
+```bash
 npm run build:chrome
-npm run build:firefox
-npm run storybook
-npm run build-storybook
+npm run test:e2e
+```
+
+**Browser coverage:** Installed-extension E2E tests currently run against Chromium. Firefox has a dedicated production build, but automated E2E testing of the installed Firefox extension is not yet supported by the project's test setup.
+
+A successful Chromium E2E run should not be interpreted as verified Firefox extension compatibility. Firefox-specific behavior still requires manual testing.
+
+### Code quality
+
+Run linting and formatting checks:
+
+```bash
+npm run lint
+npm run format:check
+```
+
+Run the full project verification workflow:
+
+```bash
 npm run check
 ```
 
-Run `npm run check` before submitting a pull request. It verifies linting, formatting, tests, and production builds.
+The verification workflow checks linting, formatting, automated tests, and production builds. See [Contributing](CONTRIBUTING.md) for development and pull-request guidelines.
+
+## Development commands
+
+| Command                   | Description                              |
+| ------------------------- | ---------------------------------------- |
+| `npm run start`           | Start the development server             |
+| `npm run lint`            | Check code with ESLint                   |
+| `npm run lint:fix`        | Automatically fix supported lint issues  |
+| `npm run format`          | Format source files                      |
+| `npm run format:check`    | Check formatting without modifying files |
+| `npm run test`            | Run unit and component tests             |
+| `npm run test:watch`      | Run tests in watch mode                  |
+| `npm run test:e2e`        | Run Playwright E2E tests                 |
+| `npm run build`           | Build both browser targets               |
+| `npm run build:chrome`    | Build the Chromium extension             |
+| `npm run build:firefox`   | Build the Firefox extension              |
+| `npm run storybook`       | Start Storybook                          |
+| `npm run build-storybook` | Build static Storybook documentation     |
+| `npm run check`           | Run the project verification workflow    |
+
+Run `npm run check` before submitting a pull request.
 
 ## Development releases
 
