@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.4
+
+### Bug Fixes
+
+- exclude Chrome sidebar APIs from Firefox builds (dbe8fb0)
+- resolve Firefox compatibility warnings and add demo service (f0db7e9)
+
 ## v0.5.3
 
 ### Bug Fixes
