@@ -24,23 +24,25 @@ export async function openWorkspaceSidebar(windowId?: number): Promise<void> {
     return
   }
 
-  if (typeof chrome !== 'undefined' && chrome.sidePanel?.open) {
-    if (windowId !== undefined) {
-      await chrome.sidePanel.open({ windowId })
+  if (import.meta.env.VITE_BROWSER_TARGET !== 'firefox') {
+    if (typeof chrome !== 'undefined' && chrome.sidePanel?.open) {
+      if (windowId !== undefined) {
+        await chrome.sidePanel.open({ windowId })
+        return
+      }
+
+      const currentWindow = await chrome.windows.getCurrent()
+
+      if (currentWindow.id === undefined) {
+        throw new Error('Unable to determine the current browser window.')
+      }
+
+      await chrome.sidePanel.open({
+        windowId: currentWindow.id,
+      })
+
       return
     }
-
-    const currentWindow = await chrome.windows.getCurrent()
-
-    if (currentWindow.id === undefined) {
-      throw new Error('Unable to determine the current browser window.')
-    }
-
-    await chrome.sidePanel.open({
-      windowId: currentWindow.id,
-    })
-
-    return
   }
 
   throw new Error('Native sidebar support is unavailable in this browser.')
@@ -54,18 +56,20 @@ export async function closeWorkspaceSidebar(): Promise<void> {
     return
   }
 
-  if (typeof chrome !== 'undefined' && chrome.sidePanel?.close) {
-    const currentWindow = await chrome.windows.getCurrent()
+  if (import.meta.env.VITE_BROWSER_TARGET !== 'firefox') {
+    if (typeof chrome !== 'undefined' && chrome.sidePanel?.close) {
+      const currentWindow = await chrome.windows.getCurrent()
 
-    if (currentWindow.id === undefined) {
-      throw new Error('Unable to determine the current browser window.')
+      if (currentWindow.id === undefined) {
+        throw new Error('Unable to determine the current browser window.')
+      }
+
+      await chrome.sidePanel.close({
+        windowId: currentWindow.id,
+      })
+
+      return
     }
-
-    await chrome.sidePanel.close({
-      windowId: currentWindow.id,
-    })
-
-    return
   }
 
   throw new Error('Closing the sidebar programmatically is unavailable in this browser.')

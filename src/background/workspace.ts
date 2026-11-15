@@ -24,10 +24,15 @@ function getFirefoxSidebar() {
 }
 
 function hasSidebarSupport(): boolean {
-  return (
-    typeof getFirefoxSidebar()?.open === 'function' ||
-    (typeof chrome !== 'undefined' && typeof chrome.sidePanel?.open === 'function')
-  )
+  if (typeof getFirefoxSidebar()?.open === 'function') {
+    return true
+  }
+
+  if (import.meta.env.VITE_BROWSER_TARGET !== 'firefox') {
+    return typeof chrome !== 'undefined' && typeof chrome.sidePanel?.open === 'function'
+  }
+
+  return false
 }
 
 function getSupportedMode(mode: WorkspaceMode): WorkspaceMode {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getWorkspacePreferences } from '../utils/workspace-storage'
 import { openDetachedWorkspace } from './services/workspace-window'
 import { toggleWorkspaceSidebar } from '../utils/workspace-sidebar'
@@ -27,6 +27,7 @@ describe('background workspace', () => {
   beforeEach(async () => {
     vi.resetModules()
     vi.clearAllMocks()
+    vi.stubEnv('VITE_BROWSER_TARGET', 'chrome')
 
     vi.mocked(getWorkspacePreferences).mockResolvedValue({
       defaultMode: 'popup',
@@ -58,6 +59,12 @@ describe('background workspace', () => {
 
     initializeWorkspace = workspace.initializeWorkspace
     handleWorkspaceActionClick = workspace.handleWorkspaceActionClick
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
   })
 
   it('keeps the popup enabled by default', async () => {
@@ -229,6 +236,7 @@ describe('background workspace', () => {
   })
 
   it('opens the Firefox sidebar on the first click while preferences are loading', async () => {
+    vi.stubEnv('VITE_BROWSER_TARGET', 'firefox')
     let resolvePreferences!: (value: { defaultMode: 'sidebar' }) => void
 
     vi.mocked(getWorkspacePreferences).mockImplementation(
@@ -326,5 +334,35 @@ describe('background workspace', () => {
     } finally {
       error.mockRestore()
     }
+  })
+
+  it('supports native Firefox sidebar mode in the Firefox target', async () => {
+    vi.stubEnv('VITE_BROWSER_TARGET', 'firefox')
+    vi.stubGlobal('browser', {
+      sidebarAction: { open: vi.fn(async () => {}) },
+    })
+    vi.mocked(getWorkspacePreferences).mockResolvedValue({ defaultMode: 'sidebar' })
+
+    await initializeWorkspace()
+    await handleWorkspaceActionClick(42)
+
+    expect(setPopup).toHaveBeenCalledWith({ popup: '' })
+    expect(toggleWorkspaceSidebar).toHaveBeenCalledExactlyOnceWith(42)
+    expect(sidePanelOpen).not.toHaveBeenCalled()
+  })
+
+  it('falls back to popup in the Firefox target even when Chromium APIs exist', async () => {
+    vi.stubEnv('VITE_BROWSER_TARGET', 'firefox')
+    vi.mocked(getWorkspacePreferences).mockResolvedValue({ defaultMode: 'sidebar' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await initializeWorkspace()
+    await handleWorkspaceActionClick(42)
+
+    expect(setPopup).toHaveBeenCalledWith({ popup: 'index.html' })
+    expect(toggleWorkspaceSidebar).not.toHaveBeenCalled()
+    expect(sidePanelOpen).not.toHaveBeenCalled()
+    expect(openDetachedWorkspace).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalled()
   })
 })

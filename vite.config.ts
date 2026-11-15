@@ -7,20 +7,25 @@ import packageJson from './package.json' with { type: 'json' }
 
 type BrowserTarget = 'chrome' | 'firefox'
 
+function buildDefinitions(browser: BrowserTarget): Record<string, string> {
+  return {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(packageJson.version),
+    'import.meta.env.VITE_BROWSER_TARGET': JSON.stringify(browser),
+  }
+}
+
 function extensionPlugin(browser: BrowserTarget): Plugin {
   return {
     name: 'mediamanagarr-extension',
-
     apply: 'build',
 
     async closeBundle() {
       const outDir = join(process.cwd(), 'dist', browser)
 
-      // Build the background separately so it cannot share chunks
-      // with the popup.
+      // Keep background code separate from the popup and use the same target.
       await build({
         configFile: false,
-
+        define: buildDefinitions(browser),
         build: {
           outDir,
           emptyOutDir: false,
@@ -35,15 +40,10 @@ function extensionPlugin(browser: BrowserTarget): Plugin {
 
       const manifestPath = join(outDir, 'manifest.json')
       const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>
-
       manifest.version = packageJson.version
 
       if (browser === 'firefox') {
-        manifest.background = {
-          scripts: ['background.js'],
-        }
-
-        // Firefox and Zen use the native sidebarAction API.
+        manifest.background = { scripts: ['background.js'] }
         manifest.sidebar_action = {
           default_panel: 'index.html?workspace=sidebar',
           default_title: 'MediaManagarr',
@@ -55,17 +55,9 @@ function extensionPlugin(browser: BrowserTarget): Plugin {
           },
         }
       } else {
-        manifest.background = {
-          service_worker: 'background.js',
-        }
-
-        // Chromium browsers use the native sidePanel API.
-        manifest.side_panel = {
-          default_path: 'index.html?workspace=sidebar',
-        }
-
+        manifest.background = { service_worker: 'background.js' }
+        manifest.side_panel = { default_path: 'index.html?workspace=sidebar' }
         manifest.permissions = [...new Set([...(manifest.permissions as string[]), 'sidePanel'])]
-
         delete manifest.browser_specific_settings
       }
 
@@ -76,25 +68,24 @@ function extensionPlugin(browser: BrowserTarget): Plugin {
 
 export default defineConfig(({ mode }) => {
   const browser: BrowserTarget = mode === 'firefox' ? 'firefox' : 'chrome'
+  const definitions = buildDefinitions(browser)
+
+  // Tests select the target with vi.stubEnv instead of a compile-time constant.
+  if (process.env.VITEST) {
+    delete definitions['import.meta.env.VITE_BROWSER_TARGET']
+  }
 
   return {
     plugins: [vue(), extensionPlugin(browser)],
-
     base: './',
-
-    define: {
-      'import.meta.env.VITE_APP_VERSION': JSON.stringify(packageJson.version),
-    },
-
+    define: definitions,
     build: {
       outDir: `dist/${browser}`,
       emptyOutDir: true,
-
       rollupOptions: {
         input: join(process.cwd(), 'index.html'),
       },
     },
-
     test: {
       environment: 'jsdom',
       globals: true,
