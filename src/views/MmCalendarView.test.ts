@@ -47,6 +47,20 @@ const calendar: CalendarResult = {
   ],
 }
 
+const posterItem: CalendarItem = {
+  ...tvItem,
+  posterMediaId: 42,
+  posterUrl: '/example-poster.jpg',
+}
+
+const posterWithoutUrl: CalendarItem = {
+  ...tvItem,
+  posterMediaId: 42,
+  posterUrl: null,
+}
+
+const posterImage = 'data:image/png;base64,example'
+
 const storageGet = vi.fn()
 const storageSet = vi.fn()
 
@@ -63,6 +77,17 @@ const view = mmCalendarViewSelectors((selector) => {
 function mountView() {
   wrapper = mount(MmCalendarView)
   return wrapper
+}
+
+function calendarWithItems(items: CalendarItem[]): CalendarResult {
+  return {
+    items,
+    services: calendar.services,
+  }
+}
+
+function imageRequests() {
+  return mockedSendMessage.mock.calls.filter(([message]) => message.type === 'GET_CALENDAR_IMAGE')
 }
 
 beforeEach(() => {
@@ -345,10 +370,8 @@ describe('MmCalendarView', () => {
 
     expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-12-01')
 
-    // Simulate leaving Calendar for another view.
     wrapper.unmount()
 
-    // Simulate navigating back to Calendar.
     mountView()
     await flushPromises()
 
@@ -513,12 +536,6 @@ describe('MmCalendarView', () => {
   })
 
   it('ignores a pending poster image response after unmount', async () => {
-    const posterItem: CalendarItem = {
-      ...tvItem,
-      posterUrl: '/example-poster.jpg',
-      posterMediaId: 42,
-    }
-
     let resolveImage: ((value: { success: true; image: string }) => void) | undefined
 
     mockedSendMessage.mockImplementation((message) => {
@@ -530,10 +547,7 @@ describe('MmCalendarView', () => {
 
       return Promise.resolve({
         success: true,
-        calendar: {
-          items: [posterItem],
-          services: calendar.services,
-        },
+        calendar: calendarWithItems([posterItem]),
       })
     })
 
@@ -550,12 +564,225 @@ describe('MmCalendarView', () => {
 
     resolveImage?.({
       success: true,
-      image: 'data:image/png;base64,example',
+      image: posterImage,
     })
 
     await flushPromises()
 
     expect(wrapper.vm.$.isUnmounted).toBe(true)
     expect(mockedSendMessage).toHaveBeenCalledTimes(2)
+  })
+
+  it('loads a poster when posterMediaId exists but posterUrl is missing', async () => {
+    mockedSendMessage.mockImplementation((message) => {
+      if (message.type === 'GET_CALENDAR_IMAGE') {
+        return Promise.resolve({
+          success: true,
+          image: posterImage,
+        })
+      }
+
+      return Promise.resolve({
+        success: true,
+        calendar: calendarWithItems([posterWithoutUrl]),
+      })
+    })
+
+    mountView()
+    await flushPromises()
+
+    expect(mockedSendMessage).toHaveBeenCalledWith({
+      type: 'GET_CALENDAR_IMAGE',
+      service: 'sonarr',
+      mediaId: 42,
+    })
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('images')).toMatchObject({
+      [posterWithoutUrl.id]: posterImage,
+    })
+  })
+
+  it('does not request posters without a valid media ID', async () => {
+    const invalidPoster: CalendarItem = {
+      ...tvItem,
+      posterUrl: '/example-poster.jpg',
+      posterMediaId: 0,
+    }
+
+    mockedSendMessage.mockResolvedValue({
+      success: true,
+      calendar: calendarWithItems([invalidPoster]),
+    })
+
+    mountView()
+    await flushPromises()
+
+    expect(imageRequests()).toHaveLength(0)
+  })
+
+  it('retries a failed poster request after revisiting the date', async () => {
+    let imageAttempts = 0
+
+    mockedSendMessage.mockImplementation((message) => {
+      if (message.type === 'GET_CALENDAR_IMAGE') {
+        imageAttempts += 1
+
+        if (imageAttempts === 1) {
+          return Promise.resolve({
+            success: false,
+            error: 'Background service temporarily unavailable.',
+          })
+        }
+
+        return Promise.resolve({
+          success: true,
+          image: posterImage,
+        })
+      }
+
+      return Promise.resolve({
+        success: true,
+        calendar: calendarWithItems([posterItem]),
+      })
+    })
+
+    mountView()
+    await flushPromises()
+
+    expect(imageAttempts).toBe(1)
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('images')?.[posterItem.id]).toBeNull()
+
+    // Leave the day with the poster.
+    wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-12')
+
+    await flushPromises()
+
+    // Return to the original day.
+    wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-05')
+
+    await flushPromises()
+
+    expect(imageAttempts).toBe(2)
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('images')).toMatchObject({
+      [posterItem.id]: posterImage,
+    })
+  })
+
+  it('retries a failed poster request when refreshing Calendar', async () => {
+    let imageAttempts = 0
+
+    mockedSendMessage.mockImplementation((message) => {
+      if (message.type === 'GET_CALENDAR_IMAGE') {
+        imageAttempts += 1
+
+        if (imageAttempts === 1) {
+          return Promise.resolve({
+            success: false,
+            error: 'Temporary poster error.',
+          })
+        }
+
+        return Promise.resolve({
+          success: true,
+          image: posterImage,
+        })
+      }
+
+      return Promise.resolve({
+        success: true,
+        calendar: calendarWithItems([posterItem]),
+      })
+    })
+
+    mountView()
+    await flushPromises()
+
+    expect(imageAttempts).toBe(1)
+
+    await view.refresh().trigger('click')
+    await flushPromises()
+
+    expect(imageAttempts).toBe(2)
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('images')).toMatchObject({
+      [posterItem.id]: posterImage,
+    })
+  })
+
+  it('caches successfully loaded posters when revisiting a date', async () => {
+    mockedSendMessage.mockImplementation((message) => {
+      if (message.type === 'GET_CALENDAR_IMAGE') {
+        return Promise.resolve({
+          success: true,
+          image: posterImage,
+        })
+      }
+
+      return Promise.resolve({
+        success: true,
+        calendar: calendarWithItems([posterItem]),
+      })
+    })
+
+    mountView()
+    await flushPromises()
+
+    expect(imageRequests()).toHaveLength(1)
+
+    wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-12')
+
+    await flushPromises()
+
+    wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-05')
+
+    await flushPromises()
+
+    expect(imageRequests()).toHaveLength(1)
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('images')).toMatchObject({
+      [posterItem.id]: posterImage,
+    })
+  })
+
+  it('deduplicates concurrent poster requests for the same media', async () => {
+    const secondEpisode: CalendarItem = {
+      ...posterItem,
+      id: 'sonarr-2',
+      subtitle: 'S01E02',
+    }
+
+    let resolveImage: ((value: { success: true; image: string }) => void) | undefined
+
+    mockedSendMessage.mockImplementation((message) => {
+      if (message.type === 'GET_CALENDAR_IMAGE') {
+        return new Promise((resolve) => {
+          resolveImage = resolve as typeof resolveImage
+        })
+      }
+
+      return Promise.resolve({
+        success: true,
+        calendar: calendarWithItems([posterItem, secondEpisode]),
+      })
+    })
+
+    mountView()
+    await flushPromises()
+
+    expect(imageRequests()).toHaveLength(1)
+
+    resolveImage?.({
+      success: true,
+      image: posterImage,
+    })
+
+    await flushPromises()
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('images')).toMatchObject({
+      [posterItem.id]: posterImage,
+      [secondEpisode.id]: posterImage,
+    })
   })
 })

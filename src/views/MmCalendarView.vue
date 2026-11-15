@@ -29,7 +29,6 @@ const filters = [
 ]
 
 const today = ref(calendarDateKey(new Date()))
-
 const month = ref(calendarDateKey(startOfCalendarMonth(new Date())))
 const selectedDate = ref(today.value)
 const activeFilter = ref<CalendarFilter>('all')
@@ -40,7 +39,11 @@ const loading = ref(false)
 const error = ref('')
 
 const images = ref<Record<string, string | null>>({})
-const imageCache = new Map<string, string | null>()
+
+// Only successfully loaded images are cached.
+const imageCache = new Map<string, string>()
+
+// Share requests for the same media item while they are in flight.
 const pendingImages = new Map<string, Promise<string | null>>()
 
 let requestSequence = 0
@@ -101,6 +104,14 @@ function resetToToday(): void {
   month.value = calendarDateKey(startOfCalendarMonth(now))
 }
 
+function hasValidPosterMediaId(item: CalendarItem): boolean {
+  return (
+    typeof item.posterMediaId === 'number' &&
+    Number.isSafeInteger(item.posterMediaId) &&
+    item.posterMediaId > 0
+  )
+}
+
 async function loadCalendar(): Promise<void> {
   if (isUnmounted) {
     return
@@ -145,27 +156,24 @@ async function loadCalendar(): Promise<void> {
 }
 
 async function loadImage(item: CalendarItem): Promise<void> {
-  if (isUnmounted) {
+  if (isUnmounted || !hasValidPosterMediaId(item)) {
     return
   }
 
-  const mediaId = item.posterMediaId
-
-  if (typeof mediaId !== 'number' || !Number.isSafeInteger(mediaId) || mediaId < 1) {
-    return
-  }
-
+  const mediaId = item.posterMediaId as number
   const cacheKey = `${item.source}-${mediaId}`
 
-  if (imageCache.has(cacheKey)) {
-    images.value[item.id] = imageCache.get(cacheKey) ?? null
+  const cachedImage = imageCache.get(cacheKey)
+
+  if (cachedImage) {
+    images.value[item.id] = cachedImage
     return
   }
 
   let request = pendingImages.get(cacheKey)
 
   if (!request) {
-    request = (async () => {
+    request = (async (): Promise<string | null> => {
       try {
         const response = await sendBackgroundMessage({
           type: 'GET_CALENDAR_IMAGE',
@@ -189,8 +197,14 @@ async function loadImage(item: CalendarItem): Promise<void> {
       return
     }
 
-    imageCache.set(cacheKey, image)
-    images.value[item.id] = image
+    if (image) {
+      imageCache.set(cacheKey, image)
+      images.value[item.id] = image
+    } else {
+      // A temporary failure must not become a permanent cache entry.
+      // Keep an existing successful image if one is already displayed.
+      images.value[item.id] = imageCache.get(cacheKey) ?? images.value[item.id] ?? null
+    }
   } finally {
     if (pendingImages.get(cacheKey) === request) {
       pendingImages.delete(cacheKey)
@@ -198,14 +212,20 @@ async function loadImage(item: CalendarItem): Promise<void> {
   }
 }
 
+function loadSelectedImages(): void {
+  for (const item of selectedItems.value) {
+    // The background service retrieves the poster URL from Sonarr/Radarr
+    // metadata, so the calendar item's posterUrl is not required.
+    if (hasValidPosterMediaId(item)) {
+      void loadImage(item)
+    }
+  }
+}
+
 watch(
   selectedItems,
-  (currentItems) => {
-    for (const item of currentItems) {
-      if (item.posterUrl && item.posterMediaId) {
-        void loadImage(item)
-      }
-    }
+  () => {
+    loadSelectedImages()
   },
   { immediate: true },
 )
@@ -267,11 +287,13 @@ function refresh(): void {
   }
 
   void loadCalendar()
+
+  // Retry posters even if refreshing returns the same calendar items.
+  loadSelectedImages()
 }
 
 onMounted(() => {
-  // Always start a new Calendar visit on today's local date.
-  // Previously saved calendar positions are intentionally ignored.
+  // Every new Calendar visit starts on today's local date.
   resetToToday()
 
   void loadCalendar()
