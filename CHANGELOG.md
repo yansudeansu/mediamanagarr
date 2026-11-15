@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.3
+
+### Bug Fixes
+
+- reject service redirects and prepare store publication (e2ff586)
+
 ## v0.5.2
 
 ### Bug Fixes
