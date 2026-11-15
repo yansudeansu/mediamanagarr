@@ -12,12 +12,12 @@ node reviewer-services.mjs
 
 Keep the terminal running. In the installed extension's Settings, add the following services and grant the requested local host permissions:
 
-| Service | URL |
-| --- | --- |
-| Jellyfin | http://127.0.0.1:18961 |
-| Seerr | http://127.0.0.1:18962 |
-| Sonarr | http://127.0.0.1:18963 |
-| Radarr | http://127.0.0.1:18964 |
+| Service     | URL                    |
+| ----------- | ---------------------- |
+| Jellyfin    | http://127.0.0.1:18961 |
+| Seerr       | http://127.0.0.1:18962 |
+| Sonarr      | http://127.0.0.1:18963 |
+| Radarr      | http://127.0.0.1:18964 |
 | qBittorrent | http://127.0.0.1:18965 |
 
 Use `review-only-api-key` as the API key for every service. Select `Review User` for Jellyfin.
