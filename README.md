@@ -15,12 +15,15 @@ Built with Vue 3, TypeScript, and Vite, the project focuses on accessibility, pr
 - [Architecture](docs/ARCHITECTURE.md) — Service registry, navigation features, and application structure.
 - [Contributing](CONTRIBUTING.md) — Development conventions, testing, and pull requests.
 - [Component Library](https://yansudeansu.github.io/mediamanagarr/) — Storybook documentation for reusable UI components.
+- [Privacy Policy](PRIVACY.md) — Local storage, service communication, and third-party image requests.
 
 ## Getting started
 
 ### Requirements
 
-Install a Node.js version supported by the engines declared in `package.json`, along with npm.
+Install [Node.js](https://nodejs.org/) 26.x and its bundled npm.
+
+The release workflow builds on Ubuntu using Node.js 26. Use `npm ci` to install the dependency versions recorded in `package-lock.json`.
 
 ### Development
 
@@ -42,7 +45,7 @@ The development server runs the Vue application. Browser-extension functionality
 
 ### Build the extension
 
-Build both browser targets:
+After installing dependencies, build both browser targets:
 
 ```bash
 npm run build
@@ -52,12 +55,40 @@ Or build a specific target:
 
 ```bash
 npm run build:firefox
+```
+
+```bash
 npm run build:chrome
 ```
 
 Build output is written to `dist/firefox/` and `dist/chrome/`.
 
 To load a development build into your browser, follow the [installation instructions](docs/USER-GUIDE.md#installation).
+
+### Build from a release source archive
+
+Download the source archive for the release tag you want to build from [GitHub Releases](https://github.com/yansudeansu/mediamanagarr/releases).
+
+Extract the archive and open a terminal in the extracted project directory containing `package.json` and `package-lock.json`.
+
+Install dependencies and build Firefox:
+
+```bash
+npm ci
+npm run build:firefox
+```
+
+The Firefox output is written to `dist/firefox/`.
+
+To build Chrome instead:
+
+```bash
+npm run build:chrome
+```
+
+The Chrome output is written to `dist/chrome/`.
+
+The browser-specific release ZIPs contain the contents of the corresponding output directory, with `manifest.json` at the ZIP root. GitHub's automatically generated source archives contain the project source and must be built before they can be loaded as extensions.
 
 ## Testing and quality assurance
 
@@ -123,7 +154,7 @@ See [Contributing](CONTRIBUTING.md) for individual commands and pull-request gui
 
 Run `npm run check` before submitting a pull request.
 
-## Development releases
+## Releases
 
 MediaManagarr provides browser-specific ZIP archives through [GitHub Releases](https://github.com/yansudeansu/mediamanagarr/releases).
 
@@ -134,7 +165,9 @@ mediamanagarr-vX.Y.Z-firefox.zip
 mediamanagarr-vX.Y.Z-chrome.zip
 ```
 
-These archives are intended for development and testing, not browser-store distribution.
+These archives contain browser-specific extension builds for testing and store submission.
+
+The Firefox ZIP provided on GitHub is unsigned. Publishing a GitHub release does not sign the extension or publish it to a browser extension store.
 
 See the [User Guide](docs/USER-GUIDE.md#installation) for installation instructions.
 
@@ -147,6 +180,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions and pull-requ
 ## Security and privacy
 
 Never include real API keys, passwords, private server addresses, or personal media data in issues, tests, screenshots, or Storybook stories.
+
+See the [Privacy Policy](PRIVACY.md) for details about local storage, communication with configured services, background requests, and third-party poster images.
 
 ## License
 
