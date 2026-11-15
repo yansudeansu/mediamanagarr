@@ -18,7 +18,7 @@ export default defineConfig(
   vue.configs['flat/recommended'],
 
   {
-    files: ['tools/reviewer-simulator/**/*.mjs'],
+    files: ['tools/demo-services/**/*.mjs'],
     languageOptions: {
       globals: {
         Buffer: 'readonly',

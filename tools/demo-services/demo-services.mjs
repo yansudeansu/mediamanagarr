@@ -1,8 +1,8 @@
 import { createServer } from 'node:http'
 
 // Standalone simulated services. No imports from the extension or test runner.
-const key = 'review-only-api-key'
-const userId = 'review-user'
+const key = 'demo-api-key'
+const userId = 'demo-user'
 const definitions = [
   ['jellyfin', 18961],
   ['seerr', 18962],
@@ -19,13 +19,13 @@ const iso = (offset = 0) => {
   return date.toISOString()
 }
 const arrivals = Array.from({ length: 15 }, (_, i) => ({
-  Id: `review-item-${i + 1}`,
-  Name: i % 2 ? `Review episode ${i + 1}` : `Review movie ${i + 1}`,
+  Id: `demo-item-${i + 1}`,
+  Name: i % 2 ? `Demo episode ${i + 1}` : `Demo movie ${i + 1}`,
   Type: i % 2 ? 'Episode' : 'Movie',
   DateCreated: iso(-i),
   ProductionYear: now.getFullYear(),
-  SeriesName: 'Review series',
-  SeriesId: 'review-series',
+  SeriesName: 'Demo series',
+  SeriesId: 'demo-series',
   ParentIndexNumber: 1,
   IndexNumber: i + 1,
   UserData: { Played: false },
@@ -36,21 +36,21 @@ const requests = Array.from({ length: 15 }, (_, i) => ({
   status: (i % 3) + 1,
   type: i % 2 ? 'tv' : 'movie',
   createdAt: iso(-i),
-  requestedBy: { displayName: 'Review User' },
+  requestedBy: { displayName: 'Demo User' },
   media: { tmdbId: i + 1, status: (i % 4) + 2, posterPath: null },
 }))
 const episodes = [-3, 0, 1, 3, 7].map((offset, i) => ({
   id: i + 1,
   seriesId: 1,
-  title: `Review episode ${i + 1}`,
+  title: `Demo episode ${i + 1}`,
   seasonNumber: 1,
   episodeNumber: i + 1,
   airDateUtc: iso(offset),
-  series: { id: 1, title: 'Review series', images: [] },
+  series: { id: 1, title: 'Demo series', images: [] },
 }))
 const movies = [-2, 0, 2, 5, 10].map((offset, i) => ({
   id: i + 1,
-  title: `Review movie ${i + 1}`,
+  title: `Demo movie ${i + 1}`,
   year: now.getFullYear(),
   digitalRelease: iso(offset).slice(0, 10),
   images: [],
@@ -58,7 +58,7 @@ const movies = [-2, 0, 2, 5, 10].map((offset, i) => ({
 const initialTorrents = () => [
   {
     hash: 'a'.repeat(40),
-    name: 'Simulated review download',
+    name: 'Simulated demo download',
     progress: 0.48,
     state: 'downloading',
     dlspeed: 2097152,
@@ -128,12 +128,12 @@ async function body(req) {
 async function handle(service, req, res) {
   const url = new URL(req.url, 'http://127.0.0.1')
   const path = url.pathname
-  if (!authenticated(service, req)) return json(res, 401, { error: 'Invalid review API key' })
+  if (!authenticated(service, req)) return json(res, 401, { error: 'Invalid demo API key' })
   if (req.method === 'GET') {
     if (service === 'jellyfin') {
       if (path === '/Library/MediaFolders')
         return json(res, 200, { Items: [], TotalRecordCount: 0 })
-      if (path === '/Users') return json(res, 200, [{ Id: userId, Name: 'Review User' }])
+      if (path === '/Users') return json(res, 200, [{ Id: userId, Name: 'Demo User' }])
       if (path === `/Users/${userId}/Items`) {
         const skip = numberParam(url, 'StartIndex', 0, 10000)
         const limit = numberParam(url, 'Limit', 10, 100)
@@ -146,7 +146,7 @@ async function handle(service, req, res) {
         return json(res, 404, { error: 'No demo poster' })
     }
     if (service === 'seerr') {
-      if (path === '/api/v1/status') return json(res, 200, { version: 'review-simulator' })
+      if (path === '/api/v1/status') return json(res, 200, { version: 'demo-simulator' })
       if (path === '/api/v1/request') {
         const skip = numberParam(url, 'skip', 0, 10000)
         const take = numberParam(url, 'take', 10, 100)
@@ -164,11 +164,11 @@ async function handle(service, req, res) {
       }
       const metadata = path.match(/^\/api\/v1\/(movie|tv)\/(\d+)$/)
       if (metadata)
-        return json(res, 200, { title: `Review ${metadata[1]} ${metadata[2]}`, posterPath: null })
+        return json(res, 200, { title: `Demo ${metadata[1]} ${metadata[2]}`, posterPath: null })
     }
     if (service === 'sonarr' || service === 'radarr') {
       if (path === '/api/v3/system/status')
-        return json(res, 200, { appName: service, version: 'review-simulator' })
+        return json(res, 200, { appName: service, version: 'demo-simulator' })
       const detail = path.match(/^\/api\/v3\/(series|movie)\/(\d+)$/)
       if (detail) {
         const id = Number(detail[2])
@@ -225,7 +225,7 @@ async function handle(service, req, res) {
     return res.end('Ok.')
   }
   console.warn(`Unhandled simulator route: ${service} ${req.method} ${path}`)
-  json(res, 404, { error: 'Route not implemented by review simulator' })
+  json(res, 404, { error: 'Route not implemented by demo simulator' })
 }
 
 async function close() {

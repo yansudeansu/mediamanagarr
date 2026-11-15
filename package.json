@@ -26,7 +26,7 @@
     "check": "npm run lint && npm run format:check && npm run test && npm run build",
     "release:prepare": "node scripts/prepare-release.mts",
     "release:check": "node scripts/verify-release.mts",
-    "reviewer:services": "node tools/reviewer-simulator/reviewer-services.mjs"
+    "demo:services": "node tools/demo-services/demo-services.mjs"
   },
   "dependencies": {
     "@lucide/vue": "^1.62.0",
