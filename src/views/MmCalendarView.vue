@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
 import MmCalendarTemplate from '../components/templates/MmCalendarTemplate/MmCalendarTemplate.vue'
 import MmCalendarHeader from '../components/molecules/MmCalendarHeader/MmCalendarHeader.vue'
 import MmCalendarGrid from '../components/organisms/MmCalendarGrid/MmCalendarGrid.vue'
 import MmCalendarDetails from '../components/organisms/MmCalendarDetails/MmCalendarDetails.vue'
 import MmFilterGroup from '../components/molecules/MmFilterGroup/MmFilterGroup.vue'
 import MmButton from '../components/atoms/MmButton/MmButton.vue'
-import type {
-  CalendarFilter,
-  CalendarItem,
-  CalendarPosition,
-  CalendarServiceStatus,
-} from '../types/calendar'
+
+import type { CalendarFilter, CalendarItem, CalendarServiceStatus } from '../types/calendar'
+
 import {
   calendarDateKey,
   calendarItemDateKey,
@@ -21,9 +19,8 @@ import {
   previousCalendarMonth,
   startOfCalendarMonth,
 } from '../utils/calendar-date'
-import { sendBackgroundMessage } from '../utils/background-messaging'
 
-const STORAGE_KEY = 'mediaManagarrCalendarPosition'
+import { sendBackgroundMessage } from '../utils/background-messaging'
 
 const filters = [
   { label: 'All', value: 'all' },
@@ -31,10 +28,9 @@ const filters = [
   { label: 'Movies', value: 'movie' },
 ]
 
-const today = calendarDateKey(new Date())
-
+const today = ref(calendarDateKey(new Date()))
 const month = ref(calendarDateKey(startOfCalendarMonth(new Date())))
-const selectedDate = ref(today)
+const selectedDate = ref(today.value)
 const activeFilter = ref<CalendarFilter>('all')
 
 const items = ref<CalendarItem[]>([])
@@ -43,7 +39,11 @@ const loading = ref(false)
 const error = ref('')
 
 const images = ref<Record<string, string | null>>({})
-const imageCache = new Map<string, string | null>()
+
+// Only successfully loaded images are cached.
+const imageCache = new Map<string, string>()
+
+// Share requests for the same media item while they are in flight.
 const pendingImages = new Map<string, Promise<string | null>>()
 
 let requestSequence = 0
@@ -96,53 +96,20 @@ function currentMonthDate(): Date {
   return parseCalendarDateKey(month.value) ?? startOfCalendarMonth(new Date())
 }
 
-async function savePosition(): Promise<void> {
-  try {
-    await chrome.storage.local.set({
-      [STORAGE_KEY]: {
-        month: month.value,
-        selectedDate: selectedDate.value,
-      } satisfies CalendarPosition,
-    })
-  } catch {
-    // Storage failures should not prevent calendar navigation.
-  }
+function resetToToday(): void {
+  const now = new Date()
+
+  today.value = calendarDateKey(now)
+  selectedDate.value = today.value
+  month.value = calendarDateKey(startOfCalendarMonth(now))
 }
 
-async function restorePosition(): Promise<void> {
-  try {
-    const result = (await chrome.storage.local.get(STORAGE_KEY)) as {
-      [STORAGE_KEY]?: CalendarPosition
-    }
-
-    if (isUnmounted) {
-      return
-    }
-
-    const stored = result[STORAGE_KEY]
-
-    if (!stored) {
-      return
-    }
-
-    const storedMonth = parseCalendarDateKey(stored.month)
-    const storedDate = parseCalendarDateKey(stored.selectedDate)
-
-    if (!storedMonth || !storedDate) {
-      return
-    }
-
-    const normalizedMonth = calendarDateKey(startOfCalendarMonth(storedMonth))
-
-    if (stored.selectedDate.slice(0, 7) !== normalizedMonth.slice(0, 7)) {
-      return
-    }
-
-    month.value = normalizedMonth
-    selectedDate.value = calendarDateKey(storedDate)
-  } catch {
-    // Storage is optional; use the current month if unavailable.
-  }
+function hasValidPosterMediaId(item: CalendarItem): boolean {
+  return (
+    typeof item.posterMediaId === 'number' &&
+    Number.isSafeInteger(item.posterMediaId) &&
+    item.posterMediaId > 0
+  )
 }
 
 async function loadCalendar(): Promise<void> {
@@ -189,27 +156,24 @@ async function loadCalendar(): Promise<void> {
 }
 
 async function loadImage(item: CalendarItem): Promise<void> {
-  if (isUnmounted) {
+  if (isUnmounted || !hasValidPosterMediaId(item)) {
     return
   }
 
-  const mediaId = item.posterMediaId
-
-  if (typeof mediaId !== 'number' || !Number.isSafeInteger(mediaId) || mediaId < 1) {
-    return
-  }
-
+  const mediaId = item.posterMediaId as number
   const cacheKey = `${item.source}-${mediaId}`
 
-  if (imageCache.has(cacheKey)) {
-    images.value[item.id] = imageCache.get(cacheKey) ?? null
+  const cachedImage = imageCache.get(cacheKey)
+
+  if (cachedImage) {
+    images.value[item.id] = cachedImage
     return
   }
 
   let request = pendingImages.get(cacheKey)
 
   if (!request) {
-    request = (async () => {
+    request = (async (): Promise<string | null> => {
       try {
         const response = await sendBackgroundMessage({
           type: 'GET_CALENDAR_IMAGE',
@@ -233,8 +197,14 @@ async function loadImage(item: CalendarItem): Promise<void> {
       return
     }
 
-    imageCache.set(cacheKey, image)
-    images.value[item.id] = image
+    if (image) {
+      imageCache.set(cacheKey, image)
+      images.value[item.id] = image
+    } else {
+      // A temporary failure must not become a permanent cache entry.
+      // Keep an existing successful image if one is already displayed.
+      images.value[item.id] = imageCache.get(cacheKey) ?? images.value[item.id] ?? null
+    }
   } finally {
     if (pendingImages.get(cacheKey) === request) {
       pendingImages.delete(cacheKey)
@@ -242,14 +212,20 @@ async function loadImage(item: CalendarItem): Promise<void> {
   }
 }
 
+function loadSelectedImages(): void {
+  for (const item of selectedItems.value) {
+    // The background service retrieves the poster URL from Sonarr/Radarr
+    // metadata, so the calendar item's posterUrl is not required.
+    if (hasValidPosterMediaId(item)) {
+      void loadImage(item)
+    }
+  }
+}
+
 watch(
   selectedItems,
-  (currentItems) => {
-    for (const item of currentItems) {
-      if (item.posterUrl && item.posterMediaId) {
-        void loadImage(item)
-      }
-    }
+  () => {
+    loadSelectedImages()
   },
   { immediate: true },
 )
@@ -277,39 +253,32 @@ function selectDate(date: string): void {
     month.value = selectedMonth
     void loadCalendar()
   }
-
-  void savePosition()
 }
 
 function previousMonth(): void {
   month.value = calendarDateKey(previousCalendarMonth(currentMonthDate()))
+
   selectedDate.value = month.value
 
-  void savePosition()
   void loadCalendar()
 }
 
 function nextMonth(): void {
   month.value = calendarDateKey(nextCalendarMonth(currentMonthDate()))
+
   selectedDate.value = month.value
 
-  void savePosition()
   void loadCalendar()
 }
 
 function goToToday(): void {
-  const now = new Date()
-  const currentToday = calendarDateKey(now)
-  const todayMonth = calendarDateKey(startOfCalendarMonth(now))
+  const previousMonthKey = month.value
 
-  selectedDate.value = currentToday
+  resetToToday()
 
-  if (month.value !== todayMonth) {
-    month.value = todayMonth
+  if (month.value !== previousMonthKey) {
     void loadCalendar()
   }
-
-  void savePosition()
 }
 
 function refresh(): void {
@@ -318,14 +287,16 @@ function refresh(): void {
   }
 
   void loadCalendar()
+
+  // Retry posters even if refreshing returns the same calendar items.
+  loadSelectedImages()
 }
 
-onMounted(async () => {
-  await restorePosition()
+onMounted(() => {
+  // Every new Calendar visit starts on today's local date.
+  resetToToday()
 
-  if (!isUnmounted) {
-    await loadCalendar()
-  }
+  void loadCalendar()
 })
 
 onBeforeUnmount(() => {
@@ -383,7 +354,8 @@ onBeforeUnmount(() => {
         class="calendar-view__warning"
         role="status"
       >
-        <strong>{{ warning.service }}:</strong> {{ warning.message }}
+        <strong>{{ warning.service }}:</strong>
+        {{ warning.message }}
       </div>
     </template>
 
