@@ -1,3 +1,5 @@
+/// <reference types="chrome" />
+
 import type { BrowserContext } from '@playwright/test'
 import type { ServiceConfigs } from '../../../src/types/service'
 import type { WorkspaceNavigationState } from '../../../src/utils/workspace-state'

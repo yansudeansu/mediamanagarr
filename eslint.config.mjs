@@ -18,6 +18,19 @@ export default defineConfig(
   vue.configs['flat/recommended'],
 
   {
+    files: ['tools/reviewer-simulator/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        Buffer: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        console: 'readonly',
+        process: 'readonly',
+      },
+    },
+  },
+
+  {
     files: ['**/*.vue'],
     extends: [
       ...tseslint.configs.recommended.map((config) => ({
