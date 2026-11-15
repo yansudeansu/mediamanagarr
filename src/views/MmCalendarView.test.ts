@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+
 import MmCalendarView from './MmCalendarView.vue'
 import MmCalendarHeader from '../components/molecules/MmCalendarHeader/MmCalendarHeader.vue'
 import MmCalendarGrid from '../components/organisms/MmCalendarGrid/MmCalendarGrid.vue'
 import MmCalendarDetails from '../components/organisms/MmCalendarDetails/MmCalendarDetails.vue'
 import MmFilterGroup from '../components/molecules/MmFilterGroup/MmFilterGroup.vue'
+
 import type { CalendarItem, CalendarResult } from '../types/calendar'
 import { sendBackgroundMessage } from '../utils/background-messaging'
 import { mmCalendarViewSelectors } from '../test/selectors/views/mmCalendarView.selectors'
@@ -51,7 +53,10 @@ const storageSet = vi.fn()
 let wrapper: VueWrapper
 
 const view = mmCalendarViewSelectors((selector) => {
-  if (wrapper.element instanceof Element && wrapper.element.matches(selector)) return wrapper
+  if (wrapper.element instanceof Element && wrapper.element.matches(selector)) {
+    return wrapper
+  }
+
   return wrapper.find(selector.replace(/^\.calendar-template /, ''))
 })
 
@@ -125,6 +130,7 @@ describe('MmCalendarView', () => {
     expect(view.actions().text()).toContain('Today')
     expect(view.refresh().exists()).toBe(true)
     expect(view.navigation().text()).not.toContain('Today')
+
     expect(view.navigation().find('button[aria-label="Refresh calendar"]').exists()).toBe(false)
   })
 
@@ -133,6 +139,7 @@ describe('MmCalendarView', () => {
     await flushPromises()
 
     wrapper.findComponent(MmFilterGroup).vm.$emit('update:modelValue', 'tv')
+
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarGrid).props('items')).toEqual([tvItem])
@@ -143,6 +150,7 @@ describe('MmCalendarView', () => {
     await flushPromises()
 
     wrapper.findComponent(MmFilterGroup).vm.$emit('update:modelValue', 'movie')
+
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarGrid).props('items')).toEqual([movieItem])
@@ -153,6 +161,7 @@ describe('MmCalendarView', () => {
     await flushPromises()
 
     wrapper.findComponent(MmFilterGroup).vm.$emit('update:modelValue', 'invalid')
+
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarGrid).props('items')).toEqual([tvItem, movieItem])
@@ -165,6 +174,7 @@ describe('MmCalendarView', () => {
     expect(wrapper.findComponent(MmCalendarDetails).props('items')).toEqual([tvItem])
 
     wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-12')
+
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarDetails).props('items')).toEqual([movieItem])
@@ -211,6 +221,7 @@ describe('MmCalendarView', () => {
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-11-01')
+
     expect(wrapper.findComponent(MmCalendarDetails).props('date')).toBe('2026-11-05')
   })
 
@@ -219,6 +230,7 @@ describe('MmCalendarView', () => {
     await flushPromises()
 
     wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-12')
+
     await flushPromises()
 
     expect(view.today().text().trim()).toBe('Today')
@@ -263,22 +275,20 @@ describe('MmCalendarView', () => {
     expect(view.refreshEnabled().exists()).toBe(true)
   })
 
-  it('persists the selected date', async () => {
+  it('does not persist the selected date', async () => {
     mountView()
     await flushPromises()
 
     wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-12')
+
     await flushPromises()
 
-    expect(storageSet).toHaveBeenCalledWith({
-      mediaManagarrCalendarPosition: {
-        month: '2026-11-01',
-        selectedDate: '2026-11-12',
-      },
-    })
+    expect(wrapper.findComponent(MmCalendarDetails).props('date')).toBe('2026-11-12')
+
+    expect(storageSet).not.toHaveBeenCalled()
   })
 
-  it('restores the saved calendar position', async () => {
+  it('ignores saved calendar positions and starts on today', async () => {
     storageGet.mockResolvedValue({
       mediaManagarrCalendarPosition: {
         month: '2026-12-01',
@@ -289,17 +299,20 @@ describe('MmCalendarView', () => {
     mountView()
     await flushPromises()
 
-    expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-12-01')
-    expect(wrapper.findComponent(MmCalendarDetails).props('date')).toBe('2026-12-15')
+    expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-11-01')
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('date')).toBe('2026-11-05')
 
     expect(mockedSendMessage).toHaveBeenCalledWith({
       type: 'GET_CALENDAR',
-      start: '2026-12-01',
-      end: '2027-01-01',
+      start: '2026-11-01',
+      end: '2026-12-01',
     })
+
+    expect(storageGet).not.toHaveBeenCalled()
   })
 
-  it('ignores invalid saved calendar positions', async () => {
+  it('starts on today even when an invalid saved position exists', async () => {
     storageGet.mockResolvedValue({
       mediaManagarrCalendarPosition: {
         month: 'invalid',
@@ -311,6 +324,39 @@ describe('MmCalendarView', () => {
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-11-01')
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('date')).toBe('2026-11-05')
+
+    expect(storageGet).not.toHaveBeenCalled()
+  })
+
+  it('resets to today when Calendar is reopened', async () => {
+    mountView()
+    await flushPromises()
+
+    wrapper.findComponent(MmCalendarGrid).vm.$emit('select', '2026-11-12')
+
+    await flushPromises()
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('date')).toBe('2026-11-12')
+
+    wrapper.findComponent(MmCalendarHeader).vm.$emit('next')
+    await flushPromises()
+
+    expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-12-01')
+
+    // Simulate leaving Calendar for another view.
+    wrapper.unmount()
+
+    // Simulate navigating back to Calendar.
+    mountView()
+    await flushPromises()
+
+    expect(wrapper.findComponent(MmCalendarHeader).props('month')).toBe('2026-11-01')
+
+    expect(wrapper.findComponent(MmCalendarGrid).props('selectedDate')).toBe('2026-11-05')
+
+    expect(wrapper.findComponent(MmCalendarDetails).props('date')).toBe('2026-11-05')
   })
 
   it('shows a warning when one service fails', async () => {
@@ -320,7 +366,11 @@ describe('MmCalendarView', () => {
         items: [tvItem],
         services: [
           { service: 'sonarr', state: 'connected' },
-          { service: 'radarr', state: 'failed', error: 'Connection timed out.' },
+          {
+            service: 'radarr',
+            state: 'failed',
+            error: 'Connection timed out.',
+          },
         ],
       },
     })
@@ -330,6 +380,7 @@ describe('MmCalendarView', () => {
 
     expect(view.warnings().text()).toContain('Radarr:')
     expect(view.warnings().text()).toContain('Connection timed out.')
+
     expect(wrapper.findComponent(MmCalendarGrid).props('items')).toEqual([tvItem])
   })
 
@@ -361,6 +412,7 @@ describe('MmCalendarView', () => {
     await flushPromises()
 
     expect(view.error().text()).toContain('Background service unavailable.')
+
     expect(view.retry().text()).toContain('Retry')
   })
 
@@ -393,41 +445,42 @@ describe('MmCalendarView', () => {
       success: true,
       calendar,
     })
+
     await flushPromises()
 
     expect(wrapper.findComponent(MmCalendarGrid).props('items')).toEqual([movieItem])
   })
 
-  it('does not load the calendar after unmounting during position restoration', async () => {
-    let resolveStorage:
-      | ((value: {
-          mediaManagarrCalendarPosition: {
-            month: string
-            selectedDate: string
-          }
-        }) => void)
-      | undefined
+  it('does not load calendar data after the view is unmounted', async () => {
+    let resolveRequest: ((value: { success: true; calendar: CalendarResult }) => void) | undefined
 
-    storageGet.mockImplementationOnce(
+    mockedSendMessage.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
-          resolveStorage = resolve
+          resolveRequest = resolve as typeof resolveRequest
         }),
     )
 
     mountView()
+
+    expect(mockedSendMessage).toHaveBeenCalledWith({
+      type: 'GET_CALENDAR',
+      start: '2026-11-01',
+      end: '2026-12-01',
+    })
+
     wrapper.unmount()
 
-    resolveStorage?.({
-      mediaManagarrCalendarPosition: {
-        month: '2026-12-01',
-        selectedDate: '2026-12-15',
-      },
+    resolveRequest?.({
+      success: true,
+      calendar,
     })
 
     await flushPromises()
 
-    expect(mockedSendMessage).not.toHaveBeenCalled()
+    expect(wrapper.vm.$.isUnmounted).toBe(true)
+    expect(mockedSendMessage).toHaveBeenCalledTimes(1)
+    expect(storageGet).not.toHaveBeenCalled()
     expect(storageSet).not.toHaveBeenCalled()
   })
 

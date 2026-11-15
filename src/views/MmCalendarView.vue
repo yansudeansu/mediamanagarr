@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
 import MmCalendarTemplate from '../components/templates/MmCalendarTemplate/MmCalendarTemplate.vue'
 import MmCalendarHeader from '../components/molecules/MmCalendarHeader/MmCalendarHeader.vue'
 import MmCalendarGrid from '../components/organisms/MmCalendarGrid/MmCalendarGrid.vue'
 import MmCalendarDetails from '../components/organisms/MmCalendarDetails/MmCalendarDetails.vue'
 import MmFilterGroup from '../components/molecules/MmFilterGroup/MmFilterGroup.vue'
 import MmButton from '../components/atoms/MmButton/MmButton.vue'
-import type {
-  CalendarFilter,
-  CalendarItem,
-  CalendarPosition,
-  CalendarServiceStatus,
-} from '../types/calendar'
+
+import type { CalendarFilter, CalendarItem, CalendarServiceStatus } from '../types/calendar'
+
 import {
   calendarDateKey,
   calendarItemDateKey,
@@ -21,9 +19,8 @@ import {
   previousCalendarMonth,
   startOfCalendarMonth,
 } from '../utils/calendar-date'
-import { sendBackgroundMessage } from '../utils/background-messaging'
 
-const STORAGE_KEY = 'mediaManagarrCalendarPosition'
+import { sendBackgroundMessage } from '../utils/background-messaging'
 
 const filters = [
   { label: 'All', value: 'all' },
@@ -31,10 +28,10 @@ const filters = [
   { label: 'Movies', value: 'movie' },
 ]
 
-const today = calendarDateKey(new Date())
+const today = ref(calendarDateKey(new Date()))
 
 const month = ref(calendarDateKey(startOfCalendarMonth(new Date())))
-const selectedDate = ref(today)
+const selectedDate = ref(today.value)
 const activeFilter = ref<CalendarFilter>('all')
 
 const items = ref<CalendarItem[]>([])
@@ -96,53 +93,12 @@ function currentMonthDate(): Date {
   return parseCalendarDateKey(month.value) ?? startOfCalendarMonth(new Date())
 }
 
-async function savePosition(): Promise<void> {
-  try {
-    await chrome.storage.local.set({
-      [STORAGE_KEY]: {
-        month: month.value,
-        selectedDate: selectedDate.value,
-      } satisfies CalendarPosition,
-    })
-  } catch {
-    // Storage failures should not prevent calendar navigation.
-  }
-}
+function resetToToday(): void {
+  const now = new Date()
 
-async function restorePosition(): Promise<void> {
-  try {
-    const result = (await chrome.storage.local.get(STORAGE_KEY)) as {
-      [STORAGE_KEY]?: CalendarPosition
-    }
-
-    if (isUnmounted) {
-      return
-    }
-
-    const stored = result[STORAGE_KEY]
-
-    if (!stored) {
-      return
-    }
-
-    const storedMonth = parseCalendarDateKey(stored.month)
-    const storedDate = parseCalendarDateKey(stored.selectedDate)
-
-    if (!storedMonth || !storedDate) {
-      return
-    }
-
-    const normalizedMonth = calendarDateKey(startOfCalendarMonth(storedMonth))
-
-    if (stored.selectedDate.slice(0, 7) !== normalizedMonth.slice(0, 7)) {
-      return
-    }
-
-    month.value = normalizedMonth
-    selectedDate.value = calendarDateKey(storedDate)
-  } catch {
-    // Storage is optional; use the current month if unavailable.
-  }
+  today.value = calendarDateKey(now)
+  selectedDate.value = today.value
+  month.value = calendarDateKey(startOfCalendarMonth(now))
 }
 
 async function loadCalendar(): Promise<void> {
@@ -277,39 +233,32 @@ function selectDate(date: string): void {
     month.value = selectedMonth
     void loadCalendar()
   }
-
-  void savePosition()
 }
 
 function previousMonth(): void {
   month.value = calendarDateKey(previousCalendarMonth(currentMonthDate()))
+
   selectedDate.value = month.value
 
-  void savePosition()
   void loadCalendar()
 }
 
 function nextMonth(): void {
   month.value = calendarDateKey(nextCalendarMonth(currentMonthDate()))
+
   selectedDate.value = month.value
 
-  void savePosition()
   void loadCalendar()
 }
 
 function goToToday(): void {
-  const now = new Date()
-  const currentToday = calendarDateKey(now)
-  const todayMonth = calendarDateKey(startOfCalendarMonth(now))
+  const previousMonthKey = month.value
 
-  selectedDate.value = currentToday
+  resetToToday()
 
-  if (month.value !== todayMonth) {
-    month.value = todayMonth
+  if (month.value !== previousMonthKey) {
     void loadCalendar()
   }
-
-  void savePosition()
 }
 
 function refresh(): void {
@@ -320,12 +269,12 @@ function refresh(): void {
   void loadCalendar()
 }
 
-onMounted(async () => {
-  await restorePosition()
+onMounted(() => {
+  // Always start a new Calendar visit on today's local date.
+  // Previously saved calendar positions are intentionally ignored.
+  resetToToday()
 
-  if (!isUnmounted) {
-    await loadCalendar()
-  }
+  void loadCalendar()
 })
 
 onBeforeUnmount(() => {
@@ -383,7 +332,8 @@ onBeforeUnmount(() => {
         class="calendar-view__warning"
         role="status"
       >
-        <strong>{{ warning.service }}:</strong> {{ warning.message }}
+        <strong>{{ warning.service }}:</strong>
+        {{ warning.message }}
       </div>
     </template>
 
