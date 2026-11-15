@@ -205,6 +205,68 @@ describe('background workspace', () => {
     expect(toggleWorkspaceSidebar).toHaveBeenCalledExactlyOnceWith(42)
   })
 
+  it('registers listeners before preferences finish loading', async () => {
+    let resolvePreferences!: (value: { defaultMode: 'sidebar' }) => void
+
+    vi.mocked(getWorkspacePreferences).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePreferences = resolve
+        }),
+    )
+
+    const initialization = initializeWorkspace()
+
+    expect(addClickListener).toHaveBeenCalledOnce()
+    expect(addStorageListener).toHaveBeenCalledOnce()
+
+    resolvePreferences({ defaultMode: 'sidebar' })
+
+    await initialization
+    await handleWorkspaceActionClick(42)
+
+    expect(toggleWorkspaceSidebar).toHaveBeenCalledExactlyOnceWith(42)
+  })
+
+  it('opens the Firefox sidebar on the first click while preferences are loading', async () => {
+    let resolvePreferences!: (value: { defaultMode: 'sidebar' }) => void
+
+    vi.mocked(getWorkspacePreferences).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePreferences = resolve
+        }),
+    )
+
+    vi.stubGlobal('browser', {
+      sidebarAction: {
+        open: vi.fn(async () => {}),
+      },
+    })
+
+    const initialization = initializeWorkspace()
+
+    expect(addClickListener).toHaveBeenCalledOnce()
+
+    const listener = addClickListener.mock.calls[0]?.[0] as
+      ((tab: { windowId?: number }) => void) | undefined
+
+    expect(listener).toBeTypeOf('function')
+
+    // Simulate a click BEFORE the storage read completes.
+    listener?.({ windowId: 42 })
+
+    // The sidebar must be triggered immediately.
+    expect(toggleWorkspaceSidebar).toHaveBeenCalledExactlyOnceWith(42)
+
+    resolvePreferences({ defaultMode: 'sidebar' })
+    await initialization
+
+    expect(setPopup).toHaveBeenCalledWith({
+      popup: '',
+    })
+  })
+
   it('falls back to popup when native sidebar support is unavailable', async () => {
     vi.stubGlobal('chrome', {
       action: {

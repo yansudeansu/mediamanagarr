@@ -6,11 +6,12 @@ import { isWorkspaceMode, type WorkspaceMode } from '../types/workspace'
 const POPUP_PATH = 'index.html'
 const STORAGE_KEY = 'mediaManagarrWorkspacePreferences'
 
-let currentMode: WorkspaceMode = 'popup'
+let currentMode: WorkspaceMode | null = null
 let initialized = false
 let preferenceVersion = 0
+let initializationPromise: Promise<void> | null = null
 
-function hasSidebarSupport(): boolean {
+function getFirefoxSidebar() {
   const browserGlobal = globalThis as typeof globalThis & {
     browser?: {
       sidebarAction?: {
@@ -19,8 +20,12 @@ function hasSidebarSupport(): boolean {
     }
   }
 
+  return browserGlobal.browser?.sidebarAction
+}
+
+function hasSidebarSupport(): boolean {
   return (
-    typeof browserGlobal.browser?.sidebarAction?.open === 'function' ||
+    typeof getFirefoxSidebar()?.open === 'function' ||
     (typeof chrome !== 'undefined' && typeof chrome.sidePanel?.open === 'function')
   )
 }
@@ -79,23 +84,21 @@ function handleWorkspaceStorageChange(
     return
   }
 
+  // Invalidate any preference read still in progress.
+  ++preferenceVersion
+
   const stored: unknown = changes[STORAGE_KEY].newValue
 
-  if (
+  const mode: WorkspaceMode =
     typeof stored === 'object' &&
     stored !== null &&
     'defaultMode' in stored &&
     isWorkspaceMode(stored.defaultMode)
-  ) {
-    void applyWorkspaceMode(stored.defaultMode).catch((error) => {
-      console.error('MediaManagarr: Unable to update toolbar behavior:', error)
-    })
+      ? stored.defaultMode
+      : 'popup'
 
-    return
-  }
-
-  void applyWorkspaceMode('popup').catch((error) => {
-    console.error('MediaManagarr: Unable to restore the toolbar popup:', error)
+  void applyWorkspaceMode(mode).catch((error) => {
+    console.error('MediaManagarr: Unable to update toolbar behavior:', error)
   })
 }
 
@@ -108,16 +111,41 @@ export async function handleWorkspaceActionClick(windowId?: number): Promise<voi
 
     if (currentMode === 'detached') {
       await openDetachedWorkspace()
+      return
     }
+
+    if (currentMode === 'popup') {
+      return
+    }
+
+    // Firefox/Zen first-click recovery:
+    //
+    // Firefox only dispatches action.onClicked when the action
+    // does not have a popup configured.
+    //
+    // If this handler runs before preferences have loaded, the
+    // browser's toolbar configuration already tells us that
+    // this is a non-popup workspace.
+    //
+    // Prioritize the native Firefox sidebar and invoke it
+    // immediately, without awaiting storage. This preserves
+    // the user gesture needed by Firefox's sidebar API.
+    if (typeof getFirefoxSidebar()?.open === 'function') {
+      await toggleWorkspaceSidebar(windowId)
+      return
+    }
+
+    console.warn('MediaManagarr: Workspace preference has not finished initializing.')
   } catch (error) {
     console.error('MediaManagarr: Unable to open preferred workspace:', error)
   }
 }
 
-export async function initializeWorkspace(): Promise<void> {
+export function initializeWorkspace(): Promise<void> {
   if (!initialized) {
     initialized = true
 
+    // Register synchronously, before the first storage read.
     chrome.action.onClicked.addListener((tab) => {
       void handleWorkspaceActionClick(tab.windowId)
     })
@@ -125,5 +153,11 @@ export async function initializeWorkspace(): Promise<void> {
     chrome.storage.onChanged.addListener(handleWorkspaceStorageChange)
   }
 
-  await refreshWorkspacePreference()
+  if (!initializationPromise) {
+    initializationPromise = refreshWorkspacePreference().finally(() => {
+      initializationPromise = null
+    })
+  }
+
+  return initializationPromise
 }
