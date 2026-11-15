@@ -119,6 +119,20 @@ npm run test:e2e:chromium
 
 Chromium E2E results do not establish Firefox compatibility. Firefox-specific behavior requires manual verification.
 
+### Local demo services
+
+Run a local API simulator to exercise the installed extension with synthetic service data:
+
+```bash
+npm run demo:services
+```
+
+Keep the terminal running, then configure the extension with the localhost URLs and demo API key listed in the [demo services instructions](tools/demo-services/README.md).
+
+The simulator provides sample Jellyfin arrivals, Seerr requests, Sonarr and Radarr calendar entries, and qBittorrent transfer information. Torrent start, stop, and removal actions change simulated records only; no real media files or torrents are transferred or deleted.
+
+It runs separately from the extension and can be used for manual testing in Firefox and Chromium, including store review. It requires no Playwright or Docker. It does not verify compatibility with real service installations, and poster images are not provided.
+
 ### Code quality
 
 Run the full project verification workflow:
@@ -150,6 +164,7 @@ See [Contributing](CONTRIBUTING.md) for individual commands and pull-request gui
 | `npm run build:firefox`     | Build the Firefox extension                |
 | `npm run storybook`         | Start Storybook                            |
 | `npm run build-storybook`   | Build static Storybook documentation       |
+| `npm run demo:services`     | Start the local service API simulator      |
 | `npm run check`             | Run the project verification workflow      |
 
 Run `npm run check` before submitting a pull request.
