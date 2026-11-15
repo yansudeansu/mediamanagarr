@@ -86,6 +86,7 @@ async function attemptConnection(serviceId: ServiceId, config: ServiceConfig): P
         ...request.headers,
       },
       signal: controller.signal,
+      redirect: 'error',
     })
 
     if (!response.ok) {

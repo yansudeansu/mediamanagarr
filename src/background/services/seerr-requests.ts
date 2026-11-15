@@ -162,6 +162,7 @@ async function seerrFetch(config: ServiceConfig, path: string): Promise<unknown>
         Accept: 'application/json',
       },
       signal: controller.signal,
+      redirect: 'error',
     })
 
     if (!response.ok) {
