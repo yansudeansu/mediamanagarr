@@ -8,15 +8,20 @@ import {
 describe('workspace-sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv('VITE_BROWSER_TARGET', 'chrome')
     vi.stubGlobal('browser', undefined)
     vi.stubGlobal('chrome', undefined)
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   describe('Firefox and Zen', () => {
+    beforeEach(() => {
+      vi.stubEnv('VITE_BROWSER_TARGET', 'firefox')
+    })
     it('opens the native sidebar using sidebarAction', async () => {
       const open = vi.fn().mockResolvedValue(undefined)
 
@@ -327,6 +332,54 @@ describe('workspace-sidebar', () => {
 
       expect(getCurrent).not.toHaveBeenCalled()
       expect(open).toHaveBeenCalledWith({ windowId: 42 })
+    })
+  })
+
+  describe('Firefox target without native sidebar support', () => {
+    beforeEach(() => {
+      vi.stubEnv('VITE_BROWSER_TARGET', 'firefox')
+    })
+
+    it('rejects opening without touching the Chromium fallback', async () => {
+      const chromiumAccess = vi.fn(() => {
+        throw new Error('The Firefox target must not access chrome.sidePanel.')
+      })
+      const getCurrent = vi.fn()
+
+      vi.stubGlobal('chrome', {
+        get sidePanel() {
+          return chromiumAccess()
+        },
+        windows: { getCurrent },
+      })
+
+      await expect(openWorkspaceSidebar(42)).rejects.toThrow(
+        'Native sidebar support is unavailable in this browser.',
+      )
+      await expect(toggleWorkspaceSidebar(42)).rejects.toThrow(
+        'Native sidebar support is unavailable in this browser.',
+      )
+
+      expect(chromiumAccess).not.toHaveBeenCalled()
+      expect(getCurrent).not.toHaveBeenCalled()
+    })
+
+    it('rejects closing without touching the Chromium fallback', async () => {
+      const chromiumAccess = vi.fn(() => {
+        throw new Error('The Firefox target must not access chrome.sidePanel.')
+      })
+
+      vi.stubGlobal('chrome', {
+        get sidePanel() {
+          return chromiumAccess()
+        },
+      })
+
+      await expect(closeWorkspaceSidebar()).rejects.toThrow(
+        'Closing the sidebar programmatically is unavailable in this browser.',
+      )
+
+      expect(chromiumAccess).not.toHaveBeenCalled()
     })
   })
 
