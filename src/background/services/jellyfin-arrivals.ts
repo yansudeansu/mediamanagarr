@@ -141,6 +141,7 @@ export async function fetchJellyfinArrivals(
         method: 'GET',
         headers: createHeaders(config.apiKey),
         signal: controller.signal,
+        redirect: 'error',
       },
     )
 

@@ -37,6 +37,7 @@ export async function fetchJellyfinImage(
           Authorization: `MediaBrowser Client="MediaManagarr", Device="Browser Extension", DeviceId="mediamanagarr", Version="0.1.0", Token="${config.apiKey}"`,
         },
         signal: controller.signal,
+        redirect: 'error',
       },
     )
 

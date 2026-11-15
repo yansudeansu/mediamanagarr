@@ -50,6 +50,7 @@ async function apiFetch(
       },
       cache: 'no-store',
       signal: controller.signal,
+      redirect: 'error',
     })
 
     if (!response.ok) {

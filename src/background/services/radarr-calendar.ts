@@ -176,6 +176,7 @@ export async function fetchRadarrCalendar(
           'X-Api-Key': config.apiKey,
         },
         signal: controller.signal,
+        redirect: 'error',
       },
     )
 

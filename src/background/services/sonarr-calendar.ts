@@ -174,6 +174,7 @@ export async function fetchSonarrCalendar(
           'X-Api-Key': config.apiKey,
         },
         signal: controller.signal,
+        redirect: 'error',
       },
     )
 

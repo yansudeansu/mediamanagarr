@@ -21,6 +21,7 @@ export async function fetchJellyfinUsers(config: ServiceConfig): Promise<Jellyfi
         Authorization: `MediaBrowser Client="MediaManagarr", Device="Browser Extension", DeviceId="mediamanagarr", Version="0.1.0", Token="${config.apiKey}"`,
       },
       signal: controller.signal,
+      redirect: 'error',
     })
 
     if (!response.ok) {
